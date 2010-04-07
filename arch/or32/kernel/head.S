@@ -1,0 +1,2473 @@
+/*
+ *  linux/arch/or32/kernel/head.S
+ *
+ *  or32 version
+ *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ *
+ *  For more information about OpenRISC processors, licensing and
+ *  design services you may contact Beyond Semiconductor at
+ *  sales@bsemi.com or visit website http://www.bsemi.com.
+ *
+ *  changes:
+ *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
+ *    initial port to or32 architecture
+ *  06. 12. 2003: Matjaz Breskvar (phoenix@bsemi.com)
+ *    major changes in handling exceptions
+ *    physical addresses used only by code in head.S
+ *    cleand exception handlers and moved them to entry.S
+ */
+
+#include <linux/linkage.h>
+#include <linux/threads.h>
+#include <linux/errno.h>
+#include <asm/processor.h>
+#include <asm/page.h>
+#include <asm/mmu.h>
+#include <asm/pgtable.h>
+#include <asm/cache.h>
+#include <asm/or32_asm.h>
+#include <asm/spr_defs.h>
+#include <asm/board.h>
+#include <asm/asm-offsets.h>
+	
+/* some defines to ease or32 assembly programming */	
+#include "or32_funcs.S"
+
+#define DRAM_END (PAGE_OFFSET+CONFIG_OR32_MEMORY_SIZE)
+	
+#if defined(CONFIG_OR32_ICACHE_ENABLED) && defined(CONFIG_OR32_DCACHE_ENABLED)
+#  define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_SM)
+#elif defined(CONFIG_OR32_ICACHE_ENABLED) && !defined(CONFIG_OR32_DCACHE_ENABLED)
+#  define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME |              SPR_SR_ICE | SPR_SR_SM)
+#elif defined(CONFIG_OR32_DCACHE_ENABLED) && !defined(CONFIG_OR32_ICACHE_ENABLED)
+#  define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE              | SPR_SR_SM)
+#else
+#  define EXCEPTION_SR	(SPR_SR_DME | SPR_SR_IME | SPR_SR_SM)
+#endif
+
+#undef  CONFIG_DMMU_WORKS
+#define CONFIG_DMMU_WORKS 1
+#undef  CONFIG_IMMU_WORKS
+#define CONFIG_IMMU_WORKS 1
+
+	
+#undef	CONFIG_OR32_EXCEPTION_REGENERATE
+//#define	CONFIG_OR32_EXCEPTION_REGENERATE 1
+#undef	CONFIG_OR32_EXCEPTION_DEBUG
+//#define	CONFIG_OR32_EXCEPTION_DEBUG 1
+
+#undef	DEBUG_TLB_EXCEPTIONS
+//#define	DEBUG_TLB_EXCEPTIONS 1
+ 					
+/* ============================================[ tmp store locations ]=== */
+
+/*
+ * workaround for passing next open ethernet tx buffer descriptor number
+ * when used prior linux. for details look into drivers/net/open_eth.[ch]
+ */
+#define INIT_OETH_TX_NEXT		0x0
+
+/*
+ * inital configuration
+ */
+#define INIT_IC_ADDR			0x4
+#define INIT_DC_ADDR			0x8
+
+#define SF_DISABLED(reg,ADDR)		l.lwz	reg,ADDR(r0)	;\
+					l.sfeqi	reg,0x0	
+		
+#ifdef CONFIG_OR32_ICACHE_ENABLED	
+#  define INIT_CONFIG_ICACHE(reg)	l.ori	reg,r0,1	;\
+					l.sw	INIT_IC_ADDR(r0),reg	
+#else
+#  define INIT_CONFIG_ICACHE(reg)	l.ori	reg,r0,0	;\
+					l.sw	INIT_IC_ADDR(r0),reg	
+#endif
+
+#ifdef CONFIG_OR32_DCACHE_ENABLED	
+#  define INIT_CONFIG_DCACHE(reg)	l.ori	reg,r0,1	;\
+					l.sw	INIT_DC_ADDR(r0),reg	
+#else
+#  define INIT_CONFIG_DCACHE(reg)	l.ori	reg,r0,0	;\
+					l.sw	INIT_DC_ADDR(r0),reg	
+#endif
+				
+/* 
+ * emergency_print temporary stores 
+ */
+#define EMERGENCY_PRINT_STORE_GPR4	l.sw    0x20(r0),r4
+#define EMERGENCY_PRINT_LOAD_GPR4	l.lwz   r4,0x20(r0)
+
+#define EMERGENCY_PRINT_STORE_GPR5	l.sw    0x24(r0),r5
+#define EMERGENCY_PRINT_LOAD_GPR5	l.lwz   r5,0x24(r0)
+	
+#define EMERGENCY_PRINT_STORE_GPR6	l.sw    0x28(r0),r6
+#define EMERGENCY_PRINT_LOAD_GPR6	l.lwz   r6,0x28(r0)
+	
+#define EMERGENCY_PRINT_STORE_GPR7	l.sw    0x2c(r0),r7
+#define EMERGENCY_PRINT_LOAD_GPR7	l.lwz   r7,0x2c(r0)
+
+#define EMERGENCY_PRINT_STORE_GPR8	l.sw    0x30(r0),r8
+#define EMERGENCY_PRINT_LOAD_GPR8	l.lwz   r8,0x30(r0)
+
+#define EMERGENCY_PRINT_STORE_GPR9	l.sw    0x34(r0),r9
+#define EMERGENCY_PRINT_LOAD_GPR9	l.lwz   r9,0x34(r0)
+
+/* 
+ * EXCEPTION_DEBUG temporary stores
+ */
+#define EXCEPTION_DEBUG_STORE_GPR3	l.sw    0x40(r0),r3
+#define EXCEPTION_DEBUG_LOAD_GPR3	l.lwz   r3,0x40(r0)
+	
+#define EXCEPTION_DEBUG_STORE_GPR4	l.sw    0x44(r0),r4
+#define EXCEPTION_DEBUG_LOAD_GPR4	l.lwz   r4,0x44(r0)
+	
+#define EXCEPTION_DEBUG_STORE_GPR9	l.sw    0x48(r0),r9
+#define EXCEPTION_DEBUG_LOAD_GPR9	l.lwz   r9,0x48(r0)
+
+#define EXCEPTION_DEBUG_STORE_F_GPR9	l.sw    0x4c(r0),r9
+#define EXCEPTION_DEBUG_LOAD_F_GPR9	l.lwz   r9,0x4c(r0)
+	
+/* 
+ * EXCEPTION_REGENERATE temporary stores
+ */
+#define E_REGEN_STORE_STATUS(reg)	l.sw    0x50(r0),reg
+#define E_REGEN_LOAD_STATUS(reg)	l.lwz   reg,0x50(r0)
+
+#define E_REGEN_STORE_GPR3		l.sw    0x54(r0),r3
+#define E_REGEN_LOAD_GPR3		l.lwz   r3,0x54(r0)
+
+#define E_REGEN_STORE_GPR4		l.sw    0x58(r0),r4
+#define E_REGEN_LOAD_GPR4		l.lwz   r4,0x58(r0)
+
+#define E_REGEN_STORE_GPR5		l.sw    0x5c(r0),r5
+#define E_REGEN_LOAD_GPR5		l.lwz   r5,0x5c(r0)
+
+#define E_REGEN_STORE_GPR6		l.sw    0x60(r0),r6
+#define E_REGEN_LOAD_GPR6		l.lwz   r6,0x60(r0)
+
+#define E_REGEN_STORE_GPR9		l.sw    0x14(r0),r9
+#define E_REGEN_LOAD_GPR9		l.lwz   r9,0x14(r0)
+	
+				
+/* 
+ * TLB miss handlers temorary stores 
+ */
+#define EXCEPTION_STORE_GPR9		l.sw    0x10(r0),r9
+#define EXCEPTION_LOAD_GPR9		l.lwz   r9,0x10(r0)
+	
+#define EXCEPTION_STORE_GPR2		l.sw    0x64(r0),r2
+#define EXCEPTION_LOAD_GPR2		l.lwz   r2,0x64(r0)
+	
+#define EXCEPTION_STORE_GPR3		l.sw    0x68(r0),r3
+#define EXCEPTION_LOAD_GPR3		l.lwz   r3,0x68(r0)
+	
+#define EXCEPTION_STORE_GPR4		l.sw    0x6c(r0),r4
+#define EXCEPTION_LOAD_GPR4		l.lwz   r4,0x6c(r0)
+	
+#define EXCEPTION_STORE_GPR5		l.sw    0x70(r0),r5
+#define EXCEPTION_LOAD_GPR5		l.lwz   r5,0x70(r0)
+	
+#define EXCEPTION_STORE_GPR6		l.sw    0x74(r0),r6
+#define EXCEPTION_LOAD_GPR6		l.lwz   r6,0x74(r0)
+	
+			
+/* 
+ * EXCEPTION_HANDLE temporary stores 
+ */	
+#define EXCEPTION_T_STORE_GPR31		l.sw    0x78(r0),r31
+#define EXCEPTION_T_LOAD_GPR31(reg)	l.lwz   reg,0x78(r0)
+
+#define EXCEPTION_T_STORE_GPR10		l.sw    0x7c(r0),r10
+#define EXCEPTION_T_LOAD_GPR10(reg)	l.lwz   reg,0x7c(r0)
+
+#define EXCEPTION_T_STORE_SP		l.sw	0x80(r0),r1
+#define EXCEPTION_T_LOAD_SP(reg)	l.lwz   reg,0x80(r0)
+
+/* 
+ * UNHANDLED_EXCEPTION temporary stores 
+ */
+#define UNH_EXCEPTION_T_STORE_GPR31	l.sw    0x84(r0),r31
+#define UNH_EXCEPTION_T_LOAD_GPR31(reg)	l.lwz   reg,0x84(r0)
+
+#define UNH_EXCEPTION_T_STORE_GPR2	l.sw    0x88(r0),r2
+#define UNH_EXCEPTION_T_LOAD_GPR2(reg)	l.lwz   reg,0x88(r0)
+
+#define UNH_EXCEPTION_T_STORE_SP	l.sw	0x8c(r0),r1
+#define UNH_EXCEPTION_T_LOAD_SP(reg)	l.lwz   reg,0x8c(r0)	
+
+/* =========================================================[ macros ]=== */
+
+
+#define LOAD_CURRENT_THREAD_INFO(reg,t1)			\
+	LOAD_SYMBOL_2_GPR(reg,_current_thread_info_set)		;\
+	tophys  (t1,reg)					;\
+	l.lwz   reg,0(t1)
+
+#define GET_CURRENT_THREAD_INFO(reg,ksp)			\
+	l.srli	reg,ksp,PAGE_SHIFT				;\
+	l.slli	reg,reg,PAGE_SHIFT
+
+#define GET_CURRENT_PGD(reg,t1)					\
+	LOAD_SYMBOL_2_GPR(reg,_current_pgd)			;\
+	tophys  (t1,reg)					;\
+	l.lwz   reg,0(t1)
+
+#if defined(CONFIG_OR32_EXCEPTION_DEBUG) && defined(CONFIG_OR32_EXCEPTION_REGENERATE)
+#  define EXCEPTION_DEBUG					\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	_exception_debug 				;\
+	  l.mfspr	r4,r0,SPR_PC				;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+
+#  define EXCEPTION_DEBUG_VALUE(value)				\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	_exception_debug				;\
+	  l.addi	r4,r0,value				;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+
+#  define EXCEPTION_DEBUG_ER					\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	_exception_debug				;\
+	  l.mfspr	r4,r0,SPR_PC				;\
+	  l.jal	_exception_regenerate				;\
+	  l.nop							;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+
+#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	_exception_debug				;\
+	  l.addi	r4,r0,value				;\
+	  l.jal	_exception_regenerate				;\
+	  l.nop							;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+#elif !defined(CONFIG_OR32_EXCEPTION_DEBUG) && defined(CONFIG_OR32_EXCEPTION_REGENERATE)
+#  define EXCEPTION_DEBUG
+#  define EXCEPTION_DEBUG_VALUE(value)
+
+#  define EXCEPTION_DEBUG_ER					\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	   _exception_regenerate			;\
+	  l.nop							;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+
+#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+   	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	   _exception_regenerate			;\
+	  l.nop							;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+#elif defined(CONFIG_OR32_EXCEPTION_DEBUG) && !defined(CONFIG_OR32_EXCEPTION_REGENERATE)
+#  define EXCEPTION_DEBUG					\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	   _exception_debug 				;\
+	  l.mfspr  r4,r0,SPR_PC					;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+#  define EXCEPTION_DEBUG_VALUE(value)				\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	   _exception_debug				;\
+	  l.addi   r4,r0,value					;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+#  define EXCEPTION_DEBUG_ER					\
+	  EXCEPTION_DEBUG
+#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
+	  EXCEPTION_DEBUG_VALUE(value)
+#else
+#  define EXCEPTION_DEBUG
+#  define EXCEPTION_DEBUG_VALUE(value)
+#  define EXCEPTION_DEBUG_ER
+#  define EXCEPTION_DEBUG_VALUE_ER(value)	
+#endif
+
+#  define EXCEPTION_DEBUG_VALUE_ER_ENABLED(value)		\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	_exception_debug				;\
+	  l.addi	r4,r0,value				;\
+	  l.jal	_exception_regenerate				;\
+	  l.nop							;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9
+
+#  define EXCEPTION_DEBUG_VALUE_ENABLED(value)			\
+	  EXCEPTION_DEBUG_STORE_GPR4				;\
+	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
+	  l.jal	   _exception_debug				;\
+	  l.addi   r4,r0,value					;\
+	  EXCEPTION_DEBUG_LOAD_GPR4				;\
+	  EXCEPTION_DEBUG_LOAD_F_GPR9	
+
+#ifdef DEBUG_TLB_EXCEPTIONS
+#  define DEBUG_TLB_PROBE(value)				\
+	  EXCEPTION_DEBUG_VALUE_ENABLED(value)
+#else
+#  define DEBUG_TLB_PROBE(value)	
+#endif	
+		
+		
+/*
+ * DSCR: this is a common hook for handling exceptions. it will save
+ *       the needed registers, set up stack and pointer to current
+ *	 then jump to the handler while enabling MMU 	
+ *
+ * PRMS: handler	- a function to jump to. it has to save the
+ *			remaining registers to kernel stack, call
+ *			appropriate arch-independant exception handler
+ *			and finaly jump to ret_from_except
+ *
+ * PREQ: unchanged state from the time exception happened
+ *
+ * POST: SAVED the following registers original value 
+ *	       to the new created exception frame pointed to by r1
+ *
+ *	 r1  - ksp	pointing to the new (exception) frame
+ *	 r4  - EEAR     exception EA
+ *	 r10 - current	pointing to current_thread_info struct
+ *	 r12 - syscall  0, since we didn't come from syscall
+ *	 r13 - temp	it actually contains new SR, not needed anymore
+ *	 r31 - handler	address of the handler we'll jump to
+ *
+ *	 handler has to save remaining registers to the exception
+ *	 ksp frame *before* tainting them!
+ *
+ * NOTE: this function is not reentrant per se. reentrancy is guaranteed
+ *       by processor disabling all exceptions/interrupts when exception
+ *	 accours.
+ *
+ * OPTM: no need to make it so wasteful to extract ksp when in user mode
+ */
+#define EXCEPTION_HANDLE(handler)				\
+	EXCEPTION_DEBUG						;\
+	EXCEPTION_T_STORE_GPR31					;\
+	EXCEPTION_T_STORE_GPR10					;\
+	EXCEPTION_T_STORE_SP					;\
+	l.mfspr r31,r0,SPR_ESR_BASE				;\
+	l.andi  r31,r31,SPR_SR_SM				;\
+	l.sfeqi r31,0						;\
+	l.bnf   2f /* kernel_mode */				;\
+	l.nop							;\
+1: /* user_mode:   */						;\
+	LOAD_SYMBOL_2_GPR(r1,_current_thread_info_set)		;\
+	tophys  (r31,r1)					;\
+	/* r10: current_thread_info  */				;\
+	l.lwz   r10,0(r31)					;\
+	tophys  (r31,r10)					;\
+	l.lwz   r1,(TI_KSP)(r31)				;\
+	/* fall through */					;\
+2: /* kernel_mode: */						;\
+	/* create new stack frame, save only needed gprs */	;\
+	/* r1: KSP, r10: current, r4: EEAR, r31: __pa(KSP) */	;\
+	/* r12:	temp, syscall indicator, r13 temp */		;\
+	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
+	/* r1 is KSP, r31 is __pa(KSP) */			;\
+	tophys  (r31,r1)					;\
+        l.sw    GPR12(r31),r12					;\
+	l.mfspr r12,r0,SPR_EPCR_BASE				;\
+        l.sw    PC(r31),r12					;\
+        l.mfspr r12,r0,SPR_ESR_BASE				;\
+        l.sw    SR(r31),r12					;\
+	/* save r31 */						;\
+	EXCEPTION_T_LOAD_GPR31(r12)				;\
+	l.sw	GPR31(r31),r12					;\
+	/* save r10 as was prior to exception */		;\
+	EXCEPTION_T_LOAD_GPR10(r12)				;\
+	l.sw	GPR10(r31),r12					;\
+	/* save SP as was prior to exception */			;\
+	EXCEPTION_T_LOAD_SP(r12)				;\
+	l.sw	SP(r31),r12					;\
+        l.sw    GPR13(r31),r13					;\
+	/* save exception r4, set r4 = EA */			;\
+	l.sw	GPR4(r31),r4					;\
+	l.mfspr r4,r0,SPR_EEAR_BASE				;\
+	/* r12 == 1 if we come from syscall */			;\
+	CLEAR_GPR(r12)						;\
+	/* ----- turn on MMU ----- */				;\
+	l.ori	r31,r0,(EXCEPTION_SR)				;\
+	l.mtspr	r0,r31,SPR_ESR_BASE				;\
+	/* r31:	EA address of handler */			;\
+	LOAD_SYMBOL_2_GPR(r31,handler)				;\
+	l.mtspr r0,r31,SPR_EPCR_BASE				;\
+	l.rfe
+
+/*
+ * this doesn't work
+ *
+ *	
+ * #ifdef CONFIG_JUMP_UPON_UNHANDLED_EXCEPTION
+ * #define UNHANDLED_EXCEPTION(handler)				\ 
+ *	l.ori   r3,r0,0x1					;\
+ *	l.mtspr r0,r3,SPR_SR					;\
+ *      l.movhi r3,hi(0xf0000100)				;\
+ *      l.ori   r3,r3,lo(0xf0000100)				;\
+ *	l.jr	r3						;\
+ *	l.nop	1
+ *
+ * #endif
+ */ 	
+
+/* DSCR: this is the same as EXCEPTION_HANDLE(), we are just
+ *       a bit more carefull (if we have a SP or current pointer	 
+ *       corruption) and set them up from 'current_set'
+ *
+ */
+#define UNHANDLED_EXCEPTION(handler)				\
+	EXCEPTION_DEBUG						;\
+	EXCEPTION_T_STORE_GPR31					;\
+	EXCEPTION_T_STORE_GPR10					;\
+	EXCEPTION_T_STORE_SP					;\
+	/* temporary store r3, r9 into r1, r10 */		;\
+	l.addi	r1,r3,0x0					;\
+	l.addi	r10,r9,0x0					;\
+	/* the string referenced by r3 must be low enough */	;\
+	l.jal	_emergency_print				;\
+	l.ori	r3,r0,lo(_string_unhandled_exception)		;\
+	l.mfspr	r3,r0,SPR_PC					;\
+	l.jal	_emergency_print_nr				;\
+	l.andi	r3,r3,0x1f00					;\
+	/* the string referenced by r3 must be low enough */	;\
+	l.jal	_emergency_print				;\
+	l.ori	r3,r0,lo(_string_epc_prefix)			;\
+	l.jal	_emergency_print_nr				;\
+	l.mfspr	r3,r0,SPR_EPCR_BASE				;\
+	l.jal	_emergency_print				;\
+	l.ori	r3,r0,lo(_string_nl)				;\
+	/* end of printing */					;\
+	l.addi	r3,r1,0x0					;\
+	l.addi	r9,r10,0x0					;\
+	/* extract current, ksp from current_set */		;\
+	LOAD_SYMBOL_2_GPR(r1,_unhandled_stack_top)		;\
+	LOAD_SYMBOL_2_GPR(r10,_init_thread_union)		;\
+	/* create new stack frame, save only needed gprs */	;\
+	/* r1: KSP, r10: current, r31: __pa(KSP) */		;\
+	/* r12:	temp, syscall indicator, r13 temp */		;\
+	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
+	/* r1 is KSP, r31 is __pa(KSP) */			;\
+	tophys  (r31,r1)					;\
+        l.sw    GPR12(r31),r12					;\
+	l.mfspr r12,r0,SPR_EPCR_BASE				;\
+        l.sw    PC(r31),r12					;\
+        l.mfspr r12,r0,SPR_ESR_BASE				;\
+        l.sw    SR(r31),r12					;\
+	/* save r31 */						;\
+	EXCEPTION_T_LOAD_GPR31(r12)				;\
+	l.sw	GPR31(r31),r12					;\
+	/* save r10 as was prior to exception */		;\
+	EXCEPTION_T_LOAD_GPR10(r12)				;\
+	l.sw	GPR10(r31),r12					;\
+	/* save SP as was prior to exception */			;\
+	EXCEPTION_T_LOAD_SP(r12)				;\
+	l.sw	SP(r31),r12					;\
+        l.sw    GPR13(r31),r13					;\
+	/* --> */						;\
+	/* save exception r4, set r4 = EA */			;\
+	l.sw	GPR4(r31),r4					;\
+	l.mfspr r4,r0,SPR_EEAR_BASE				;\
+	/* r12 == 1 if we come from syscall */			;\
+	CLEAR_GPR(r12)						;\
+	/* ----- play a MMU trick ----- */			;\
+	l.ori	r31,r0,(EXCEPTION_SR)				;\
+	l.mtspr	r0,r31,SPR_ESR_BASE				;\
+	/* r31:	EA address of handler */			;\
+	LOAD_SYMBOL_2_GPR(r31,handler)				;\
+	l.mtspr r0,r31,SPR_EPCR_BASE				;\
+	l.rfe
+	
+/* =====================================================[ exceptions] === */
+
+/* ---[ 0x100: RESET exception ]----------------------------------------- */
+    .org 0x100
+
+	l.ori	r3,r0,0x1
+	l.mtspr	r0,r3,SPR_SR
+
+#ifdef CONFIG_OR32_FLASH_BOOT
+	LOAD_SYMBOL_2_GPR(r3,0xf0000118)	// jumps to the 'reset_start'
+	l.jr	r3
+	l.nop
+		
+reset_start:
+#if   CONFIG_OR32_MC_VERSION==1 && defined CONFIG_OR32_MC_INIT
+	l.jal	_mc_init_1
+	l.nop
+#elif CONFIG_OR32_MC_VERSION==2 && defined CONFIG_OR32_MC_INIT
+	l.jal	_mc_init_2
+	l.nop
+#elif !defined CONFIG_OR32_MC_INIT
+	l.nop
+	l.nop
+#else
+#  error "no configuration for given memory controler type"
+#endif
+	
+	l.jal	_early_uart_init
+	l.nop
+	
+	LOAD_SYMBOL_2_GPR(r4,_string_copying_linux)
+	l.movhi	r3,hi(0x30000000)
+	l.add	r3,r3,r4
+	l.jal	_emergency_print
+	l.nop
+		
+	/*
+	 * copy linux kernel image from flash to sdram
+	 */
+	LOAD_SYMBOL_2_GPR(r3,0xf0000000)	// source
+	LOAD_SYMBOL_2_GPR(r4,0x0)		// destination
+	LOAD_SYMBOL_2_GPR(r6,__end)		// last destination
+	tophys	(r5,r6)				// last destination
+
+	/*
+	 * copy %r3 to %r4 until %r4 == %r5 
+	 */
+2:
+        l.sfgeu r4,r5
+        l.bf    1f
+        l.nop
+        l.lwz   r8,0(r3)
+        l.sw    0(r4),r8
+        l.addi  r3,r3,4
+        l.j     2b
+        l.addi  r4,r4,4
+1:
+
+#else /* CONFIG_OR32_FLASH_BOOT */
+#if   CONFIG_OR32_MC_VERSION==1 && defined CONFIG_OR32_MC_INIT
+	l.jal	_mc_init_1
+	l.nop
+#elif CONFIG_OR32_MC_VERSION==2 && defined CONFIG_OR32_MC_INIT
+	l.jal	_mc_init_2
+	l.nop
+#elif !defined CONFIG_OR32_MC_INIT
+	l.nop
+	l.nop
+#else
+#  error "no configuration for given memory controler type"
+#endif
+
+	l.jal	_early_uart_init
+	l.nop
+
+#endif /* CONFIG_OR32_FLASH_BOOT */
+#if 1
+	LOAD_SYMBOL_2_GPR(r4,_string_ok_booting)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+#endif	
+	LOAD_SYMBOL_2_GPR(r4, _start)
+	tophys	(r3,r4)				// physical address
+	l.jr	r3
+	l.nop
+
+/* ---[ 0x200: BUS exception ]------------------------------------------- */
+    .org 0x200
+_dispatch_bus_fault:
+	UNHANDLED_EXCEPTION(_vector_0x200)
+
+/* ---[ 0x300: Data Page Fault exception ]------------------------------- */
+    .org 0x300
+_dispatch_do_dpage_fault:
+//      totaly disable timer interrupt
+// 	l.mtspr	r0,r0,SPR_TTMR
+//	DEBUG_TLB_PROBE(0x300)
+//	EXCEPTION_DEBUG_VALUE_ER_ENABLED(0x300)
+	EXCEPTION_HANDLE(_data_page_fault_handler)
+	
+/* ---[ 0x400: Insn Page Fault exception ]------------------------------- */
+    .org 0x400
+_dispatch_do_ipage_fault:
+//      totaly disable timer interrupt
+//	l.mtspr	r0,r0,SPR_TTMR
+//	DEBUG_TLB_PROBE(0x400)
+//	EXCEPTION_DEBUG_VALUE_ER_ENABLED(0x400)	
+	EXCEPTION_HANDLE(_insn_page_fault_handler)
+
+/* ---[ 0x500: Timer exception ]----------------------------------------- */
+    .org 0x500
+	EXCEPTION_HANDLE(_timer_handler)
+
+/* ---[ 0x600: Aligment exception ]-------------------------------------- */
+    .org 0x600
+	UNHANDLED_EXCEPTION(_vector_0x600)
+//	EXCEPTION_HANDLE(_aligment_handler)
+	
+/* ---[ 0x700: Illegal insn exception ]---------------------------------- */
+    .org 0x700
+	UNHANDLED_EXCEPTION(_vector_0x700)
+
+/* ---[ 0x800: External interrupt exception ]---------------------------- */
+    .org 0x800
+	EXCEPTION_HANDLE(_external_irq_handler)
+
+/* ---[ 0x900: DTLB miss exception ]------------------------------------- */
+    .org 0x900
+	l.j	boot_dtlb_miss_handler
+	l.nop
+	
+/* ---[ 0xa00: ITLB miss exception ]------------------------------------- */
+    .org 0xa00
+	l.j	boot_itlb_miss_handler
+	l.nop
+		
+/* ---[ 0xb00: Range exception ]----------------------------------------- */
+    .org 0xb00
+	UNHANDLED_EXCEPTION(_vector_0xb00)
+
+/* ---[ 0xc00: Syscall exception ]--------------------------------------- */
+    .org 0xc00
+	EXCEPTION_HANDLE(_sys_call_handler)
+
+/* ---[ 0xd00: Trap exception ]------------------------------------------ */
+    .org 0xd00
+	UNHANDLED_EXCEPTION(_vector_0xd00)
+
+/* ---[ 0xe00: Trap exception ]------------------------------------------ */
+    .org 0xe00
+	UNHANDLED_EXCEPTION(_vector_0xe00)
+
+/* ---[ 0xf00: Reserved exception ]-------------------------------------- */
+    .org 0xf00
+	UNHANDLED_EXCEPTION(_vector_0xf00)
+
+/* ---[ 0x1000: Reserved exception ]------------------------------------- */
+    .org 0x1000
+	UNHANDLED_EXCEPTION(_vector_0x1000)
+
+/* ---[ 0x1100: Reserved exception ]------------------------------------- */
+    .org 0x1100
+	UNHANDLED_EXCEPTION(_vector_0x1100)
+
+/* ---[ 0x1200: Reserved exception ]------------------------------------- */
+    .org 0x1200
+	UNHANDLED_EXCEPTION(_vector_0x1200)
+
+/* ---[ 0x1300: Reserved exception ]------------------------------------- */
+    .org 0x1300
+	UNHANDLED_EXCEPTION(_vector_0x1300)
+
+/* ---[ 0x1400: Reserved exception ]------------------------------------- */
+    .org 0x1400
+	UNHANDLED_EXCEPTION(_vector_0x1400)
+
+/* ---[ 0x1500: Reserved exception ]------------------------------------- */
+    .org 0x1500
+	UNHANDLED_EXCEPTION(_vector_0x1500)
+
+/* ---[ 0x1600: Reserved exception ]------------------------------------- */
+    .org 0x1600
+	UNHANDLED_EXCEPTION(_vector_0x1600)
+
+/* ---[ 0x1700: Reserved exception ]------------------------------------- */
+    .org 0x1700
+	UNHANDLED_EXCEPTION(_vector_0x1700)
+
+/* ---[ 0x1800: Reserved exception ]------------------------------------- */
+    .org 0x1800
+	UNHANDLED_EXCEPTION(_vector_0x1800)
+
+/* ---[ 0x1900: Reserved exception ]------------------------------------- */
+    .org 0x1900
+	UNHANDLED_EXCEPTION(_vector_0x1900)
+
+/* ---[ 0x1a00: Reserved exception ]------------------------------------- */
+    .org 0x1a00
+	UNHANDLED_EXCEPTION(_vector_0x1a00)
+
+/* ---[ 0x1b00: Reserved exception ]------------------------------------- */
+    .org 0x1b00
+	UNHANDLED_EXCEPTION(_vector_0x1b00)
+
+/* ---[ 0x1c00: Reserved exception ]------------------------------------- */
+    .org 0x1c00
+	UNHANDLED_EXCEPTION(_vector_0x1c00)
+
+/* ---[ 0x1d00: Reserved exception ]------------------------------------- */
+    .org 0x1d00
+	UNHANDLED_EXCEPTION(_vector_0x1d00)
+
+/* ---[ 0x1e00: Reserved exception ]------------------------------------- */
+    .org 0x1e00
+	UNHANDLED_EXCEPTION(_vector_0x1e00)
+
+/* ---[ 0x1f00: Reserved exception ]------------------------------------- */
+    .org 0x1f00
+	UNHANDLED_EXCEPTION(_vector_0x1f00)
+
+    .org 0x2000
+/* ===================================================[ kernel start ]=== */
+	
+    .text
+    .global _stext
+_stext:
+
+    .global _start
+_start:
+	/*
+	 * ensure a deterministic start
+	 */
+	
+	l.ori	r3,r0,0x1
+	l.mtspr	r0,r3,SPR_SR
+
+	CLEAR_GPR(r1)
+	CLEAR_GPR(r2)
+	CLEAR_GPR(r3)
+	CLEAR_GPR(r4)
+	CLEAR_GPR(r5)
+	CLEAR_GPR(r6)
+	CLEAR_GPR(r7)
+	CLEAR_GPR(r8)
+	CLEAR_GPR(r9)
+	CLEAR_GPR(r10)
+	CLEAR_GPR(r11)
+	CLEAR_GPR(r12)
+	CLEAR_GPR(r13)
+	CLEAR_GPR(r14)
+	CLEAR_GPR(r15)
+	CLEAR_GPR(r16)
+	CLEAR_GPR(r17)
+	CLEAR_GPR(r18)
+	CLEAR_GPR(r19)
+	CLEAR_GPR(r20)
+	CLEAR_GPR(r21)
+	CLEAR_GPR(r22)
+	CLEAR_GPR(r23)
+	CLEAR_GPR(r24)
+	CLEAR_GPR(r25)
+	CLEAR_GPR(r26)
+	CLEAR_GPR(r27)
+	CLEAR_GPR(r28)
+	CLEAR_GPR(r29)
+	CLEAR_GPR(r30)
+	CLEAR_GPR(r31)
+	
+	/*
+	 * set up initial ksp and current
+	 */
+	LOAD_SYMBOL_2_GPR(r1,_init_thread_union+0x2000)	// setup kernel stack
+	LOAD_SYMBOL_2_GPR(r10,_init_thread_union)	// setup current
+	tophys	(r31,r10)
+	l.sw	TI_KSP(r31), r1
+
+write_config:		
+	INIT_CONFIG_ICACHE(r3)	
+	INIT_CONFIG_DCACHE(r3)
+
+	l.ori	r4,r0,0x0
+	E_REGEN_STORE_STATUS(r4)			// 
+
+			
+	/* 
+	 * .data contains initialized data, 
+	 * .bss contains uninitialized data - clear it up 
+	 */
+clear_bss:
+	LOAD_SYMBOL_2_GPR(r24, ___bss_start)
+	LOAD_SYMBOL_2_GPR(r26, __end)
+	tophys(r28,r24)
+	tophys(r30,r26)
+	CLEAR_GPR(r24)
+	CLEAR_GPR(r26)
+1:
+	l.sw    (0)(r28),r0
+	l.sfltu r28,r30
+	l.bf    1b
+	l.addi  r28,r28,4
+
+enable_ic:
+	l.jal	_ic_enable
+	l.nop	
+
+
+enable_dc:
+	l.jal	_dc_enable
+ 	l.nop
+
+flush_tlb:
+	/*
+	 *  I N V A L I D A T E   T L B   e n t r i e s
+	 */	
+	LOAD_SYMBOL_2_GPR(r5,SPR_DTLBMR_BASE(0))
+	LOAD_SYMBOL_2_GPR(r6,SPR_ITLBMR_BASE(0))
+	l.addi	r7,r0,64
+1:		
+	l.mtspr	r5,r0,0x0
+	l.mtspr	r6,r0,0x0
+
+	l.addi	r5,r5,1
+	l.addi	r6,r6,1
+	l.sfeq	r7,r0
+	l.bnf	1b
+	l.addi	r7,r7,-1
+
+enable_mmu:
+	/* 
+	 * enable dmmu & immu
+	 * SR[5] = 0, SR[6] = 0, 6th and 7th bit of SR set to 0 
+	 */
+	SR_ENABLE_BITS((SPR_SR_DME | SPR_SR_IME),r28,r30)
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+
+	// reset the simulation counters
+	l.nop 5
+
+
+hw_breakpoint:
+#if 0
+	/* set effective address */
+	LOAD_SYMBOL_2_GPR(r3,SPR_DVR(0))
+	LOAD_SYMBOL_2_GPR(r4,_start_kernel)
+	l.mtspr	r3,r4,0x0
+
+	/* control register: present, equal to, instruction fetch EA */
+	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
+	LOAD_SYMBOL_2_GPR(r4,0x23)
+	l.mtspr	r3,r4,0x0	
+
+	/* control register: present, equal to, store/load EA */
+//	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
+//	LOAD_SYMBOL_2_GPR(r4,0xc3)
+//	l.mtspr	r3,r4,0x0	
+
+	/* ext watchpoint | watchpoint 0 */
+       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
+	LOAD_SYMBOL_2_GPR(r4,0x2)
+	l.mtspr	r3,r4,0x0
+
+	/* watchpoint 0 triggers trap instruction, enable counter 0 */
+       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR2)
+	LOAD_SYMBOL_2_GPR(r4,0x1001)
+	l.mtspr	r3,r4,0x0
+#endif
+
+#if 0
+	// this will not work due to trap handler jumping
+	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
+	LOAD_SYMBOL_2_GPR(r4,0x800000)
+	l.mtspr	r3,r4,0x0
+#endif
+
+#if 0
+	/* set effective address */
+	LOAD_SYMBOL_2_GPR(r3,SPR_DVR(0))
+	LOAD_SYMBOL_2_GPR(r4,0x100)
+	l.mtspr	r3,r4,0x0
+
+	/* control register: present, not equal to, store/load EA */
+	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
+	LOAD_SYMBOL_2_GPR(r4,0xcd)
+	l.mtspr	r3,r4,0x0	
+
+	/* ext watchpoint | watchpoint 0 */
+       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
+	LOAD_SYMBOL_2_GPR(r4,0x2)
+	l.mtspr	r3,r4,0x0
+
+	/* watchpoint 0 triggers trap instruction, enable counter 0 */
+       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR2)
+	LOAD_SYMBOL_2_GPR(r4,0x1001)
+	l.mtspr	r3,r4,0x0
+#endif
+	
+clear_regs:		
+	/* 
+	 * clear all GPRS to increase determinism 
+	 */
+	CLEAR_GPR(r2)
+	CLEAR_GPR(r3)
+	CLEAR_GPR(r4)
+	CLEAR_GPR(r5)
+	CLEAR_GPR(r6)
+	CLEAR_GPR(r7)
+	CLEAR_GPR(r8)
+	CLEAR_GPR(r9)
+	CLEAR_GPR(r11)
+	CLEAR_GPR(r12)
+	CLEAR_GPR(r13)
+	CLEAR_GPR(r14)
+	CLEAR_GPR(r15)
+	CLEAR_GPR(r16)
+	CLEAR_GPR(r17)
+	CLEAR_GPR(r18)
+	CLEAR_GPR(r19)
+	CLEAR_GPR(r20)
+	CLEAR_GPR(r21)
+	CLEAR_GPR(r22)
+	CLEAR_GPR(r23)
+	CLEAR_GPR(r24)
+	CLEAR_GPR(r25)
+	CLEAR_GPR(r26)
+	CLEAR_GPR(r27)
+	CLEAR_GPR(r28)
+	CLEAR_GPR(r29)
+	CLEAR_GPR(r30)
+	CLEAR_GPR(r31)
+		
+jump_start_kernel:
+	/* 
+	 * jump to kernel entry (start_kernel) 
+	 */
+	LOAD_SYMBOL_2_GPR(r30, _start_kernel)
+	l.jr    r30
+	l.nop
+
+/* ========================================[ memory controler, cache ]=== */
+	
+ENTRY(_mc_init_1)
+#if   CONFIG_OR32_MC_VERSION==1 && defined CONFIG_OR32_MC_INIT
+        l.movhi r3,hi(MC_BASE_ADD)
+        l.ori   r3,r3,lo(MC_BASE_ADD)
+ 
+        l.addi  r4,r3,MC_CSC(0)
+        l.movhi r5,hi(FLASH_BASE_ADD)
+        l.srai  r5,r5,6
+        l.ori   r5,r5,0x0025
+        l.sw    0(r4),r5
+ 
+        l.addi  r4,r3,MC_TMS(0)
+        l.movhi r5,hi(FLASH_TMS_VAL)
+        l.ori   r5,r5,lo(FLASH_TMS_VAL)
+        l.sw    0(r4),r5
+ 
+        l.addi  r4,r3,MC_BA_MASK
+        l.addi  r5,r0,MC_MASK_VAL
+        l.sw    0(r4),r5
+ 
+        l.addi  r4,r3,MC_CSR
+        l.movhi r5,hi(MC_CSR_VAL)
+        l.ori   r5,r5,lo(MC_CSR_VAL)
+        l.sw    0(r4),r5
+ 
+        l.addi  r4,r3,MC_TMS(1)
+        l.movhi r5,hi(SDRAM_TMS_VAL)
+        l.ori   r5,r5,lo(SDRAM_TMS_VAL)
+        l.sw    0(r4),r5
+ 
+        l.addi  r4,r3,MC_CSC(1)
+        l.movhi r5,hi(SDRAM_BASE_ADD)
+        l.srai  r5,r5,6
+        l.ori   r5,r5,0x0411
+        l.sw    0(r4),r5
+
+#ifdef FBMEM_BASE_ADD
+        l.addi  r4,r3,MC_CSC(2)
+        l.movhi r5,hi(FBMEM_BASE_ADD)
+        l.srai  r5,r5,6
+        l.ori   r5,r5,0x0005
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_TMS(2)
+        l.movhi r5,0xffff
+        l.ori   r5,r5,0xffff
+        l.sw    0(r4),r5 
+#endif /* FBMEM_BASE_ADD */
+#endif /* CONFIG_OR32_MC_VERSION==1 && defined CONFIG_OR32_MC_INIT */
+	l.jr	r9
+	l.nop
+
+ENTRY(_mc_init_2)
+#if   CONFIG_OR32_MC_VERSION==2 && defined CONFIG_OR32_MC_INIT
+        l.movhi r3,hi(MC_BASE_ADD)
+        l.ori   r3,r3,lo(MC_BASE_ADD)
+
+        l.addi  r4,r3,MC_BAR_0
+        l.movhi r5,hi(FLASH_BAR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_AMR_0
+        l.movhi r5,hi(FLASH_AMR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_WTR_0
+        l.movhi r5,hi(FLASH_WTR_VAL)
+        l.ori   r5,r5,lo(FLASH_WTR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_RTR_0
+        l.movhi r5,hi(FLASH_RTR_VAL)
+        l.ori   r5,r5,lo(FLASH_RTR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_OSR
+        l.movhi r5,hi(0x40000000)
+        l.ori   r5,r5,lo(0x40000000)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_BAR_4
+        l.movhi r5,hi(SDRAM_BAR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_AMR_4
+        l.movhi r5,hi(SDRAM_AMR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_CCR_4
+        l.movhi r5,hi(MC_CCR_4_VAL_DISABLED)
+        l.ori   r5,r5,lo(MC_CCR_4_VAL_DISABLED)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_RATR
+        l.movhi r5,hi(SDRAM_RATR_VAL)
+        l.ori   r5,r5,lo(SDRAM_RATR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_RCDR
+        l.movhi r5,hi(SDRAM_RCDR_VAL)
+        l.ori   r5,r5,lo(SDRAM_RCDR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_RCTR
+        l.movhi r5,hi(SDRAM_RCTR_VAL)
+        l.ori   r5,r5,lo(SDRAM_RCTR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_REFCTR
+        l.movhi r5,hi(SDRAM_REFCTR_VAL)
+        l.ori   r5,r5,lo(SDRAM_REFCTR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_PTR
+        l.movhi r5,hi(SDRAM_PTR_VAL)
+        l.ori   r5,r5,lo(SDRAM_PTR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_RRDR
+        l.movhi r5,hi(SDRAM_RRDR_VAL)
+        l.ori   r5,r5,lo(SDRAM_RRDR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_WRTR
+        l.movhi r5,hi(SDRAM_WRTR_VAL)
+        l.ori   r5,r5,lo(SDRAM_WRTR_VAL)
+        l.sw    0(r4),r5
+	
+        l.addi  r4,r3,MC_RIR
+        l.movhi r5,hi(SDRAM_RIR_VAL)
+        l.ori   r5,r5,lo(SDRAM_RIR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_OSR
+        l.movhi r5,hi(0x5e000000)
+        l.ori   r5,r5,lo(0x5e000000)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_ORR
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_OSR
+        l.movhi r5,hi(0x6e000000)
+        l.ori   r5,r5,lo(0x6e000000)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_ORR
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_OSR
+        l.movhi r5,hi(MC_OSR_VAL)
+        l.ori   r5,r5,lo(MC_OSR_VAL)
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_ORR
+        l.sw    0(r4),r5
+
+        l.addi  r4,r3,MC_CCR_4
+        l.movhi r5,hi(MC_CCR_4_VAL_ENABLED)
+        l.ori   r5,r5,lo(MC_CCR_4_VAL_ENABLED)
+        l.sw    0(r4),r5
+#endif /* CONFIG_OR32_MC_VERSION==2 && defined CONFIG_OR32_MC_INIT */
+
+        l.jr    r9
+        l.nop
+
+	/* aligment here so we don't change memory offsets with
+	 * memory controler defined 
+	 */
+	.align 0x2000
+
+#ifdef CONFIG_OR32_CACHE_DEBUG
+ENTRY(_ic_enable)
+	SF_DISABLED(r6,INIT_IC_ADDR)
+	l.bf	9f
+	l.nop
+
+	EMERGENCY_PRINT_STORE_GPR9
+	LOAD_SYMBOL_2_GPR(r4,_string_icache_clean)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+	
+        /* Disable IC */
+        l.mfspr r6,r0,SPR_SR
+        l.addi  r5,r0,-1
+        l.xori  r5,r5,SPR_SR_ICE
+        l.and   r5,r6,r5
+        l.mtspr r0,r5,SPR_SR
+	      
+        /* Invalidate IC */
+        l.addi  r6,r0,0
+        l.addi  r5,r0,IC_SIZE
+1:
+#if 0
+	LOAD_SYMBOL_2_GPR(r4,_string_ic_invalidate)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+
+	l.jal	_emergency_print_nr
+	l.addi	r3,r6,0
+#endif
+	l.mtspr r0,r6,SPR_ICBIR
+        l.sfne  r6,r5
+	l.bf    1b
+        l.addi  r6,r6,IC_LINE
+
+	LOAD_SYMBOL_2_GPR(r4,_string_ic_enable)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+		
+        /* Enable IC */
+        l.mfspr r6,r0,SPR_SR
+        l.ori   r6,r6,SPR_SR_ICE
+        l.mtspr r0,r6,SPR_SR
+        l.nop
+        l.nop
+        l.nop
+        l.nop
+        l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	EMERGENCY_PRINT_LOAD_GPR9
+9:
+        l.jr    r9
+        l.nop
+#else
+ENTRY(_ic_enable)
+	SF_DISABLED(r6,INIT_IC_ADDR)
+	l.bf	9f
+	l.nop
+
+        /* Disable IC */
+        l.mfspr r6,r0,SPR_SR
+        l.addi  r5,r0,-1
+        l.xori  r5,r5,SPR_SR_ICE
+        l.and   r5,r6,r5
+        l.mtspr r0,r5,SPR_SR
+	      
+        /* Invalidate IC */
+        l.addi  r6,r0,0
+        l.addi  r5,r0,IC_SIZE
+1:
+	l.mtspr r0,r6,SPR_ICBIR
+        l.sfne  r6,r5
+	l.bf    1b
+        l.addi  r6,r6,IC_LINE
+
+        /* Enable IC */
+        l.mfspr r6,r0,SPR_SR
+        l.ori   r6,r6,SPR_SR_ICE
+        l.mtspr r0,r6,SPR_SR
+        l.nop
+        l.nop
+        l.nop
+        l.nop
+        l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+	l.nop
+9:
+        l.jr    r9
+        l.nop
+#endif	
+
+#ifdef CONFIG_OR32_CACHE_DEBUG	
+ENTRY(_dc_enable)
+	SF_DISABLED(r6,INIT_DC_ADDR)
+	l.bf	9f
+	l.nop
+
+	EMERGENCY_PRINT_STORE_GPR9
+	LOAD_SYMBOL_2_GPR(r4,_string_dcache_clean)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop	
+	
+	/* Disable DC */
+	l.mfspr r6,r0,SPR_SR
+	l.addi  r5,r0,-1
+	l.xori  r5,r5,SPR_SR_DCE
+	l.and   r5,r6,r5
+	l.mtspr r0,r5,SPR_SR
+
+	/* Flush DC */
+	l.addi  r6,r0,0
+	l.addi  r5,r0,DC_SIZE
+1:
+#ifdef CONFIG_OR32_CACHE_DEBUG
+	LOAD_SYMBOL_2_GPR(r4,_string_dc_invalidate)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+	
+	l.jal	_emergency_print_nr
+	l.addi	r3,r6,0
+#endif
+	
+	l.mtspr r0,r6,SPR_DCBIR
+	l.sfne  r6,r5
+	l.bf    1b
+	l.addi  r6,r6,DC_LINE
+
+	LOAD_SYMBOL_2_GPR(r4,_string_dc_enable)
+	tophys	(r3,r4)
+	l.jal	_emergency_print
+	l.nop
+	
+	/* Enable DC */
+	l.mfspr r6,r0,SPR_SR
+	l.ori   r6,r6,SPR_SR_DCE
+	l.mtspr r0,r6,SPR_SR
+	EMERGENCY_PRINT_LOAD_GPR9
+9:
+	l.jr    r9
+	l.nop
+#else
+ENTRY(_dc_enable)
+	SF_DISABLED(r6,INIT_DC_ADDR)
+	l.bf	9f
+	l.nop
+
+	/* Disable DC */
+	l.mfspr r6,r0,SPR_SR
+	l.addi  r5,r0,-1
+	l.xori  r5,r5,SPR_SR_DCE
+	l.and   r5,r6,r5
+	l.mtspr r0,r5,SPR_SR
+
+	/* Flush DC */
+	l.addi  r6,r0,0
+	l.addi  r5,r0,DC_SIZE
+1:
+	l.mtspr r0,r6,SPR_DCBIR
+	l.sfne  r6,r5
+	l.bf    1b
+	l.addi  r6,r6,DC_LINE
+
+	/* Enable DC */
+	l.mfspr r6,r0,SPR_SR
+	l.ori   r6,r6,SPR_SR_DCE
+	l.mtspr r0,r6,SPR_SR
+9:
+	l.jr    r9
+	l.nop
+#endif
+	
+/* ===============================================[ page table masks ]=== */
+
+/* bit 4 is used in hardware as write back cache bit. we never use this bit 
+ * explicitly, so we can reuse it as _PAGE_FILE bit and mask it out when
+ * writing into hardware pte's
+ */
+	
+#define DTLB_UP_CONVERT_MASK  0x3fa
+#define ITLB_UP_CONVERT_MASK  0x3a
+
+/* for SMP we'd have (this is a bit subtle, CC must be always set
+ * for SMP, but since we have _PAGE_PRESENT bit always defined
+ * we can just modify the mask)
+ */
+#define DTLB_SMP_CONVERT_MASK  0x3fb
+#define ITLB_SMP_CONVERT_MASK  0x3b
+
+/* ==============================================[ DTLB miss handler ]=== */
+		
+	.global _dtlb_miss_handler
+_dtlb_miss_handler:
+	EXCEPTION_DEBUG_VALUE_ER(0x900)
+
+	EXCEPTION_STORE_GPR2
+	EXCEPTION_STORE_GPR3
+	EXCEPTION_STORE_GPR4
+	EXCEPTION_STORE_GPR5
+	/* 
+	 * get EA of the miss
+	 */
+	l.mfspr	r2,r0,SPR_EEAR_BASE
+	/*
+	 * pmd = (pmd_t *)(current_pgd + pgd_index(daddr)); 
+	 */
+	GET_CURRENT_PGD(r3,r5)		// r3 is current_pgd, r5 is temp
+	l.srli	r4,r2,0x18		// >> PAGE_SHIFT + (PAGE_SHIFT - 2)
+	l.slli	r4,r4,0x2		// to get address << 2
+	l.add	r5,r4,r3		// r4 is pgd_index(daddr)
+	/*
+         * if (pmd_none(*pmd))
+	 *   goto pmd_none:	
+	 */
+	tophys	(r4,r5)
+	l.lwz	r3,0x0(r4)		// get *pmd value
+	l.sfne	r3,r0
+	l.bnf	d_pmd_none
+	l.andi	r3,r3,0x1fff		// ~PAGE_MASK
+	/*
+         * if (pmd_bad(*pmd))
+	 *   pmd_clear(pmd)
+	 *   goto pmd_bad:	
+	 */
+//	l.sfeq	r3,r0			// check *pmd value
+//	l.bf	d_pmd_good
+	l.addi	r3,r0,0xffffe000	// PAGE_MASK
+//	l.j	d_pmd_bad
+//	l.sw	0x0(r4),r0		// clear pmd
+d_pmd_good:	
+	/*
+	 * pte = *pte_offset(pmd, daddr);
+	 */
+	l.lwz	r4,0x0(r4)		// get **pmd value
+	l.and	r4,r4,r3		// & PAGE_MASK
+	l.srli	r5,r2,0xd		// >> PAGE_SHIFT, r2 == EEAR
+	l.andi	r3,r5,0x7ff		// (1UL << PAGE_SHIFT - 2) - 1
+	l.slli	r3,r3,0x2		// to get address << 2
+	l.add	r3,r3,r4
+	l.lwz	r2,0x0(r3)		// this is pte at last
+	/*
+	 * if (!pte_present(pte))
+	 */
+	l.andi	r4,r2,0x1
+	l.sfne	r4,r0			// is pte present
+	l.bnf	d_pte_not_present
+	l.addi	r3,r0,0xffffe3fa	// PAGE_MASK | DTLB_UP_CONVERT_MASK
+	/* 
+	 * fill DTLB TR register 
+	 */
+	l.and	r4,r2,r3		// apply the mask
+	l.andi	r5,r5,0x3f		// calc offset:	 & (NUM_TLB_ENTRIES-1), NUM_TLB_ENTRIES == 64
+	l.mtspr	r5,r4,SPR_DTLBTR_BASE(0)
+	/* 
+	 * fill DTLB MR register 
+	 */
+	l.mfspr	r2,r0,SPR_EEAR_BASE
+	l.addi	r3,r0,0xffffe000	// PAGE_MASK
+	l.and	r4,r2,r3		// apply PAGE_MASK to EA (__PHX__ do we really need this?)
+	l.ori	r4,r4,0x1		// set hardware valid bit: DTBL_MR entry
+	l.mtspr	r5,r4,SPR_DTLBMR_BASE(0)
+
+#ifndef CONFIG_DMMU_WORKS
+	l.addi	r5,r5,1
+	l.andi	r5,r5,0x3f
+	l.mtspr r5,r0,SPR_DTLBMR_BASE(0)
+	l.addi	r5,r5,-2
+	l.andi	r5,r5,0x3f
+	l.mtspr r5,r0,SPR_DTLBMR_BASE(0)	
+#endif
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	l.rfe
+d_pmd_bad:	
+	l.nop	1
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	l.rfe
+d_pmd_none:	
+d_pte_not_present:
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	// __PHX__ for debugging purposes
+	DEBUG_TLB_PROBE(0x903)
+	l.j	_dispatch_do_dpage_fault
+	l.nop
+		
+/* ==============================================[ ITLB miss handler ]=== */
+	.global _itlb_miss_handler
+_itlb_miss_handler:
+	EXCEPTION_DEBUG_VALUE_ER(0xa00)
+	
+	EXCEPTION_STORE_GPR2
+	EXCEPTION_STORE_GPR3
+	EXCEPTION_STORE_GPR4
+	EXCEPTION_STORE_GPR5
+	/* 
+	 * get EA of the miss
+	 */
+	l.mfspr	r2,r0,SPR_EEAR_BASE
+	
+#ifndef CONFIG_IMMU_WORKS
+	// check for exception in delay slot and on page boundry
+	l.andi	r3,r2,0x1fff		// PAGE_SIZE - 1
+	l.sfeqi	r3,0
+	l.bnf	1f			
+	l.nop				// we are on page boundry
+	l.mfspr	r4,r0,SPR_EPCR_BASE
+	l.sfeq	r4,r2			
+	l.bf	1f			// EPC and EEA are equal -> not in delay slot
+	l.nop
+
+	l.mfspr	r5,r0,SPR_ESR_BASE	// are we in user mode
+	l.andi	r5,r5,SPR_SR_SM
+	l.sfeqi	r5,0
+	l.bnf	2f			// kernel mode
+	l.nop
+
+	// user mode: no fixup
+	EXCEPTION_STORE_GPR9
+	l.jal	_emergency_print
+	l.ori	r3,r0,lo(_string_pbjds)	// page boundry, jump, delay slot
+	l.nop	0x1
+	l.j	1f
+	EXCEPTION_LOAD_GPR9
+
+2:	
+	EXCEPTION_STORE_GPR6
+	EXCEPTION_STORE_GPR9
+
+	// ok, we are in trouble...
+	l.jal	_immu_trampoline_workaround
+	l.nop
+
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
+	EXCEPTION_LOAD_GPR9
+	l.rfe
+
+1:	// this is not delay slot exception of the page boundry
+#endif	
+	
+	/*
+	 * pmd = (pmd_t *)(current_pgd + pgd_index(daddr)); 
+	 *
+	 */
+	GET_CURRENT_PGD(r3,r5)		// r3 is current_pgd, r5 is temp
+	l.srli	r4,r2,0x18		// >> PAGE_SHIFT + (PAGE_SHIFT - 2)
+	l.slli	r4,r4,0x2		// to get address << 2
+	l.add	r5,r4,r3		// r4 is pgd_index(daddr)
+	/*
+         * if (pmd_none(*pmd))
+	 *   goto pmd_none:	
+	 */
+	tophys	(r4,r5)
+	l.lwz	r3,0x0(r4)		// get *pmd value
+	l.sfne	r3,r0
+	l.bnf	i_pmd_none
+	l.andi	r3,r3,0x1fff		// ~PAGE_MASK
+	/*
+         * if (pmd_bad(*pmd))
+	 *   pmd_clear(pmd)
+	 *   goto pmd_bad:	
+	 */
+	
+//	l.sfeq	r3,r0			// check *pmd value
+//	l.bf	i_pmd_good
+	l.addi	r3,r0,0xffffe000	// PAGE_MASK
+//	l.j	i_pmd_bad
+//	l.sw	0x0(r4),r0		// clear pmd
+
+i_pmd_good:	
+	/*
+	 * pte = *pte_offset(pmd, iaddr);
+	 *
+	 */
+	l.lwz	r4,0x0(r4)		// get **pmd value
+	l.and	r4,r4,r3		// & PAGE_MASK
+	l.srli	r5,r2,0xd		// >> PAGE_SHIFT, r2 == EEAR
+	l.andi	r3,r5,0x7ff		// (1UL << PAGE_SHIFT - 2) - 1
+	l.slli	r3,r3,0x2		// to get address << 2
+	l.add	r3,r3,r4
+	l.lwz	r2,0x0(r3)		// this is pte at last
+	/*
+	 * if (!pte_present(pte))
+	 *
+	 */
+	l.andi	r4,r2,0x1
+	l.sfne	r4,r0			// is pte present
+	l.bnf	i_pte_not_present
+	l.addi	r3,r0,0xffffe03a	// PAGE_MASK | ITLB_UP_CONVERT_MASK
+	/* 
+	 * fill ITLB TR register 
+	 */
+	l.and	r4,r2,r3		// apply the mask
+	l.andi	r3,r2,0x7c0		// _PAGE_EXEC | _PAGE_SRE | _PAGE_SWE |  _PAGE_URE | _PAGE_UWE
+//	l.andi	r3,r2,0x400		// _PAGE_EXEC
+	l.sfeq	r3,r0
+	l.bf	itlb_tr_fill //_workaround
+	l.andi	r5,r5,0x3f		// calc offset:	 & (NUM_TLB_ENTRIES-1), NUM_TLB_ENTRIES == 64
+/*
+ * __PHX__ :: fixme
+ * we should not just blindly set executable flags, 
+ * but it does help with ping. the clean way would be to find out
+ * (and fix it) why stack doesn't have execution permissions
+ */
+	
+itlb_tr_fill_workaround:
+	l.ori	r4,r4,0xc0		// | (SPR_ITLBTR_UXE | ITLBTR_SXE)
+itlb_tr_fill:		
+	l.mtspr	r5,r4,SPR_ITLBTR_BASE(0)
+	/* 
+	 * fill DTLB MR register 
+	 */
+	l.mfspr	r2,r0,SPR_EEAR_BASE
+	l.addi	r3,r0,0xffffe000	// PAGE_MASK
+	l.and	r4,r2,r3		// apply PAGE_MASK to EA (__PHX__ do we really need this?)
+	l.ori	r4,r4,0x1		// set hardware valid bit: DTBL_MR entry
+	l.mtspr	r5,r4,SPR_ITLBMR_BASE(0)
+
+#ifndef CONFIG_IMMU_WORKS
+	l.addi	r5,r5,1
+	l.andi	r5,r5,0x3f
+	l.mtspr r5,r0,SPR_ITLBMR_BASE(0)
+	l.addi	r5,r5,-2
+	l.andi	r5,r5,0x3f
+	l.mtspr r5,r0,SPR_ITLBMR_BASE(0)
+#endif
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	l.rfe
+
+i_pmd_bad:	
+	l.nop	1
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	l.rfe
+i_pmd_none:	
+i_pte_not_present:
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	// __PHX__ for debugging purposes
+	DEBUG_TLB_PROBE(0xa04)
+	l.j	_dispatch_do_ipage_fault
+	l.nop
+			
+/* ==============================================[ boot tlb handlers ]=== */
+/* ---[ boot dtlb miss handler ]----------------------------------------- */
+
+boot_dtlb_miss_handler:		
+		
+/* mask for DTLB_MR register: - (0) sets V (valid) bit, 
+ *                            - (31-12) sets bits belonging to VPN (31-12)
+ */
+#define DTLB_MR_MASK 0xfffff001
+
+/* mask for DTLB_TR register: - (2) sets CI (cache inhibit) bit,
+ *			      - (4) sets A (access) bit, 
+ *                            - (5) sets D (dirty) bit,
+ *                            - (8) sets SRE (superuser read) bit
+ *                            - (9) sets SWE (superuser write) bit
+ *                            - (31-12) sets bits belonging to VPN (31-12)
+ */
+#define DTLB_TR_MASK 0xfffff332
+
+#define VPN_MASK 0xfffff000
+#define PPN_MASK 0xfffff000
+
+/*
+ * a % 64 = a & MOD_64_MASK
+ */
+#define MOD_64_MASK 0x3f
+
+#define MOD_64(dest,src)          \
+	l.andi  dest,src,MOD_64_MASK
+
+	EXCEPTION_DEBUG_VALUE_ER(0x9b0)
+	EXCEPTION_STORE_GPR6
+	
+	l.mfspr r6,r0,SPR_ESR_BASE	   // 
+	l.andi  r6,r6,SPR_SR_SM            // are we in kernel mode ?
+	l.sfeqi r6,0                       // r6 == 0x1 --> SM
+	l.bf    exit_with_no_dtranslation  // 
+	l.nop
+	
+	/* this could be optimized by moving storing of
+	 * non r6 registers here, and jumping r6 restore
+	 * if not in supervisor mode
+	 */
+
+	EXCEPTION_STORE_GPR2
+	EXCEPTION_STORE_GPR3
+	EXCEPTION_STORE_GPR4
+	EXCEPTION_STORE_GPR5
+
+	l.mfspr r4,r0,SPR_EEAR_BASE        // get the offending EA
+
+	/* do not do any translation if EA is above DRAM_END */
+	LOAD_SYMBOL_2_GPR(r6,DRAM_END)
+	l.sfgtu r4,r6                      // flag if EA larger than DRAM_END
+	l.bf    exit_with_no_dtranslation
+	/* delay slot */
+
+	
+immediate_translation:	
+	CLEAR_GPR(r6)	
+	
+	l.srli	r3,r4,0xd                  // r3 <- r4 / 8192 (sets are relative to page size (8Kb) NOT VPN size (4Kb)
+	l.andi  r2,r3,MOD_64_MASK          // r2 <- r3 % 64: ok this is SET
+	l.or    r6,r6,r4                   // r6 <- r4
+	l.ori   r6,r6,~(VPN_MASK)          // r6 <- VPN :VPN .xfff - clear up lo(r6) to 0x**** *fff
+	l.movhi r5,hi(DTLB_MR_MASK)        // r5 <- ffff:0000.x000
+	l.ori   r5,r5,lo(DTLB_MR_MASK)     // r5 <- ffff:1111.x001 - apply DTLB_MR_MASK
+	l.and   r5,r5,r6                   // r5 <- VPN :VPN .x001 - we have DTLBMR entry
+	l.mtspr r2,r5,SPR_DTLBMR_BASE(0)   // set DTLBMR
+
+	/* set up DTLB with no translation for EA <= 0xbfffffff */
+	LOAD_SYMBOL_2_GPR(r6,0xbfffffff)
+	l.sfgeu  r6,r4                     // flag if r6 >= r4 (if 0xbfffffff >= EA)
+	l.bf     1f                        // goto out
+	l.and    r3,r4,r4                  // delay slot :: 24 <- r4 (if flag==1)
+
+	tophys(r3,r4)                      // r3 <- PA
+1:
+	l.ori   r3,r3,~(PPN_MASK)          // r3 <- PPN :PPN .xfff - clear up lo(r6) to 0x**** *fff
+	l.movhi r5,hi(DTLB_TR_MASK)        // r5 <- ffff:0000.x000
+	l.ori   r5,r5,lo(DTLB_TR_MASK)     // r5 <- ffff:1111.x330 - apply DTLB_MR_MASK
+	l.and   r5,r5,r3                   // r5 <- PPN :PPN .x330 - we have DTLBTR entry
+	l.mtspr r2,r5,SPR_DTLBTR_BASE(0)   // set DTLBTR
+
+#ifndef CONFIG_DMMU_WORKS
+	l.addi	r2,r2,1
+	l.andi	r2,r2,0x3f
+	l.mtspr r2,r0,SPR_DTLBMR_BASE(0)
+	l.addi	r2,r2,-2
+	l.andi	r2,r2,0x3f
+	l.mtspr r2,r0,SPR_DTLBMR_BASE(0)
+#endif
+	
+	EXCEPTION_LOAD_GPR6
+	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR2
+	
+	l.rfe                              // SR <- ESR, PC <- EPC
+	
+exit_with_no_dtranslation:
+	/* EA out of memory or not in supervisor mode */
+	EXCEPTION_LOAD_GPR6
+	EXCEPTION_LOAD_GPR4
+	l.j	_dispatch_bus_fault
+
+/* ---[ boot itlb miss handler ]----------------------------------------- */
+	
+boot_itlb_miss_handler:	
+	
+/* mask for ITLB_MR register: - sets V (valid) bit, 
+ *                            - sets bits belonging to VPN (15-12)
+ */
+#define ITLB_MR_MASK 0xfffff001
+
+/* mask for ITLB_TR register: - sets A (access) bit, 
+ *                            - sets SXE (superuser execute) bit  
+ *                            - sets bits belonging to VPN (15-12)
+ */
+#define ITLB_TR_MASK 0xfffff050
+
+#define VPN_MASK 0xfffff000
+#define PPN_MASK 0xfffff000
+
+/*
+ * a % 64 = a & MOD_64_MASK
+ */
+#define MOD_64_MASK 0x3f
+
+#define MOD_64(dest,src)          \
+	l.andi  dest,src,MOD_64_MASK
+
+	EXCEPTION_DEBUG_VALUE_ER(0xab0)
+	
+	EXCEPTION_STORE_GPR2
+	EXCEPTION_STORE_GPR3
+	EXCEPTION_STORE_GPR4
+	EXCEPTION_STORE_GPR5
+	EXCEPTION_STORE_GPR6
+
+	l.mfspr r6,r0,SPR_ESR_BASE         // 
+	l.andi  r6,r6,SPR_SR_SM            // are we in kernel mode ?
+	l.sfeqi r6,0                       // r6 == 0x1 --> SM
+	l.bf    exit_with_no_itranslation
+	l.nop
+	
+#ifndef CONFIG_IMMU_WORKS
+	l.mfspr r2,r0,SPR_EEAR_BASE
+	
+	// check for exception in delay slot and on page boundry
+	l.andi	r3,r2,0x1fff		// PAGE_SIZE - 1
+	l.sfeqi	r3,0
+	l.bnf	1f			
+	l.nop				// we are on page boundry
+	l.mfspr	r4,r0,SPR_EPCR_BASE
+	l.sfeq	r4,r2			
+	l.bf	1f			// EPC and EEA are equal -> not in delay slot
+	l.nop
+
+	EXCEPTION_STORE_GPR6
+	EXCEPTION_STORE_GPR9
+	// ok, we are in trouble...
+	l.jal	_immu_trampoline_workaround
+	l.nop
+
+	EXCEPTION_LOAD_GPR2
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
+	EXCEPTION_LOAD_GPR9
+	l.rfe
+
+1:	// this is not delay slot exception of the page boundry
+#endif
+
+
+	l.mfspr r4,r0,SPR_EEAR_BASE        // get the offending EA
+
+	/* do not do any translation if EA is above DRAM_END */
+	LOAD_SYMBOL_2_GPR(r6,DRAM_END)
+	l.sfgtu  r4,r6                     // flag if EA larger than DRAM_END
+	l.bf     exit_with_no_itranslation
+	l.nop
+
+	CLEAR_GPR(r6)	
+		
+	l.srli  r3,r4,0xd                  // r3 <- r4 / 8192 (sets are relative to page size (8Kb) NOT VPN size (4Kb)
+	l.andi  r2,r3,MOD_64_MASK          // r2 <- r3 % 64: ok this is SET
+	l.or    r6,r6,r4                   // r6 <- r4
+	l.ori   r6,r6,~(VPN_MASK)          // r6 <- VPN :VPN .xfff - clear up lo(r6) to 0x**** *fff
+	l.movhi r5,hi(ITLB_MR_MASK)        // r5 <- ffff:0000.x000
+	l.ori   r5,r5,lo(ITLB_MR_MASK)     // r5 <- ffff:1111.x001 - apply ITLB_MR_MASK
+	l.and   r5,r5,r6                   // r5 <- VPN :VPN .x001 - we have ITLBMR entry
+	l.mtspr r2,r5,SPR_ITLBMR_BASE(0)   // set ITLBMR
+  
+	/* 
+	 * set up ITLB with no translation for EA <= 0x0fffffff
+	 * 
+	 * we need this for head.S mapping (EA = PA). if we move all functions
+	 * which run with mmu enabled into entry.S, we might be able to eliminate this.
+	 *
+	 */
+	LOAD_SYMBOL_2_GPR(r6,0x0fffffff)
+	l.sfgeu  r6,r4                     // flag if r6 >= r4 (if 0xb0ffffff >= EA)
+	l.bf     1f                        // goto out
+	l.and    r3,r4,r4                  // delay slot :: 24 <- r4 (if flag==1)
+	
+	tophys(r3,r4)                      // r3 <- PA
+1:
+	l.ori   r3,r3,~(PPN_MASK)          // r3 <- PPN :PPN .xfff - clear up lo(r6) to 0x**** *fff
+	l.movhi r5,hi(ITLB_TR_MASK)        // r5 <- ffff:0000.x000
+	l.ori   r5,r5,lo(ITLB_TR_MASK)     // r5 <- ffff:1111.x050 - apply ITLB_MR_MASK
+	l.and   r5,r5,r3                   // r5 <- PPN :PPN .x050 - we have ITLBTR entry
+	l.mtspr r2,r5,SPR_ITLBTR_BASE(0)   // set ITLBTR
+
+#ifndef CONFIG_IMMU_WORKS
+	l.addi	r2,r2,1
+	l.andi	r2,r2,0x3f
+	l.mtspr r2,r0,SPR_ITLBMR_BASE(0)
+	l.addi	r2,r2,-2
+	l.andi	r2,r2,0x3f
+	l.mtspr r2,r0,SPR_ITLBMR_BASE(0)
+#endif
+
+	EXCEPTION_LOAD_GPR6
+	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR3
+	EXCEPTION_LOAD_GPR2
+	
+	l.rfe                              // SR <- ESR, PC <- EPC
+
+exit_with_no_itranslation:
+	EXCEPTION_LOAD_GPR4
+	EXCEPTION_LOAD_GPR6
+	l.j    _dispatch_bus_fault
+	l.nop
+	
+/* =================================================[ debugging aids ]=== */
+
+	.align 64
+_immu_trampoline:
+	.space 64		
+_immu_trampoline_top:	
+
+#define TRAMP_SLOT_0		(0x0)
+#define TRAMP_SLOT_1		(0x4)
+#define TRAMP_SLOT_2		(0x8)
+#define TRAMP_SLOT_3		(0xc)
+#define TRAMP_SLOT_4		(0x10)
+#define TRAMP_SLOT_5		(0x14)
+#define TRAMP_FRAME_SIZE	(0x18)
+	
+ENTRY(_immu_trampoline_workaround)
+	// r2 EEA
+	// r6 is physical EEA
+	tophys(r6,r2)
+
+	LOAD_SYMBOL_2_GPR(r5,_immu_trampoline)
+	tophys	(r3,r5)			// r3 is trampoline (physical)
+	
+	LOAD_SYMBOL_2_GPR(r4,0x15000000)
+	l.sw	TRAMP_SLOT_0(r3),r4
+	l.sw	TRAMP_SLOT_1(r3),r4
+	l.sw	TRAMP_SLOT_4(r3),r4
+	l.sw	TRAMP_SLOT_5(r3),r4
+
+					// EPC = EEA - 0x4
+	l.lwz	r4,0x0(r6)		// load op @ EEA + 0x0 (fc address)
+	l.sw	TRAMP_SLOT_3(r3),r4	// store it to _immu_trampoline_data
+	l.lwz	r4,-0x4(r6)		// load op @ EEA - 0x4 (f8 address)
+	l.sw	TRAMP_SLOT_2(r3),r4	// store it to _immu_trampoline_data
+
+        l.srli  r5,r4,26                // check opcode for write access
+        l.sfeqi r5,0                    // l.j
+        l.bf    0f
+        l.sfeqi r5,0x11                 // l.jr
+        l.bf    1f
+        l.sfeqi r5,1                    // l.jal
+        l.bf    2f
+        l.sfeqi r5,0x12                 // l.jalr
+        l.bf    3f
+        l.sfeqi r5,3                    // l.bnf
+        l.bf    4f
+        l.sfeqi r5,4                    // l.bf
+        l.bf    5f
+99:	
+	l.nop
+	l.j	99b			// should never happen
+	l.nop	1
+	
+	// r2 is EEA
+	// r3 is trampoline address (physical)
+	// r4 is instruction
+	// r6 is physical(EEA)
+	//
+	// r5
+	
+2:	// l.jal
+
+	/* 19 20 aa aa	l.movhi r9,0xaaaa
+	 * a9 29 bb bb  l.ori	r9,0xbbbb
+	 *
+	 * where 0xaaaabbbb is EEA + 0x4 shifted right 2 
+	 */
+
+	l.addi	r6,r2,0x4		// this is 0xaaaabbbb
+
+					// l.movhi r9,0xaaaa
+	l.ori	r5,r0,0x1920		// 0x1920 == l.movhi r9
+	l.sh	(TRAMP_SLOT_0+0x0)(r3),r5
+	l.srli	r5,r6,16
+	l.sh	(TRAMP_SLOT_0+0x2)(r3),r5
+
+					// l.ori   r9,0xbbbb
+	l.ori	r5,r0,0xa929		// 0xa929 == l.ori r9
+	l.sh	(TRAMP_SLOT_1+0x0)(r3),r5
+	l.andi	r5,r6,0xffff
+	l.sh	(TRAMP_SLOT_1+0x2)(r3),r5
+
+	/* falthrough, need to set up new jump offset */
+	
+		
+0:	// l.j
+	l.slli	r6,r4,6			// original offset shifted left 6 - 2
+//	l.srli	r6,r6,6			// original offset shifted right 2
+
+	l.slli	r4,r2,4			// old jump position: EEA shifted left 4
+//	l.srli	r4,r4,6			// old jump position: shifted right 2
+	
+	l.addi	r5,r3,0xc		// new jump position (physical)
+	l.slli	r5,r5,4			// new jump position: shifted left 4
+	
+	// calculate new jump offset
+	// new_off = old_off + (old_jump - new_jump)
+
+	l.sub	r5,r4,r5		// old_jump - new_jump
+	l.add	r5,r6,r5		// orig_off + (old_jump - new_jump)
+	l.srli	r5,r5,6			// new offset shifted right 2
+	
+	// r5 is new jump offset
+					// l.j has opcode 0x0...
+	l.sw	TRAMP_SLOT_2(r3),r5	// write it back
+
+	l.j	trampoline_out
+	l.nop
+	
+/* ----------------------------- */
+	
+3:	// l.jalr
+
+	/* 19 20 aa aa	l.movhi r9,0xaaaa
+	 * a9 29 bb bb  l.ori	r9,0xbbbb
+	 *
+	 * where 0xaaaabbbb is EEA + 0x4 shifted right 2 
+	 */
+
+	l.addi	r6,r2,0x4		// this is 0xaaaabbbb
+
+					// l.movhi r9,0xaaaa
+	l.ori	r5,r0,0x1920		// 0x1920 == l.movhi r9
+	l.sh	(TRAMP_SLOT_0+0x0)(r3),r5
+	l.srli	r5,r6,16
+	l.sh	(TRAMP_SLOT_0+0x2)(r3),r5
+
+					// l.ori   r9,0xbbbb
+	l.ori	r5,r0,0xa929		// 0xa929 == l.ori r9
+	l.sh	(TRAMP_SLOT_1+0x0)(r3),r5
+	l.andi	r5,r6,0xffff
+	l.sh	(TRAMP_SLOT_1+0x2)(r3),r5		
+
+	l.lhz	r5,(TRAMP_SLOT_2+0x0)(r3)	// load hi part of jump instruction
+	l.andi	r5,r5,0x3ff		// clear out opcode part
+	l.ori	r5,r5,0x4400		// opcode changed from l.jalr -> l.jr
+	l.sh	(TRAMP_SLOT_2+0x0)(r3),r5 // write it back	
+
+	/* falthrough */
+	
+1:	// l.jr
+	l.j	trampoline_out
+	l.nop	
+
+/* ----------------------------- */
+		
+4:	// l.bnf	
+5:	// l.bf
+	l.slli	r6,r4,6			// original offset shifted left 6 - 2
+//	l.srli	r6,r6,6			// original offset shifted right 2
+
+	l.slli	r4,r2,4			// old jump position: EEA shifted left 4
+//	l.srli	r4,r4,6			// old jump position: shifted right 2
+	
+	l.addi	r5,r3,0xc		// new jump position (physical)
+	l.slli	r5,r5,4			// new jump position: shifted left 4
+	
+	// calculate new jump offset
+	// new_off = old_off + (old_jump - new_jump)
+
+	l.add	r6,r6,r4		// (orig_off + old_jump)
+	l.sub	r6,r6,r5		// (orig_off + old_jump) - new_jump
+	l.srli	r6,r6,6			// new offset shifted right 2
+
+	// r6 is new jump offset
+	l.lwz	r4,(TRAMP_SLOT_2+0x0)(r3)	// load jump instruction
+	l.srli	r4,r4,16
+	l.andi	r4,r4,0xfc00		// get opcode part
+	l.slli	r4,r4,16
+	l.or	r6,r4,r6		// l.b(n)f new offset
+	l.sw	TRAMP_SLOT_2(r3),r6	// write it back
+
+	/* we need to add l.j to EEA + 0x8 */
+	tophys	(r4,r2)			// may not be needed (due to shifts down_
+	l.addi	r4,r4,(0x8 - 0x8)	// jump target = r2 + 0x8 (compensate for 0x8)
+					// jump position = r5 + 0x8 (0x8 compensated)
+	l.sub	r4,r4,r5		// jump offset = target - new_position + 0x8
+
+	l.slli	r4,r4,4			// the amount of info in imediate of jump
+	l.srli	r4,r4,6			// jump instruction with offset
+	l.sw	TRAMP_SLOT_4(r3),r4	// write it to 4th slot
+
+	/* fallthrough */
+	
+trampoline_out:
+	// set up new EPC to point to our trampoline code
+	LOAD_SYMBOL_2_GPR(r5,_immu_trampoline)
+	l.mtspr	r0,r5,SPR_EPCR_BASE
+	
+	// immu_trampoline is (4x) CACHE_LINE aligned
+	// and only 6 instructions long,
+	// so we need to invalidate only 2 lines
+	l.mtspr	r0,r5,SPR_ICBIR
+	l.addi	r5,r5,IC_LINE
+	l.mtspr	r0,r5,SPR_ICBIR
+	
+	l.jr	r9
+	l.nop	
+
+/*
+ * dumping processor state without mmu
+ * (not yet finnished)
+ */
+
+ENTRY(_debug_tng)
+	l.addi	r1,r1,-16
+	l.sw	0(r1),r3
+	l.sw	4(r1),r4
+	l.mfspr	r3,r0,SPR_SR
+	l.sw	8(r1),r3
+	l.mfspr	r3,r0,SPR_PC
+	l.sw	12(r1),r3
+	
+	l.ori	r3,r0,0x8001
+	l.mtspr	r0,r3,SPR_ESR_BASE
+	LOAD_SYMBOL_2_GPR(r3,nommu_entry)
+	tophys	(r4,r3)
+	l.mtspr	r0,r4,SPR_EPCR_BASE
+
+	l.lwz	r3,0(r1)
+	l.lwz	r4,4(r1)
+	l.addi	r1,r1,8
+	l.rfe
+	
+nommu_entry:			
+	EXCEPTION_T_STORE_GPR31					
+	EXCEPTION_T_STORE_GPR10
+	EXCEPTION_T_STORE_SP					
+	/* temporary store r3, r9 into r1, r10 */
+	l.addi	r1,r3,0x0					
+	l.addi	r10,r9,0x0					
+	/* the string referenced by r3 must be low enough */	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_ed)				
+	l.mfspr	r3,r0,SPR_PC					
+	l.jal	_emergency_print_nr				
+	l.andi	r3,r3,0x1f00					
+	/* the string referenced by r3 must be low enough */	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_epc_prefix)			
+	l.jal	_emergency_print_nr				
+	l.mfspr	r3,r0,SPR_EPCR_BASE				
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_nl)				
+	/* end of printing */					
+	l.addi	r3,r1,0x0					
+	l.addi	r9,r10,0x0					
+	/* extract current, ksp from current_set */		
+	LOAD_SYMBOL_2_GPR(r1,_unhandled_stack_top)		
+	/* create new stack frame, save only needed gprs */	
+	/* r1: KSP, r10: current, r31: __pa(KSP) */		
+	/* r12:	temp, syscall indicator, r13 temp */		
+	l.addi  r1,r1,-(INT_FRAME_SIZE)				
+	/* r1 is KSP, r31 is __pa(KSP) */			
+	tophys  (r31,r1)					
+        l.sw    GPR12(r31),r12					
+	l.mfspr r12,r0,SPR_EPCR_BASE				
+        l.sw    PC(r31),r12					
+        l.mfspr r12,r0,SPR_ESR_BASE				
+        l.sw    SR(r31),r12					
+	/* save r31 */						
+	EXCEPTION_T_LOAD_GPR31(r12)				
+	l.sw	GPR31(r31),r12					
+	/* save r10 as was prior to exception */			
+	EXCEPTION_T_LOAD_GPR10(r12)				
+	l.sw	GPR10(r31),r12					
+	/* save SP as was prior to exception */			
+	EXCEPTION_T_LOAD_SP(r12)				
+	l.sw	SP(r31),r12					
+        l.sw    GPR13(r31),r13					
+	/* --> */						
+	/* save exception r4, set r4 = EA */			
+	l.sw	GPR4(r31),r4					
+	l.mfspr r4,r0,SPR_EEAR_BASE				
+	/* r31 is __pa(r1), r1 <- r31 */			
+	l.addi	r1,r31,0x0					
+        /* r1, r10, EPCR, ESR a	already saved */		
+	l.sw    GPR2(r1),r2					
+	l.sw    GPR3(r1),r3					
+        l.sw    ORIG_GPR3(r1),r3				
+        l.sw    GPR5(r1),r5					
+        l.sw    GPR6(r1),r6					
+        l.sw    GPR7(r1),r7					
+        l.sw    GPR8(r1),r8					
+        l.sw    GPR9(r1),r9					
+	/* r10 already saved */				
+        l.sw    GPR11(r1),r11					
+	/* r12,r13 already saved */				
+        l.sw    GPR14(r1),r14					
+        l.sw    GPR15(r1),r15					
+        l.sw    GPR16(r1),r16					
+        l.sw    GPR17(r1),r17					
+        l.sw    GPR18(r1),r18					
+        l.sw    GPR19(r1),r19					
+        l.sw    GPR20(r1),r20					
+        l.sw    GPR21(r1),r21					
+        l.sw    GPR22(r1),r22					
+        l.sw    GPR23(r1),r23					
+        l.sw    GPR24(r1),r24					
+        l.sw    GPR25(r1),r25					
+        l.sw    GPR26(r1),r26					
+        l.sw    GPR27(r1),r27					
+        l.sw    GPR28(r1),r28					
+        l.sw    GPR29(r1),r29					
+        l.sw    GPR30(r1),r30					
+	/* r31 already saved */					
+        l.sw    RESULT(r1),r0					
+	l.addi	r3,r1,0						
+	/* r4 is exception EA */				
+	l.addi	r5,r0,0xdead					
+	l.jal	_nommu_dump_state						
+	l.nop		
+	
+	
+/* ========================================[ standard debugging aids ]=== */
+		
+// this HAS to be atomic. also disable interrupts beetwen to entries
+// may use gpr4
+ENTRY(_exception_regenerate)
+	E_REGEN_LOAD_STATUS(r4)		// were we in this exception yet
+	l.sfeqi	r4,0x0
+	l.bnf	1f
+	l.nop
+
+0:					// first entry into this exception
+					// patch the ESR, reenter exception
+	
+	l.mfspr r4,r0,SPR_ESR_BASE	// get original ESR
+	E_REGEN_STORE_STATUS(r4)	// save original ESR
+	
+	SPR_DISABLE_LO_BITS(SPR_ESR_BASE,
+		(SPR_SR_ICE | SPR_SR_DCE | SPR_SR_IEE | SPR_SR_TEE),r4)
+	SPR_DISABLE_LO_BITS(SPR_SR,      
+		(SPR_SR_ICE | SPR_SR_DCE | SPR_SR_IEE | SPR_SR_TEE),r4)
+	
+	EXCEPTION_DEBUG_LOAD_GPR4
+	EXCEPTION_DEBUG_LOAD_F_GPR9
+		
+	l.rfe				// this will regenerate exception
+	
+1:					// second entry into this exception
+					// patch ESR, invalidate the caches
+	
+	// we already loaded previous ESR into r4
+	l.mtspr r0,r4,SPR_ESR_BASE
+	
+	l.ori	r4,r0,0x0		// next time is fresh entry
+	E_REGEN_STORE_STATUS(r4)	// prepare for next exception
+	
+	E_REGEN_STORE_GPR3
+	E_REGEN_STORE_GPR4
+	E_REGEN_STORE_GPR5
+	E_REGEN_STORE_GPR6
+	E_REGEN_STORE_GPR9
+	l.jal	_dc_enable
+	l.nop
+	l.jal	_ic_enable
+	l.nop
+	E_REGEN_LOAD_GPR3
+	E_REGEN_LOAD_GPR4
+	E_REGEN_LOAD_GPR5
+	E_REGEN_LOAD_GPR6	
+	E_REGEN_LOAD_GPR9
+
+	l.jr	r9
+	l.nop
+		
+ENTRY(_exception_debug)
+	EXCEPTION_DEBUG_STORE_GPR3
+	EXCEPTION_DEBUG_STORE_GPR9
+
+	// disable tick timer
+	l.mfspr	r3,r0,SPR_TTMR
+	LOAD_SYMBOL_2_GPR(r9,~(0x30000003))
+	l.and	r3,r3,r9
+	l.mtspr	r0,r3,SPR_TTMR
+	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_debug_exception)		
+	l.jal	_emergency_print_nr				
+	l.andi	r3,r4,0x1ff0					
+	/* the string referenced by r3 must be low enough */	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_epc_prefix)			
+	
+	l.jal	_emergency_print_nr				
+	l.mfspr	r3,r0,SPR_EPCR_BASE				
+	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_debug_esr_prefix)		
+	
+	l.jal	_emergency_print_nr				
+	l.mfspr	r3,r0,SPR_ESR_BASE
+	
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_debug_eear_prefix)		
+
+	l.jal	_emergency_print_nr				
+	l.mfspr	r3,r0,SPR_EEAR_BASE
+
+	l.jal	_emergency_print				
+	l.ori	r3,r0,lo(_string_nl)
+	
+	// enable tick timer
+	l.mfspr	r3,r0,SPR_TTMR
+	LOAD_SYMBOL_2_GPR(r9,0x20000001)
+	l.or	r3,r3,r9
+	l.mtspr	r0,r3,SPR_TTMR
+				
+	EXCEPTION_DEBUG_LOAD_GPR3				
+	EXCEPTION_DEBUG_LOAD_GPR9				
+	l.jr	r9		
+	l.nop
+		
+/*
+ * DSCR: prints a string referenced by r3.
+ *
+ * PRMS: r3     	- address of the first character of null
+ *			terminated string to be printed
+ *
+ * PREQ: UART at UART_BASE_ADD has to be initialized
+ *
+ * POST: caller should be aware that r3, r9 are changed
+ */
+ENTRY(_emergency_print)
+	EMERGENCY_PRINT_STORE_GPR4
+	EMERGENCY_PRINT_STORE_GPR5
+	EMERGENCY_PRINT_STORE_GPR6
+	EMERGENCY_PRINT_STORE_GPR7
+2:	
+	l.lbz	r7,0(r3)
+	l.sfeq	r7,r0
+	l.bf	9f
+	l.nop
+
+// putc:
+        l.movhi r4,hi(UART_BASE_ADD)
+
+        l.addi  r6,r0,0x20
+1:      l.lbz   r5,5(r4)
+        l.andi  r5,r5,0x20
+        l.sfeq  r5,r6
+        l.bnf   1b
+        l.nop
+      
+        l.sb    0(r4),r7
+
+        l.addi  r6,r0,0x60
+1:      l.lbz   r5,5(r4)
+        l.andi  r5,r5,0x60
+        l.sfeq  r5,r6
+        l.bnf   1b
+        l.nop
+
+	/* next character */
+	l.j	2b
+	l.addi	r3,r3,0x1
+
+9:
+	EMERGENCY_PRINT_LOAD_GPR7
+	EMERGENCY_PRINT_LOAD_GPR6
+	EMERGENCY_PRINT_LOAD_GPR5
+	EMERGENCY_PRINT_LOAD_GPR4	
+	l.jr	r9
+	l.nop
+
+ENTRY(_emergency_print_nr)
+	EMERGENCY_PRINT_STORE_GPR4
+	EMERGENCY_PRINT_STORE_GPR5
+	EMERGENCY_PRINT_STORE_GPR6
+	EMERGENCY_PRINT_STORE_GPR7
+	EMERGENCY_PRINT_STORE_GPR8
+
+	l.addi	r8,r0,32		// shift register
+
+1:	/* remove leading zeros */
+	l.addi	r8,r8,-0x4
+	l.srl	r7,r3,r8	
+	l.andi	r7,r7,0xf
+
+	/* don't skip the last zero if number == 0x0 */
+	l.sfeqi	r8,0x4
+	l.bf	2f
+	l.nop
+	
+	l.sfeq	r7,r0
+	l.bf	1b
+	l.nop
+	
+2:
+	l.srl	r7,r3,r8
+	
+	l.andi	r7,r7,0xf		
+	l.sflts	r8,r0
+	l.bf	9f
+	
+	l.sfgtui r7,0x9
+	l.bnf	8f
+	l.nop
+	l.addi	r7,r7,0x27
+	
+8:	
+	l.addi	r7,r7,0x30
+// putc:
+        l.movhi r4,hi(UART_BASE_ADD)
+
+        l.addi  r6,r0,0x20
+1:      l.lbz   r5,5(r4)
+        l.andi  r5,r5,0x20
+        l.sfeq  r5,r6
+        l.bnf   1b
+        l.nop
+      
+        l.sb    0(r4),r7
+
+        l.addi  r6,r0,0x60
+1:      l.lbz   r5,5(r4)
+        l.andi  r5,r5,0x60
+        l.sfeq  r5,r6
+        l.bnf   1b
+        l.nop
+
+	/* next character */
+	l.j	2b
+	l.addi	r8,r8,-0x4
+
+9:
+	EMERGENCY_PRINT_LOAD_GPR8
+	EMERGENCY_PRINT_LOAD_GPR7
+	EMERGENCY_PRINT_LOAD_GPR6
+	EMERGENCY_PRINT_LOAD_GPR5
+	EMERGENCY_PRINT_LOAD_GPR4	
+	l.jr	r9
+	l.nop	
+			
+
+ENTRY(_early_uart_init)
+        l.movhi	r3,hi(UART_BASE_ADD)
+
+        l.addi	r4,r0,0x7
+        l.sb	0x2(r3),r4        
+
+        l.addi	r4,r0,0x0
+        l.sb	0x1(r3),r4
+
+        l.addi	r4,r0,0x3
+        l.sb	0x3(r3),r4
+
+        l.lbz	r5,3(r3)
+        l.ori	r4,r5,0x80
+        l.sb	0x3(r3),r4
+	l.addi	r4,r0,((UART_DEVISOR>>8) & 0x000000ff)
+        l.sb	UART_DLM(r3),r4
+        l.addi  r4,r0,((UART_DEVISOR) & 0x000000ff)
+        l.sb	UART_DLL(r3),r4
+        l.sb	0x3(r3),r5
+  
+        l.jr	r9
+        l.nop
+
+_string_copying_linux:
+	.string "\n\n\n\n\n\rCopying Linux... \0"
+
+_string_ok_booting:
+	.string "Ok, booting the kernel.\n\r\0"
+
+_string_unhandled_exception:	
+	.string "\n\rRunarunaround: Unhandled exception 0x\0"
+
+_string_epc_prefix:
+	.string ": EPC=0x\0"
+
+_string_nl:
+	.string "\n\r\0"
+
+_string_debug_exception:	
+	.string "\n\r\tDebug: exception 0x\0"
+
+_string_debug_esr_prefix:
+	.string ", ESR=0x\0"
+	
+_string_debug_eear_prefix:
+	.string ", EEAR=0x\0"
+		
+_string_dcache_clean:	
+	.string "dcache cleaning\n\r\0"
+	
+_string_icache_clean:	
+	.string "icache cleaning\n\r\0"
+
+_string_ic_invalidate:	
+	.string "\n\r\tic invalidate:  \0"
+
+_string_ic_enable:	
+	.string "\n\ricache enabling\n\r\0"
+
+_string_dc_invalidate:	
+	.string "\n\r\tdc invalidate:  \0"
+
+_string_dc_enable:	
+	.string "\n\rdcache enabling\n\r\0"
+
+_string_pbjds:
+	.string "[jd]"
+
+_string_ed:
+	.string "\n\r[debug] "
+
+	.global	_string_esr_irq_bug		
+_string_esr_irq_bug:
+	.string "\n\rESR external interrupt bug, for details look into entry.S\n\r\0"
+
+	
+		
+/* ========================================[ page aligned structures ]=== */
+			
+/*
+ * .data section should be page aligned 
+ *	(look into arch/or32/kernel/vmlinux.lds)
+ */
+        .data
+	.global  _sdata
+_sdata:
+	.align	8192
+        .global  _empty_zero_page
+_empty_zero_page:
+        .space  8192
+				    
+        .global  _swapper_pg_dir
+_swapper_pg_dir:
+        .space  8192
+
+	.global	_unhandled_stack
+_unhandled_stack:
+	.space	8192
+_unhandled_stack_top:
+		
+/* ============================================================[ EOF ]=== */

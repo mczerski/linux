@@ -60,7 +60,7 @@ void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
 
 /* We show everything that is MORE important than this.. */
 #define MINIMUM_CONSOLE_LOGLEVEL 1 /* Minimum loglevel we let people use */
-#define DEFAULT_CONSOLE_LOGLEVEL 7 /* anything MORE serious than KERN_DEBUG */
+#define DEFAULT_CONSOLE_LOGLEVEL 1 /* anything MORE serious than KERN_DEBUG */
 
 DECLARE_WAIT_QUEUE_HEAD(log_wait);
 

@@ -957,6 +957,32 @@ config FB_EPSON1355
 	  framebuffer.  Product specs at
 	  <http://www.erd.epson.com/vdc/html/products.htm>.
 
+config FB_OC
+	bool "OpenCores VGA/LCD core 2.0 framebuffer support"
+	depends on OR32
+	default n
+	---help---
+	  Frame buffer driver for the OpenCores VGA/LCD core.
+
+	  If unsure, say N.
+
+config FB_OC_SHMEM
+	bool "Framebuffer is in main memory"
+	default y
+	depends on OR32
+	---help---
+	  If VGA/LCD core has dedicated framebuffer memory answer N
+
+	  If unsure, say Y.
+
+config FB_OC_SHMEM_SIZE
+        hex "Frame buffer memory size [hex, bytes]"
+        depends on FB_OC_SHMEM
+        default 00100000 if FB_OC_SHMEM
+        ---help---
+          Specify the size of frame buffer for OpenCores VGA/LCD core.
+
+
 config FB_S1D13XXX
 	tristate "Epson S1D13XXX framebuffer support"
 	depends on FB

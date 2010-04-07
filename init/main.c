@@ -540,7 +540,7 @@ asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
 	extern struct kernel_param __start___param[], __stop___param[];
-
+	console_loglevel = 10;
 	smp_setup_processor_id();
 
 	/*
@@ -560,6 +560,17 @@ asmlinkage void __init start_kernel(void)
 	local_irq_disable();
 	early_boot_irqs_off();
 	early_init_irq_lock_class();
+
+	/*
+	 * HACK ALERT! This is early. We're enabling the console before
+	 * we've done PCI setups etc, and console_init() must be aware of
+	 * this. But we do want output early, in case something goes wrong.
+	 */
+	console_init();
+	if (panic_later)
+		panic(panic_later, panic_param);
+
+
 
 /*
  * Interrupts are still disabled. Do necessary setups, then
@@ -633,14 +644,7 @@ asmlinkage void __init start_kernel(void)
 
 	kmem_cache_init_late();
 
-	/*
-	 * HACK ALERT! This is early. We're enabling the console before
-	 * we've done PCI setups etc, and console_init() must be aware of
-	 * this. But we do want output early, in case something goes wrong.
-	 */
-	console_init();
-	if (panic_later)
-		panic(panic_later, panic_param);
+	/* Console init used to be here */
 
 	lockdep_info();
 
@@ -703,6 +707,9 @@ asmlinkage void __init start_kernel(void)
 
 	acpi_early_init(); /* before LAPIC and SMP init */
 	sfi_init_late();
+	
+#define NOP_EXIT        0x0001      /* End of simulation */
+	//asm("l.nop %0": :"K" (NOP_EXIT));
 
 	ftrace_init();
 
@@ -854,6 +861,7 @@ static noinline int init_post(void)
 		printk(KERN_WARNING "Failed to execute %s.  Attempting "
 					"defaults...\n", execute_command);
 	}
+	/*run_init_process("/bin/hello");*/
 	run_init_process("/sbin/init");
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");

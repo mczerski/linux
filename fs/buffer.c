@@ -4,6 +4,7 @@
  *  Copyright (C) 1991, 1992, 2002  Linus Torvalds
  */
 
+
 /*
  * Start bdflush() with kernel_thread not syscall - Paul Gortmaker, 12/95
  *
@@ -1841,6 +1842,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 	int err = 0;
 	unsigned blocksize, bbits;
 	struct buffer_head *bh, *head, *wait[2], **wait_bh=wait;
+
 
 	BUG_ON(!PageLocked(page));
 	BUG_ON(from > PAGE_CACHE_SIZE);

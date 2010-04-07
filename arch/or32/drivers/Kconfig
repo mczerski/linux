@@ -1,0 +1,17 @@
+# OpenRISC specific drivers
+#
+
+config OETH
+	bool "OpenCores Ethernet support"
+	default y
+
+config OETH_UNKNOWN_TX_NEXT
+	bool "Pass tx->next to linux"
+	depends on OETH
+	default y
+	help
+	  OpenCores Ethernet core does not have support to reset
+	  next buffer descriptor to initial value, so bootloader must
+	  pass the next buffer descriptor number if it used ethernet core.
+
+	  In most cases Y should be a safe choice.

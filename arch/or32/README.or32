@@ -1,0 +1,31 @@
+This is a port of Linux to OpenRISC 1000 family of microprocessors. 
+
+For more information about OpenRISC processors, licensing and design
+services you may contact Beyond Semiconductor at 
+
+	email:		sales@bsemi.com
+
+	website:	http://www.bsemi.com
+
+Changes:
+18. 11. 2003	Matjaz Breskvar (phoenix@bsemi.com)
+	initial port of linux to OpenRISC/or32 architecture. 
+        all the core stuff is implemented and seams usable.
+
+08. 12. 2003	Matjaz Breskvar (phoenix@bsemi.com)
+	complete change of TLB miss handling.
+	rewrite of exceptions handling.
+	fully functional sash-3.6 in default initrd.
+	a much improved version with changes all around.
+
+10. 04. 2004	Matjaz Breskvar (phoenix@bsemi.com)
+	alot of bugfixes all over.
+	ethernet support, functional http and telnet servers.
+	running many standard linux apps.
+
+26. 06. 2004	Matjaz Breskvar (phoenix@bsemi.com)
+	port to 2.6.x
+
+30. 11. 2004	Matjaz Breskvar (phoenix@bsemi.com)
+	lots of bugfixes and enhancments.
+	added opencores framebuffer driver.

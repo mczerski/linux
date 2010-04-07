@@ -1,0 +1,306 @@
+#
+# For a description of the syntax of this configuration file,
+# see Documentation/kbuild/config-language.txt.
+#
+
+mainmenu "Linux/or32 Kernel Configuration"
+
+config MMU
+	bool
+	default y
+
+config ZONE_DMA
+	bool
+	default y
+
+config UID16
+	bool
+	default y
+
+config RWSEM_GENERIC_SPINLOCK
+	bool
+	default y
+
+config GENERIC_CALIBRATE_DELAY
+	bool
+	default y
+
+config RWSEM_XCHGADD_ALGORITHM
+	bool
+	default n
+
+config GENERIC_HWEIGHT
+	bool
+	default y
+
+config SCHED_NO_NO_OMIT_FRAME_POINTER
+        bool
+        default y
+
+source "init/Kconfig"
+
+config OR32
+	bool
+	default y
+
+menu "Processor type and features"
+
+choice 
+	prompt "Subarchitecture/SoC type"
+	default OR32_MARVIN
+
+config	OR32_MARVIN
+	bool "or1200/Marvin"
+	help 
+	  Marvin SoC
+
+          revision 0 prototype hardware implementation
+
+
+config OR32_HIGHLAND
+	bool "or1200/Highland"
+	help
+	  Highland SoC
+
+	  revision 1
+
+config OR32_GENERIC
+	bool "or1200/Generic"
+	help
+	  Generic or1200 platform
+
+endchoice
+
+
+config OR32_SYS_CLK
+	int "System clock frequency [MHz]"
+	default 100
+
+config OR32_MEMORY_SIZE
+	hex "System memory size [hex, bytes]"
+	default 01000000
+
+config OR32_RESERVED_MEM_SIZE
+	hex "Reserved memory size [hex, bytes]"
+	default 0
+	help
+	  Amount of memory (in bytes) that will be left unused by Linux
+          starting from MEMORY_SIZE-RESERVED_MEM_SIZE and ending at
+          MEMORY_SIZE.
+
+config OR32_FLASH_BOOT
+	bool "Boot from FLASH"
+	default n
+	help
+	  This alows you have support for extreamly simple bootloader
+          in the kernel. It will just copy kernel image from FLASH to RAM and
+	  start executing it.
+
+config HIGHMEM
+        bool "High memory support"
+
+source kernel/Kconfig.hz
+source kernel/Kconfig.preempt
+source "mm/Kconfig"
+
+#
+# Define implied and generic SoC options
+#
+
+config OR32_MC_VERSION
+	int "Memory Controler Version (1 or 2)" if OR32_GENERIC
+	range 1 2
+	default "1" if OR32_MARVIN || OR32_GENERIC
+	default "2" if OR32_HIGHLAND
+
+config OR32_MC_INIT
+	bool "Initilaze memory controler" if OR32_GENERIC
+	default n
+	---help---
+	  This option controls memory controler initizalization
+
+	  When using bootloader, memory controler initialization is
+	  usualy done by boot the bootloader. Memory timings might not
+	  be ideal, so if you know the right timings it woun't hurt to
+	  enable it.
+
+	  If booting directly from flash you need to enable this option
+	  and if neccessery provide memory timings.
+
+config OR32_HIGHLAND_DEFAULT_MEMORY_TIMINGS
+	bool "Default Highland memory timings" if OR32_MC_INIT
+	default n
+	---help---
+	  If you have Highland board with Micron MT48LC16M16A2 TC 75D
+	  memory than choose this option.
+       
+config OR32_GENERIC_MEMORY_TIMINGS
+	bool "Specify memory timings" if OR32_MC_INIT
+	default n
+	---help---
+	  This option allows you to specify memory timings for SDRAm & FLASH
+
+source "arch/or32/Kconfig.mc2"
+	  
+config OR32_ICACHE_ENABLED
+	bool "Enable iCACHE"
+	default n
+
+config OR32_IC_SIZE
+	int "iCACHE size [bytes]" if OR32_ICACHE_ENABLED
+	default 8192 if OR32_ICACHE_ENABLED
+	default 8192 if !OR32_ICACHE_ENABLED
+
+config OR32_IC_LINE
+	int "iCACHE line size [bytes]" if OR32_ICACHE_ENABLED
+	default 16 if OR32_ICACHE_ENABLED
+	default 16 if !OR32_ICACHE_ENABLED
+
+config OR32_DCACHE_ENABLED
+	bool "Enable dCACHE"
+	default n
+
+config OR32_DC_SIZE
+	int "dCACHE size [bytes]" if OR32_DCACHE_ENABLED
+	default 8192 if OR32_DCACHE_ENABLED
+	default 8192 if !OR32_DCACHE_ENABLED
+
+config OR32_DC_LINE
+	int "dCACHE line size [bytes]" if OR32_DCACHE_ENABLED
+	default 16 if OR32_DCACHE_ENABLED
+	default 16 if !OR32_DCACHE_ENABLED
+
+config OR32_ITLB_ENTRIES
+	int "Number of iTLB entries" if OR32_GENERIC
+	default "64"
+
+config OR32_DTLB_ENTRIES
+	int "Number of dTLB entries" if OR32_GENERIC
+	default "64"
+
+config OR32_NO_SPR_SR_DSX
+	bool "use SPR_SR_DSX software emulation" if OR32_GENERIC
+	default y
+	help
+	  SPR_SR_DSX bit is status register bit indicating whether
+	  the last exception has happened in delay slot.	
+
+	  OpenRISC architecture makes it optional to have it implemented
+ 	  in hardware, and Marvin and Highland SoC do not have it.
+
+	  Say N here if you know that your OpenRISC processor has
+	  SPR_SR_DSX bit implemented. Say Y if you are unsure.
+
+
+config OR32_ANONYMOUS
+	bool "Enable anonymity"
+	default n
+
+menu "Debuging options"
+
+config DEBUG_STACKOVERFLOW
+	bool "Check for kernel stack overflow"
+	default y
+	help
+	  Make extra checks for space avaliable on stack in some
+          critical functions. This will cause kernel to run a bit slower,
+	  but will catch most of kernel stack overruns and exit gracefuly.
+
+	  Say Y if you are unsure. 
+
+config OR32_GUARD_PROTECTED_CORE
+	bool "Write protect read only part of kernel"
+	default y
+	help
+	  Write to .text or .rodata sections is most probably kernel bug.
+	  Enabling this will cause an oops at the instruction that tries to
+	  corrupt kernel.
+	
+	  This has no performance implication but should help locating bugs.
+
+	  Say Y if you are unsure.
+
+config JUMP_UPON_UNHANDLED_EXCEPTION
+	bool "Try to die gracefully"
+	default y
+	help
+	  Now this puts kernel into infinite loop after first oops. Till
+	  your kernel crashes this doesn't have any influence.
+
+	  Say Y if you are unsure.
+
+config OR32_EXCEPTION_DEBUG
+	bool "Print processor state at each exception"
+	default n
+	help
+	  This option will make your kernel unusable for all but kernel
+	  debugging.
+
+	  Say N if you are unsure.
+	
+config OR32_ESR_EXCEPTION_BUG_CHECK
+	bool "Check for possible ESR exception bug"
+	default n
+	help
+	  This option enables some checks that might expose some problems
+          in kernel.
+
+	  Say N if you are unsure.
+
+endmenu
+
+endmenu
+
+
+# OpenRISC specific drivers
+
+menu "OpenRISC specific drivers"
+
+source "arch/or32/drivers/Kconfig"
+
+endmenu
+
+menu "Bus options"
+
+config PCI
+	bool "PCI support"
+	default n
+	help
+	  Find out whether your system includes a PCI bus. PCI is the name of
+	  a bus system, i.e. the way the CPU talks to the other stuff inside
+	  your box.  If you say Y here, the kernel will include drivers and
+	  infrastructure code to support PCI bus devices.
+
+config PCI_DOMAINS
+	bool
+	default PCI
+
+source "drivers/pci/Kconfig"
+
+source "drivers/pcmcia/Kconfig"
+
+endmenu
+
+menu "Executable file formats"
+
+source "fs/Kconfig.binfmt"
+
+endmenu
+
+source "net/Kconfig"
+
+source "drivers/Kconfig"
+
+source "fs/Kconfig"
+
+source "security/Kconfig"
+
+source "crypto/Kconfig"
+
+source "lib/Kconfig"
+
+menu "Kernel hacking"
+
+source "lib/Kconfig.debug"
+
+endmenu
