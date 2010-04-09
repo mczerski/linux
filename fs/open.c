@@ -695,8 +695,6 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 	file_ra_state_init(&f->f_ra, f->f_mapping->host->i_mapping);
 
 	/* NB: we're sure to have correct a_ops only after f_op->open */
-	/* if we comment this out we can ls some dirs, /proc being one*/
-	/* jb
 	if (f->f_flags & O_DIRECT) {
 		if (!f->f_mapping->a_ops ||
 		    ((!f->f_mapping->a_ops->direct_IO) &&
@@ -705,7 +703,7 @@ static struct file *__dentry_open(struct dentry *dentry, struct vfsmount *mnt,
 			f = ERR_PTR(-EINVAL);
 		}
 	}
-	*/
+
 	return f;
 
 cleanup_all:
