@@ -108,13 +108,13 @@ source "mm/Kconfig"
 #
 
 config OR32_MC_VERSION
-	int "Memory Controler Version (1 or 2)" if OR32_GENERIC
+	int "Memory Controller Version (1 or 2)" if OR32_GENERIC
 	range 1 2
 	default "1" if OR32_MARVIN || OR32_GENERIC
 	default "2" if OR32_HIGHLAND
 
 config OR32_MC_INIT
-	bool "Initilaze memory controler" if OR32_GENERIC
+	bool "Initialise memory controller" if OR32_GENERIC
 	default n
 	---help---
 	  This option controls memory controler initizalization
