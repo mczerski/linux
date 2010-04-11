@@ -1,7 +1,9 @@
 #ifndef _OR32_BOARH_H
 #define _OR32_BOARH_H 
 
+#ifdef CONFIG_OR32_HIGHLAND
 #include <asm/01-highland/highland.h>
+#endif
 
 /* System clock frequecy */
 #define SYS_CLK		(CONFIG_OR32_SYS_CLK*1000000)
@@ -47,6 +49,7 @@
 
 #define N_CE        (8)
 
+#ifdef CONFIG_OR32_MC_INIT
 #define MC_CSR      (0x00)
 #define MC_POC      (0x04)
 #define MC_BA_MASK  (0x08)
@@ -54,38 +57,13 @@
 #define MC_TMS(i)   (0x14 + (i) * 8)
 
 /* memory controler initialization constants */
-#ifdef CONFIG_OR32_MC_INIT
 #  include "mc2.h"
 #endif
 
 /* sdram organization */
-#ifdef CONFIG_OR32_NIBBLER
-#  define MC_OSR_VAL              0x7e000023
-#  define MC_CCR_4_VAL_DISABLED   0x00ee0004
-#  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-#elifdef CONFIG_OR32_HIGHLAND
-#if 0
-#  define MC_OSR_VAL              0x7e000033
-// the board without DVI connector
-// #  define MC_CCR_4_VAL_DISABLED   0x00ef0000
-// #  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-// the board with DVI connector
-#  define MC_CCR_4_VAL_DISABLED   0x00ef0004
-#  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-#endif
-#elifdef CONFIG_OR32_GENERIC
-#  define MC_OSR_VAL              0x7e000033
-// the board without DVI connector
-//#  define MC_CCR_4_VAL_DISABLED   0x00ef0000
-//#  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-// the board with DVI connector
-#  define MC_CCR_4_VAL_DISABLED   0x00ef0004
-#  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-#else
 #  define MC_OSR_VAL              0x7e000033
 #  define MC_CCR_4_VAL_DISABLED   0x00ef0004
 #  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
-#endif
 
-#endif
+#endif /* _OR32_BOARH_H */
 
