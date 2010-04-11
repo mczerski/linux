@@ -30,9 +30,6 @@
 #define DMMU_SET_NB     CONFIG_OR32_DTLB_ENTRIES
 #define IMMU_SET_NB     CONFIG_OR32_ITLB_ENTRIES
 
-/* Define this if you are using MC */
-#define MC_INIT         CONFIG_OR32_MC_INIT
-
 /* Uart definitions */
 #define UART_DLL        0       /* Out: Divisor Latch Low (DLAB=1) */
 #define UART_DLM        1       /* Out: Divisor Latch High (DLAB=1) */
