@@ -6,7 +6,7 @@
 #define PAGE_SHIFT		13
 #define PAGE_SIZE		(1UL << PAGE_SHIFT)
 #define PAGE_MASK		(~(PAGE_SIZE-1))
-#define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
+//#define PAGE_ALIGN(addr)	(((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 #define PAGE_OFFSET		0xc0000000	
 #define KERNELBASE  		PAGE_OFFSET
