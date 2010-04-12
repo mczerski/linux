@@ -17,7 +17,7 @@
 
 #define __atomic_fool_gcc(x) (*(struct { int a[100]; } *)x)
 
-typedef struct { int counter; } atomic_t;
+//typedef struct { int counter; } atomic_t;
 
 #define ATOMIC_INIT(i)  { (i) }
 
