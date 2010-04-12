@@ -9,6 +9,10 @@ config MMU
 	bool
 	default y
 
+config SYMBOL_PREFIX
+        string
+        default "_"
+
 config ZONE_DMA
 	bool
 	default y
