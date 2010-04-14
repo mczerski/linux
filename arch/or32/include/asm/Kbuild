@@ -1,0 +1,20 @@
+header-y += errno.h
+header-y += fcntl.h
+header-y += ioctl.h
+header-y += ioctls.h
+header-y += mman.h
+header-y += poll.h
+header-y += posix_types.h
+header-y += signal.h
+header-y += statfs.h
+header-y += socket.h
+header-y += sockios.h
+header-y += sigcontext.h
+header-y += spr_defs.h
+
+unifdef-y += param.h
+unifdef-y += ptrace.h
+unifdef-y += resource.h
+unifdef-y += siginfo.h
+unifdef-y += types.h
+unifdef-y += unistd.h
