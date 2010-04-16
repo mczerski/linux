@@ -1,12 +1,7 @@
 #ifndef _OR32_TERMIOS_H
 #define _OR32_TERMIOS_H
 
-#include <asm/termbits.h>
-#include <asm/ioctls.h>
-
-#define TIOCM_MODEM_BITS       TIOCM_OUT2      /* IRDA support */
-
-/* ioctl (fd, TIOCSERGETLSR, &result) where result may be as below */
+#include <asm-generic/termios.h>
 
 /* line disciplines */
 #define N_TTY		0
@@ -25,19 +20,5 @@
 #define N_HDLC		13	/* synchronous HDLC */
 #define N_SYNC_PPP	14	/* synchronous PPP */
 #define N_HCI		15  /* Bluetooth HCI UART */
-
-#ifdef __KERNEL__
-
-/*	intr=^C		quit=^\		erase=del	kill=^U
-	eof=^D		vtime=\0	vmin=\1		sxtc=\0
-	start=^Q	stop=^S		susp=^Z		eol=\0
-	reprint=^R	discard=^U	werase=^W	lnext=^V
-	eol2=\0
-*/
-#define INIT_C_CC "\003\034\177\025\004\0\1\0\021\023\032\0\022\017\027\026\0"
-
-#include <asm-generic/termios.h>
-
-#endif	/* __KERNEL__ */
 
 #endif	/* _OR32_TERMIOS_H */
