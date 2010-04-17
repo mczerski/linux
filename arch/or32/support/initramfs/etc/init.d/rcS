@@ -1,4 +1,14 @@
 #! /bin/sh
+
+mkdir -p /proc
+mount -t proc none /proc
+
+mkdir -p /dev
+mount -t devtmpfs none /dev
+
+mkdir -p /sys
+mount -t sysfs none /sys
+
 mount -a
 
 # set hostname
