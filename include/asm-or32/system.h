@@ -120,5 +120,7 @@ static inline unsigned long mfspr(unsigned long add)
  */
 extern void __print(const char *fmt, ...);
 
+#include <asm-generic/cmpxchg-local.h>
+
 #endif /* __KERNEL__ */
 #endif /* __OR32_SYSTEM_H */
