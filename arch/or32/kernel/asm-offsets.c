@@ -48,11 +48,9 @@ main(void)
   DEFINE(TASK_ACTIVE_MM, offsetof(struct task_struct, active_mm));
   
   /* offsets into thread_info */
-#if 0
   DEFINE(TI_TASK, offsetof(struct thread_info, task));
   DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
   DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
-#endif
   DEFINE(TI_KSP, offsetof(struct thread_info, ksp));
   
   /* Interrupt register frame */
