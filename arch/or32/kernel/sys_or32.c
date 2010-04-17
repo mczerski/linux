@@ -96,8 +96,8 @@ sys_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
  * This is really horribly ugly. (same as arch/i386)
  */
 
-asmlinkage int sys_ipc (uint call, int first, int second,
-			int third, void __user *ptr, long fifth)
+asmlinkage long sys_ipc (unsigned int call, int first, unsigned long second,
+		unsigned long third, void __user *ptr, long fifth)
 {
 	int version, ret;
 
