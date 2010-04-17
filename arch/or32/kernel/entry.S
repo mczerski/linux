@@ -1017,7 +1017,7 @@ ENTRY(_sys_call_table)
 	.long _sys_uselib
 	.long _sys_swapon
 	.long _sys_reboot
-	.long _old_readdir
+	.long _sys_old_readdir
 	.long _old_mmap		/* 90 */
 	.long _sys_munmap
 	.long _sys_truncate
