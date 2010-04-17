@@ -57,5 +57,16 @@
 #define SO_PASSSEC              34 /*RGD*/
 #define SO_TIMESTAMPNS		35
 #define SCM_TIMESTAMPNS		SO_TIMESTAMPNS
-#define SO_MARK                 36 //rgd
+
+#define SO_MARK                 36
+
+#define SO_TIMESTAMPING         37
+#define SCM_TIMESTAMPING        SO_TIMESTAMPING
+
+#define SO_PROTOCOL             38
+#define SO_DOMAIN               39
+#define SO_RXQ_OVFL             40
+
+/* TODO: use generic/socket.h here */
+
 #endif /* _OR32_SOCKET_H */
