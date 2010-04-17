@@ -88,7 +88,8 @@ void (*mach_debug_init)(void) = NULL;
 
 unsigned long fb_mem_start;
 /*static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=uart,mmio,0x90000000";*/
-static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=ttyS0";
+//static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=ttyS0";
+static char command_line[COMMAND_LINE_SIZE] = "console=ttyS0";
 extern const unsigned long text_start, edata; /* set by the linker script */ 
        
 static unsigned long __init setup_memory(void)
