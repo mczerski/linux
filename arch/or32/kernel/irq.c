@@ -276,6 +276,11 @@ void disable_irq(unsigned int irq)
 	pic_disable_irq(irq);
 }
 
+void disable_irq_nosync(unsigned int irq)
+{
+        disable_irq(irq);
+}
+
 int get_irq_list(char *buf)
 {
 	int i, len = 0;
