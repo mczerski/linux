@@ -84,8 +84,7 @@ out:
 /*
  * computes a partial checksum, e.g. for TCP/UDP fragments
  */
-unsigned int csum_partial(const unsigned char *buff, int len, 
-                          unsigned int sum)
+__wsum csum_partial(const void *buff, int len, __wsum sum)
 {
 	unsigned int result = do_csum(buff, len);
 

@@ -22,8 +22,7 @@
  *
  * it's best to have buff aligned on a 32-bit boundary
  */
-extern unsigned int csum_partial(const unsigned char * buff, int len,
-				 unsigned int sum);
+extern __wsum csum_partial(const void *buff, int len, __wsum sum);
 
 /*
  * Computes the checksum of a memory block at src, length len,
