@@ -17,6 +17,14 @@
 #endif
 
 
+/* THREAD_SIZE is the size of the task_struct/kernel_stack combo.
+ * normally, the stack is found by doing something like p + THREAD_SIZE
+ * in or32, a page is 8192 bytes, which seems like a sane size
+ */
+
+#define THREAD_SIZE       PAGE_SIZE
+#define THREAD_SIZE_ORDER 1
+
 /*
  * low level task data that entry.S needs immediate access to
  * - this struct should fit entirely inside of one cache line
@@ -105,9 +113,6 @@ static inline struct thread_info *current_thread_info(void)
 register struct thread_info *current_thread_info_reg asm("r10");
 #define current_thread_info()   (current_thread_info_reg)
 
-/* thread information allocation */
-#define alloc_thread_info(tsk) ((struct thread_info *) __get_free_pages(GFP_KERNEL,1))
-#define free_thread_info(ti) free_pages((unsigned long) (ti), 1)
 #define get_thread_info(ti) get_task_struct((ti)->task)
 #define put_thread_info(ti) put_task_struct((ti)->task)
 
