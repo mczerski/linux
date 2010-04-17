@@ -548,6 +548,7 @@ found_middle:
 #define smp_mb__after_clear_bit()       barrier()
 #include <asm-generic/bitops/ffs.h>
 #include <asm-generic/bitops/fls.h>
+#include <asm-generic/bitops/__fls.h>
 #include <asm-generic/bitops/hweight.h>
 #include <asm-generic/bitops/fls64.h>
 #include <asm-generic/bitops/lock.h>
