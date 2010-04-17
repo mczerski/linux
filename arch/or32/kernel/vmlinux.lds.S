@@ -94,6 +94,10 @@ SECTIONS
         .init.data		: AT(ADDR(.init.data) - LOAD_OFFSET)
 	{ 
 		*(.init.data) 
+		. = ALIGN(8);
+                VMLINUX_SYMBOL(__ctors_start) = .;
+                *(.ctors)
+                VMLINUX_SYMBOL(__ctors_end) = .;
 	}
 
 	/* Setup calls */
