@@ -97,10 +97,6 @@ static unsigned long __init setup_memory(void)
 	unsigned long bootmap_size, start_pfn, max_low_pfn;
 
 
-#define PFN_UP(x)       (((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define PFN_DOWN(x)     ((x) >> PAGE_SHIFT)
-#define PFN_PHYS(x)     ((x) << PAGE_SHIFT)
-
 #ifndef CONFIG_FB_OC_SHMEM_SIZE
 #define CONFIG_FB_OC_SHMEM_SIZE 0
 #endif /* CONFIG_FB_OC_SHMEM_SIZE */
