@@ -1,0 +1,15 @@
+Initramfs
+=========
+
+In order to have the initramfs built into your kernel you need to have the following
+options set:
+
+CONFIG_INITRAMFS_SOURCE="arch/or32/support/initramfs arch/or32/support/initramfs.devnodes"
+CONFIG_DEVTMPFS=y
+
+This builds the initramfs from the directory initramfs and adds some extra
+directories and device nodes from the file initramfs.
+
+There is not a hard dependency on devtmpfs, but it makes life easier and the initramfs
+is configured to use it!
+
