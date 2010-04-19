@@ -115,7 +115,7 @@ static int oeth_open(struct net_device *dev);
 static int oeth_start_xmit(struct sk_buff *skb, struct net_device *dev);
 static void oeth_rx(struct net_device *dev);
 static void oeth_tx(struct net_device *dev);
-static irqreturn_t oeth_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t oeth_interrupt(int irq, void *dev_id);
 static int oeth_close(struct net_device *dev);
 static struct net_device_stats *oeth_get_stats(struct net_device *dev);
 static void oeth_set_multicast_list(struct net_device *dev);
@@ -148,7 +148,7 @@ static int
 oeth_open(struct net_device *dev)
 {
 #ifdef CONFIG_OETH_UNKNOWN_TX_NEXT
-	struct oeth_private *cep = (struct oeth_private *)dev->priv;
+	struct oeth_private *cep = netdev_priv(dev);
 #endif
 
 	oeth_regs *regs = (oeth_regs *)dev->base_addr;
@@ -162,7 +162,7 @@ oeth_open(struct net_device *dev)
 
 
 #ifndef RXBUFF_PREALLOC
-	struct oeth_private *cep = (struct oeth_private *)dev->priv;
+	struct oeth_private *cep = netdev_priv(dev);
 	struct  sk_buff *skb;
 	volatile oeth_bd *rx_bd;
 	int i;
@@ -200,7 +200,7 @@ static int
 oeth_close(struct net_device *dev)
 {
 #ifdef CONFIG_OETH_UNKNOWN_TX_NEXT
-	struct oeth_private *cep = (struct oeth_private *)dev->priv;
+	struct oeth_private *cep = netdev_priv(dev);
 #endif
 	oeth_regs *regs = (oeth_regs *)dev->base_addr;
 
@@ -251,7 +251,7 @@ oeth_close(struct net_device *dev)
 static int
 oeth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct oeth_private *cep = (struct oeth_private *)dev->priv;
+	struct oeth_private *cep = netdev_priv(dev);
 	volatile oeth_bd *bdp;
 	unsigned long flags;
 
@@ -331,7 +331,7 @@ oeth_start_xmit(struct sk_buff *skb, struct net_device *dev)
 /* The interrupt handler.
  */
 static irqreturn_t
-oeth_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+oeth_interrupt(int irq, void *dev_id)
 {
 	struct	net_device *dev = dev_id;
 	volatile struct	oeth_private *cep;
@@ -364,7 +364,7 @@ oeth_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	       ((oeth_bd *)(OETH_BD_BASE+64+56))->len_status);
 #endif
 	
-	cep = (struct oeth_private *)dev->priv;
+	cep = netdev_priv(dev);
 
 	/* Get the interrupt events that caused us to be here.
 	 */
@@ -436,7 +436,7 @@ oeth_tx(struct net_device *dev)
 #endif
 	D(printk("T"));
 
-	cep = (struct oeth_private *)dev->priv;
+	cep = netdev_priv(dev);
 
 	for (;; cep->tx_last = (cep->tx_last + 1) & OETH_TXBD_NUM_MASK) {
 
@@ -489,7 +489,7 @@ oeth_rx(struct net_device *dev)
 
 	D(printk("r"));
 
-	cep = (struct oeth_private *)dev->priv;
+	cep = netdev_priv(dev);
 
 	/* First, grab all of the stats for the incoming packet.
 	 * These get messed up if we get called due to a busy condition.
@@ -641,7 +641,7 @@ static int calc_crc(char *mac_addr)
 
 static struct net_device_stats *oeth_get_stats(struct net_device *dev)
 {
-        struct oeth_private *cep = (struct oeth_private *)dev->priv;
+        struct oeth_private *cep = netdev_priv(dev);
  
         return &cep->stats;
 }
@@ -653,7 +653,7 @@ static void oeth_set_multicast_list(struct net_device *dev)
 	volatile oeth_regs *regs;
 	int	i;
 
-	cep = (struct oeth_private *)dev->priv;
+	cep = netdev_priv(dev);
 
 	/* Get pointer of controller registers.
 	 */
@@ -724,6 +724,15 @@ static int oeth_set_mac_add(struct net_device *dev, void *p)
 	return 0;
 }
 
+static const struct net_device_ops oeth_netdev_ops = {
+	.ndo_open		= oeth_open,
+	.ndo_start_xmit		= oeth_start_xmit,
+	.ndo_stop		= oeth_close,
+	.ndo_get_stats		= oeth_get_stats,
+	.ndo_set_multicast_list = oeth_set_multicast_list,
+	.ndo_set_mac_address	= oeth_set_mac_add,
+};
+
 /* Initialize the Open Ethernet MAC.
  */
 int __init oeth_init(void)
@@ -745,7 +754,7 @@ int __init oeth_init(void)
 	if (!dev)
 		return -ENOMEM;
 	
-	cep = dev->priv;
+	cep = netdev_priv(dev);
 //	spin_lock_init(&cep->lock);
 
 	/* Get pointer ethernet controller configuration registers.
@@ -933,15 +942,7 @@ int __init oeth_init(void)
 	ether_setup(dev);
 
 	dev->base_addr = (unsigned long)OETH_REG_BASE;
-
-	/* The Open Ethernet specific entries in the device structure. 
-	 */
-	dev->open = oeth_open;
-	dev->hard_start_xmit = oeth_start_xmit;
-	dev->stop = oeth_close;
-	dev->get_stats = oeth_get_stats;
-	dev->set_multicast_list = oeth_set_multicast_list;
-	dev->set_mac_address = oeth_set_mac_add;
+        dev->netdev_ops = &oeth_netdev_ops;
 
 	if ((error = register_netdev(dev))) {
 		free_netdev(dev);
