@@ -12,7 +12,7 @@ extern void enable_irq(unsigned int);
 
 #define	NR_IRQS		32
 
-static __inline__ int irq_canonicalize(int irq)
+static inline int irq_canonicalize(int irq)
 {
 	return(irq);
 }
