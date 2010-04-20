@@ -14,7 +14,6 @@
  * hardware and calculate dram_end acordingly
  */
 
-
 #ifdef CONFIG_OR32_FLASH_BOOT
 #  define LOAD_OFFSET -0x30000000
 #  define LOAD_BASE    0xc0000000
@@ -24,12 +23,12 @@
 #endif
 
 #include <asm-generic/vmlinux.lds.h>
-
 	
 OUTPUT_FORMAT("elf32-or32", "elf32-or32", "elf32-or32")
 OUTPUT_ARCH(or32)
 _jiffies = _jiffies_64 + 4;
 PAGE_SIZE = 8192;
+
 SECTIONS
 {
         /* Read-only sections, merged into text segment: */
@@ -53,32 +52,9 @@ SECTIONS
 
 	/* TODO: Check if fixup and text.__* are really necessary */
 
-/*
-        .text			: AT(ADDR(.text) - LOAD_OFFSET)
-        {
-          *(.text)
-          SCHED_TEXT
-	  LOCK_TEXT
-          *(.fixup)
-          *(.text.__*)
-        }
-*/
-/*        __etext = .;*/
-
-/*        RODATA*/
-
         __e_protected_core = .;
 
 	EXCEPTION_TABLE(4)
-/* REPLACED BY EXCEPTION_TABLE */
-/*	. = ALIGN(4); 
-	__ex_table		: AT(ADDR(__ex_table) - LOAD_OFFSET)
-	{
-		___start___ex_table = .;
-		*(__ex_table)
-		___stop___ex_table = .;
-	}
-*/
 
 	__sdata = .;
 
@@ -88,26 +64,6 @@ SECTIONS
 	/* 32 here is cacheline size... recheck this <-- Jonas */
 	RW_DATA_SECTION(32, 8192, 8192)
 
-/*REPLACED BY RW_DATA_SECTION 
-        . = ALIGN(4);
-        .data    		: AT(ADDR(.data) - LOAD_OFFSET)
-        {
-          *(.data)
-        }
-
-	. = ALIGN(32);
-	.data.cacheline_aligned	: AT(ADDR(.data.cacheline_aligned) - LOAD_OFFSET)
-	{ 
-		*(.data.cacheline_aligned) 
-	}
-
-       /* init_task and stack, must be aligned */
-  /*      . = ALIGN(8192);      
-        .data.init_task		: AT(ADDR(.data.init_task) - LOAD_OFFSET) 
-        { 
-          *(.data.init_task) 
-        }
-*/
         __edata  =  .;
  
         /* Init code and data */
@@ -122,88 +78,6 @@ SECTIONS
 	/* Align ___setup_start on 16 byte boundary */
 	INIT_DATA_SECTION(16)
 
-
-/* Replaced by INIT_TEXT_SECTION 
-        .init.text		: AT(ADDR(.init.text) - LOAD_OFFSET)
-	{
-		__sinittext = .;
-                *(.init.text)
-                __einittext = .;
-        }
-*/
-
-
-/* Replaced by INIT_DATA_SECTION
-        .init.data		: AT(ADDR(.init.data) - LOAD_OFFSET)
-	{ 
-		*(.init.data) 
-		. = ALIGN(8);
-                VMLINUX_SYMBOL(__ctors_start) = .;
-                *(.ctors)
-                VMLINUX_SYMBOL(__ctors_end) = .;
-	}
-*/
-
-	/* Setup calls */
-/* Replaced by INIT_DATA_SECTION 
-       . = ALIGN(16);
-        ___setup_start = .;
-        .init.setup		: AT(ADDR(.init.setup) - LOAD_OFFSET) 
-	{ 
-		*(.init.setup) 
-	}
-        ___setup_end = .;
-*/
-	
-/* REPLACED BY RO_DATA_SECTION
-        ___start___param = .;
-        __param			: AT(ADDR(__param) - LOAD_OFFSET) 
-	{ 
-		*(__param) 
-	}
-        ___stop___param = .;
-*/
-
-/* INIT_DATA_SECTION -> INIT_CALLS	
-        .initcall.init		: AT(ADDR(.initcall.init) - LOAD_OFFSET)
-	{
-                ___initcall_start = .;
-                INITCALLS
-                ___initcall_end = .;
-        }
-*/
-/* INIT_DATA_SECTION -> CON_INITCALL
-        .con_initcall.init	: AT(ADDR(.con_initcall.init) - LOAD_OFFSET) 
-	{
-                ___con_initcall_start = .;
-                *(.con_initcall.init)
-                ___con_initcall_end = .;
-        }
-*/
-/* INIT_DATA_SECTION -> SECURITY_INITALL	
-        SECURITY_INIT
-*/
-
-/* INIT_DATA_SECTION-> INIT_RAM_FS
-	. = ALIGN(8192); 
-	.init.ramfs		: AT(ADDR(.init.ramfs) - LOAD_OFFSET)
-	{
-                ___initramfs_start = .;
-                *(.init.ramfs)
-                ___initramfs_end = .;
-*/
-                /* We fill to the next page, so we can discard all init
-                   pages without needing to consider what payload might be
-                   appended to the kernel image.  */
-/*                FILL (0);
-                . = ALIGN (8192);
-        }
-*/
-	/* --> Check if this fill is still really needed */
-        /* We fill to the next page, so we can discard all init
-           pages without needing to consider what payload might be
-           appended to the kernel image.  */
-/*	FILL (0);*/
 	. = ALIGN(8192);
 
 	/* TODO: PERCPU sections should go here */
@@ -221,22 +95,11 @@ SECTIONS
 	}
 
         ___vmlinux_end = .;            /* last address of the physical file */
-/*        ___init_end = .;
-*/
         ___data_end = . ;              /* Move to _edata ? */
 
 
 	BSS_SECTION(0, 0, 0x20)
 
-/*        ___bss_start = .;              /* BSS */
-/*        .bss			: AT(ADDR(.bss) - LOAD_OFFSET)
-	{
-                *(COMMON)
-                *(.bss)
-        }
-
-        . =  ALIGN (0x20);
-*/
         __end = .;
 
         /* Sections to be discarded */
@@ -246,23 +109,4 @@ SECTIONS
 	/* Throw in the debugging sections */
 	STABS_DEBUG
 	DWARF_DEBUG
-
-/* REPLACED BY DISCARDS
-        /DISCARD/ : 
-	{
-		*(.exit.text)
-                *(.text.exit)
-                *(.data.exit)
-                *(.exitcall.exit)
-        }
-*/
-	/* we need to add an extra underscore */
-/* These are not needed anymore */
-/*	PROVIDE(___start___ksymtab	= __start___ksymtab); 
-	PROVIDE(___stop___ksymtab	= __stop___ksymtab);
-	PROVIDE(___start___ksymtab_gpl	= __start___ksymtab_gpl);
-	PROVIDE(___stop___ksymtab_gpl	= __stop___ksymtab_gpl);
-	PROVIDE(___sched_text_start     = __sched_text_start);
-	PROVIDE(___sched_text_end       = __sched_text_end);
-*/
 }
