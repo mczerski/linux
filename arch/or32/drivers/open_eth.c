@@ -742,11 +742,7 @@ int __init oeth_init(void)
 	volatile oeth_regs *regs;
 	volatile oeth_bd *tx_bd, *rx_bd;
 	int error, i, j, k;
-#ifdef SRAM_BUFF
-	unsigned long mem_addr = SRAM_BUFF_BASE;
-#else
 	unsigned long mem_addr;
-#endif
 
 	/* Create an Ethernet device instance.
          */
@@ -848,9 +844,7 @@ int __init oeth_init(void)
 	 */
 	for(i = 0, k = 0; i < OETH_TX_BUFF_PAGE_NUM; i++) {
 
-#ifndef SRAM_BUFF
 		mem_addr = __get_free_page(GFP_KERNEL);
-#endif
 
 		for(j = 0; j < OETH_TX_BUFF_PPGAE; j++, k++) {
 			tx_bd[k].len_status = OETH_TX_BD_PAD | OETH_TX_BD_CRC | OETH_RX_BD_IRQ;
@@ -879,9 +873,7 @@ int __init oeth_init(void)
 	 */
 	for(i = 0, k = 0; i < OETH_RX_BUFF_PAGE_NUM; i++) {
 
-#ifndef SRAM_BUFF
 		mem_addr = __get_free_page(GFP_KERNEL);
-#endif
 
 		for(j = 0; j < OETH_RX_BUFF_PPGAE; j++, k++) {
 			rx_bd[k].len_status = OETH_RX_BD_EMPTY | OETH_RX_BD_IRQ;
