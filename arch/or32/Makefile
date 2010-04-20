@@ -29,7 +29,7 @@ CFLAGS		+= -fsigned-char -pipe -ffixed-r10 \
                    -Wno-uninitialized
 AFLAGS		+= 
 
-head-y 		:= arch/or32/kernel/head.o
+head-y 		:= arch/or32/kernel/head.o arch/or32/kernel/init_task.o
 
 
 core-y		+= arch/or32/lib/ \
