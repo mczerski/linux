@@ -91,4 +91,13 @@ extern void iounmap(void *addr);
 extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
 extern void ioport_unmap(void __iomem *);
 
+#define ioread8(addr)           readb(addr)
+#define ioread16(addr)          readw(addr)
+#define ioread32(addr)          readl(addr)
+
+#define iowrite8(v, addr)       writeb((v), (addr))
+#define iowrite16(v, addr)      writew((v), (addr))
+#define iowrite32(v, addr)      writel((v), (addr))
+
+
 #endif

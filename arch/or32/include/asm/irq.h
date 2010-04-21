@@ -21,8 +21,8 @@ static inline int irq_canonicalize(int irq)
  * "Generic" interrupt sources
  */
 
-#define IRQ_UART_0            (2)       /* interrupt source for UART dvice 0 */
-#define IRQ_ETH_0             (4)       /* interrupt source for Ethernet dvice 0 */
+//#define IRQ_UART_0            (2)       /* interrupt source for UART dvice 0 */
+//#define IRQ_ETH_0             (4)       /* interrupt source for Ethernet dvice 0 */
 #define IRQ_PS2_0             (5)       /* interrupt source for ps2 dvice 0 */
 #define IRQ_SCHED_TIMER       (0)       /* interrupt source for scheduling timer */
 

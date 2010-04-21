@@ -23,6 +23,8 @@
 #include <linux/console.h>
 #include <linux/device.h>
 #include <linux/serial_8250.h>
+#include <linux/if.h>
+#include <net/ethoc.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -106,10 +108,47 @@ void config_BSP(char *command, int len)
 	mach_debug_init      = NULL;
 }
 
+#define UART_IRQ       2
+
+#define ETHOC_IRQ      4
+#define ETHOC_IOBASE   0x92000000
+
+static unsigned char bdbuffer[(1<<15)];
+
+static struct resource ethoc_resources[] = {
+        {
+                .start  = ETHOC_IOBASE,
+                .end    = ETHOC_IOBASE + 0x53,
+                .flags  = IORESOURCE_MEM,
+        }, {
+                .start  = bdbuffer,
+                .end    = bdbuffer + (1<<15) - 1,
+                .flags  = IORESOURCE_MEM,
+        }, {
+                .start  = ETHOC_IRQ,
+                .end    = ETHOC_IRQ,
+                .flags  = IORESOURCE_IRQ,
+        }
+};
+
+static struct ethoc_platform_data ethoc_platdata = {
+//	.hwaddr = {0x01, 0x01, 0x01, 0x01, 0x01, 0x00},
+//	.phy_id = 0
+};
+
+static struct platform_device ethoc_device = {
+	.name			= "ethoc",
+	.dev			= {
+		.platform_data  = &ethoc_platdata
+	},
+        .resource       = ethoc_resources,
+        .num_resources  = ARRAY_SIZE(ethoc_resources),
+};
+
 static struct plat_serial8250_port serial_platform_data[] = {
 	{
 		.mapbase	= 0x90000000,
-		.irq		= 2,
+		.irq		= UART_IRQ,
 		.uartclk	= BASE_BAUD,
 		.regshift	= 0,
 		.iotype		= UPIO_MEM,
@@ -126,8 +165,9 @@ static struct platform_device serial_device = {
 	},
 };
 
-void __init config_serial(void)
+void __init or1200_register_platform_devices(void)
 {
 	platform_device_register(&serial_device);
+	platform_device_register(&ethoc_device);
 }
-arch_initcall(config_serial);
+arch_initcall(or1200_register_platform_devices);
