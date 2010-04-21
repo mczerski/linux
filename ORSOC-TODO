@@ -1,4 +1,4 @@
-
+Fixup asm/types.h ... should use generic version, check version l64 or ll64 defs are appicable
 
 LOAD_CURRENT_THREAD_INFO is not used anywhere
 
