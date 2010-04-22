@@ -946,17 +946,17 @@ ENTRY(_sys_call_table)
 	.long _sys_chmod	/* 15 */
 	.long _sys_lchown
 	.long _sys_ni_syscall		/* old break syscall holder */
-	.long _sys_stat
+	.long _sys_ni_syscall           /* old stat syscall */
 	.long _sys_lseek
 	.long _sys_getpid	/* 20 */
 	.long _sys_mount
-	.long _sys_oldumount
+	.long _sys_ni_syscall           /* oldumount */
 	.long _sys_setuid
 	.long _sys_getuid
 	.long _sys_stime	/* 25 */
 	.long _sys_ptrace
 	.long _sys_alarm
-	.long _sys_fstat
+	.long _sys_ni_syscall           /* old fstat */
 	.long _sys_pause
 	.long _sys_utime	/* 30 */
 	.long _sys_ni_syscall		/* old stty syscall holder */
@@ -1004,7 +1004,7 @@ ENTRY(_sys_call_table)
 	.long _sys_sigpending
 	.long _sys_sethostname
 	.long _sys_setrlimit	/* 75 */
-	.long _sys_old_getrlimit
+	.long _sys_ni_syscall           /* old_getrlimit */
 	.long _sys_getrusage
 	.long _sys_gettimeofday
 	.long _sys_settimeofday
@@ -1012,12 +1012,12 @@ ENTRY(_sys_call_table)
 	.long _sys_setgroups
 	.long _sys_select		/* was old_select */
 	.long _sys_symlink
-	.long _sys_lstat
+	.long _sys_ni_syscall           /* old lstat */
 	.long _sys_readlink	/* 85 */
 	.long _sys_uselib
 	.long _sys_swapon
 	.long _sys_reboot
-	.long _sys_old_readdir
+	.long _sys_ni_syscall           /* old_readdir */
 	.long _old_mmap		/* 90 */
 	.long _sys_munmap
 	.long _sys_truncate
