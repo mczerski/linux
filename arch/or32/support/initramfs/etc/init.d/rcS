@@ -19,6 +19,12 @@ mount -o remount,rw /
 #echo "Launching udhcpc"
 #/sbin/udhcpc -n -q -s /usr/share/udhcpc/default.script
 
+# create some dirs to avoid warning messages
+mkdir /var
+mkdir /var/run
+mkdir /etc/network/if-up.d
+mkdir /etc/network/if-pre-up.d
+
 echo "Configuring loopback device"
 #ifconfig lo 127.0.0.1
 ifup lo
