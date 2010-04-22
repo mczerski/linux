@@ -1,5 +1,5 @@
 ::sysinit:/etc/init.d/rcS
-::askfirst:/bin/sh
+::askfirst:-/bin/sh
 
 # Stuff to do when restarting the init process
 ::restart:/sbin/init
