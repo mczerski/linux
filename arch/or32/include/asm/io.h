@@ -50,11 +50,16 @@ extern void iounmap(void *addr);
 #define readb(addr) (*(volatile unsigned char *) (addr))
 #define readw(addr) (*(volatile unsigned short *) (addr))
 #define readl(addr) (*(volatile unsigned int *) (addr))
+#define __raw_readb readb
+#define __raw_readw readw
+#define __raw_readl readl
 
 #define writeb(b,addr) ((*(volatile unsigned char *) (addr)) = (b))
 #define writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
 #define writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
-#define __raw_writel writel /*RGD*/
+#define __raw_writeb writeb
+#define __raw_writew writew
+#define __raw_writel writel
 
 #define memset_io(a,b,c)	memset((void *)(a),(b),(c))
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
