@@ -33,7 +33,7 @@ extern inline void * ioremap_nocache(unsigned long offset, unsigned long size)
 
 extern void iounmap(void *addr);
 
-#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+//#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
 
 /*
  * IO bus memory addresses are also 1:1 with the physical address
