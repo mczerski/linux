@@ -1,5 +1,3 @@
-Fixup asm/types.h ... should use generic version, check version l64 or ll64 defs are appicable
-
 LOAD_CURRENT_THREAD_INFO is not used anywhere
 
 Use __HEAD macro to install to .text.head
@@ -12,3 +10,5 @@ thus we need to think about whether it's really possible to make
 this switch or if we have to live with what we've got.
 
 Implement memcpy and memset (string.h)
+
+DMA implementation
