@@ -18,16 +18,17 @@
 #  define LOAD_OFFSET -0x30000000
 #  define LOAD_BASE    0xc0000000
 #else
-#  define LOAD_OFFSET  0x00000000
-#  define LOAD_BASE    0x00000000
+#  define LOAD_OFFSET  PAGE_OFFSET
+#  define LOAD_BASE    PAGE_OFFSET
 #endif
 
+#include <asm/page.h>
 #include <asm-generic/vmlinux.lds.h>
 	
 OUTPUT_FORMAT("elf32-or32", "elf32-or32", "elf32-or32")
 OUTPUT_ARCH(or32)
 _jiffies = _jiffies_64 + 4;
-PAGE_SIZE = 8192;
+/*PAGE_SIZE = 8192;*/
 
 SECTIONS
 {
