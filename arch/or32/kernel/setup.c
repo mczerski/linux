@@ -392,5 +392,5 @@ void arch_gettod(int *year, int *mon, int *day, int *hour,
  *support the "weak" attribute correctly at this time
  *once we do (support weak) this should be removed!!
  */
-extern const void __start_notes(){}
-extern const void __stop_notes(){}
+void __start_notes(void){}
+void __stop_notes(void){}
