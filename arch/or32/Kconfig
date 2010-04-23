@@ -41,6 +41,11 @@ config SCHED_NO_NO_OMIT_FRAME_POINTER
         bool
         default y
 
+config FRAME_POINTER
+       bool
+       default y
+ 
+
 # For now, use generic checksum functions
 #These can be reimplemented in assembly later if so inclined
 config GENERIC_CSUM
