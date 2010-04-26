@@ -37,7 +37,7 @@
 #include <asm/or32-hf.h>
 
 /* table for system interrupt handlers */
-static or_irq_handler_t irq_list[NR_IRQS]; /*RGD*/
+static struct irq_handler irq_list[NR_IRQS];
 
 static const char *default_names[NR_IRQS] = {
 	"int0", "int1", "int2", "int3",	"int4", "int5", "int6", "int7"
@@ -190,7 +190,7 @@ asmlinkage void do_IRQ(struct pt_regs *regs)
 //		mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
 
 		if (irq_list[irq].handler)
-			irq_list[irq].handler(irq, irq_list[irq].dev_id, regs);
+			irq_list[irq].handler(irq, irq_list[irq].dev_id);
 		else
 			panic("No interrupt handler for autovector %d\n", irq);
 //		mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << irq));

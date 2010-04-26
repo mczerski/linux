@@ -37,12 +37,12 @@ static inline int irq_canonicalize(int irq)
 /*
  * This structure has only 4 elements for speed reasons
  */
-typedef struct irq_handler {
-	irqreturn_t     (*handler)(int, void *, struct pt_regs *);
+struct irq_handler {
+	irqreturn_t     (*handler)(int, void *);
 	unsigned long   flags;
 	void            *dev_id;
 	const char      *devname;
-} or_irq_handler_t; /*RGD*/
+};
 
 #endif /* __OR32_IRQ_H__ */
 #endif /* __KERNEL__ */
