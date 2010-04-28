@@ -1,308 +1,149 @@
-/* Copyright (C) 2002 by James.Bottomley@HansenPartnership.com 
+/*
+ * Implements the generic device dma API for microblaze and the pci
  *
- * Implements the generic device dma API via the existing pci_ one
- * for unconverted architectures
+ * Copyright (C) 2009-2010 Michal Simek <monstr@monstr.eu>
+ * Copyright (C) 2009-2010 PetaLogix
+ *
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License. See the file COPYING in the main directory of this
+ * archive for more details.
+ *
+ * This file is base on powerpc and x86 dma-mapping.h versions
+ * Copyright (C) 2004 IBM
  */
 
-#ifndef _ASM_GENERIC_DMA_MAPPING_H
-#define _ASM_GENERIC_DMA_MAPPING_H
+#ifndef _ASM_OR32_DMA_MAPPING_H
+#define _ASM_OR32_DMA_MAPPING_H
 
+/*
+ * See Documentation/PCI/PCI-DMA-mapping.txt and
+ * Documentation/DMA-API.txt for documentation.
+ */
+
+#include <linux/types.h>
+#include <linux/cache.h>
+#include <linux/mm.h>
+#include <linux/scatterlist.h>
+#include <linux/dma-debug.h>
+#include <linux/dma-attrs.h>
+#include <asm/io.h>
+#include <asm-generic/dma-coherent.h>
+
+#define DMA_ERROR_CODE		(~(dma_addr_t)0x0)
+
+#define __dma_alloc_coherent(dev, gfp, size, handle)	NULL
+#define __dma_free_coherent(size, addr)		((void)0)
+#define __dma_sync(addr, size, rw)		((void)0)
+
+static inline unsigned long device_to_mask(struct device *dev)
+{
+	if (dev->dma_mask && *dev->dma_mask)
+		return *dev->dma_mask;
+	/* Assume devices without mask can take 32 bit addresses */
+	return 0xfffffffful;
+}
+
+extern struct dma_map_ops dma_direct_ops;
+
+static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+{
+        return &dma_direct_ops;
+/*#else
+        if (unlikely(!dev) || !dev->archdata.dma_ops)
+                return dma_ops;
+        else
+                return dev->archdata.dma_ops;
+#endif
+*/
+}
+
+/*
+static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
+{
+	dev->archdata.dma_ops = ops;
+}
+*/
+
+static inline int dma_supported(struct device *dev, u64 mask)
+{
+	struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (unlikely(!ops))
+		return 0;
+	if (!ops->dma_supported)
+		return 1;
+	return ops->dma_supported(dev, mask);
+}
 
 #ifdef CONFIG_PCI
-
-/* we implement the API below in terms of the existing PCI one,
- * so include it */
-#include <linux/pci.h>
-/* need struct page definitions */
-#include <linux/mm.h>
-
-static inline int
-dma_supported(struct device *dev, u64 mask)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_dma_supported(to_pci_dev(dev), mask);
-}
-
-static inline int
-dma_set_mask(struct device *dev, u64 dma_mask)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_set_dma_mask(to_pci_dev(dev), dma_mask);
-}
-
-static inline void *
-dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
-		   gfp_t flag)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_alloc_consistent(to_pci_dev(dev), size, dma_handle);
-}
-
-static inline void
-dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
-		    dma_addr_t dma_handle)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_free_consistent(to_pci_dev(dev), size, cpu_addr, dma_handle);
-}
-
-static inline dma_addr_t
-dma_map_single(struct device *dev, void *cpu_addr, size_t size,
-	       enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_map_single(to_pci_dev(dev), cpu_addr, size, (int)direction);
-}
-
-static inline void
-dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
-		 enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_unmap_single(to_pci_dev(dev), dma_addr, size, (int)direction);
-}
-
-static inline dma_addr_t
-dma_map_page(struct device *dev, struct page *page,
-	     unsigned long offset, size_t size,
-	     enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_map_page(to_pci_dev(dev), page, offset, size, (int)direction);
-}
-
-static inline void
-dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
-	       enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_unmap_page(to_pci_dev(dev), dma_address, size, (int)direction);
-}
-
-static inline int
-dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-	   enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	return pci_map_sg(to_pci_dev(dev), sg, nents, (int)direction);
-}
-
-static inline void
-dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
-	     enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_unmap_sg(to_pci_dev(dev), sg, nhwentries, (int)direction);
-}
-
-static inline void
-dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
-			enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_dma_sync_single_for_cpu(to_pci_dev(dev), dma_handle,
-				    size, (int)direction);
-}
-
-static inline void
-dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
-			   enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_dma_sync_single_for_device(to_pci_dev(dev), dma_handle,
-				       size, (int)direction);
-}
-
-static inline void
-dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
-		    enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_dma_sync_sg_for_cpu(to_pci_dev(dev), sg, nelems, (int)direction);
-}
-
-static inline void
-dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
-		       enum dma_data_direction direction)
-{
-	BUG_ON(dev->bus != &pci_bus_type);
-
-	pci_dma_sync_sg_for_device(to_pci_dev(dev), sg, nelems, (int)direction);
-}
-
-static inline int
-dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-{
-	return pci_dma_mapping_error(to_pci_dev(dev), dma_addr);
-}
-
-
-#else
-
-static inline int
-dma_supported(struct device *dev, u64 mask)
-{
-	return 0;
-}
-
-static inline int
-dma_set_mask(struct device *dev, u64 dma_mask)
-{
-	BUG();
-	return 0;
-}
-
-static inline void *
-dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *dma_handle,
-		   gfp_t flag)
-{
-	BUG();
-	return NULL;
-}
-
-static inline void
-dma_free_coherent(struct device *dev, size_t size, void *cpu_addr,
-		    dma_addr_t dma_handle)
-{
-	BUG();
-}
-
-static inline dma_addr_t
-dma_map_single(struct device *dev, void *cpu_addr, size_t size,
-	       enum dma_data_direction direction)
-{
-	BUG();
-	return 0;
-}
-
-static inline void
-dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
-		 enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline dma_addr_t
-dma_map_page(struct device *dev, struct page *page,
-	     unsigned long offset, size_t size,
-	     enum dma_data_direction direction)
-{
-	BUG();
-	return 0;
-}
-
-static inline void
-dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
-	       enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline int
-dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
-	   enum dma_data_direction direction)
-{
-	BUG();
-	return 0;
-}
-
-static inline void
-dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
-	     enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline void
-dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
-			enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline void
-dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
-			   enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline void
-dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
-		    enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline void
-dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
-		       enum dma_data_direction direction)
-{
-	BUG();
-}
-
-static inline int
-dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-{
-	return 0;
-}
+/* We have our own implementation of pci_set_dma_mask() */
+#define HAVE_ARCH_PCI_SET_DMA_MASK
 
 #endif
 
-/* Now for the API extensions over the pci_ one */
+static inline int dma_set_mask(struct device *dev, u64 dma_mask)
+{
+	struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (unlikely(ops == NULL))
+		return -EIO;
+	if (ops->set_dma_mask)
+		return ops->set_dma_mask(dev, dma_mask);
+	if (!dev->dma_mask || !dma_supported(dev, dma_mask))
+		return -EIO;
+	*dev->dma_mask = dma_mask;
+	return 0;
+}
+
+#include <asm-generic/dma-mapping-common.h>
+
+static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+{
+	struct dma_map_ops *ops = get_dma_ops(dev);
+	if (ops->mapping_error)
+		return ops->mapping_error(dev, dma_addr);
+
+	return (dma_addr == DMA_ERROR_CODE);
+}
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
 #define dma_is_consistent(d, h)	(1)
 
-static inline int
-dma_get_cache_alignment(void)
+static inline void *dma_alloc_coherent(struct device *dev, size_t size,
+					dma_addr_t *dma_handle, gfp_t flag)
 {
-	/* no easy way to get cache size on all processors, so return
-	 * the maximum possible, to be safe */
-	return (1 << INTERNODE_CACHE_SHIFT);
+	struct dma_map_ops *ops = get_dma_ops(dev);
+	void *memory;
+
+	BUG_ON(!ops);
+
+	memory = ops->alloc_coherent(dev, size, dma_handle, flag);
+
+	debug_dma_alloc_coherent(dev, size, *dma_handle, memory);
+	return memory;
 }
 
-static inline void
-dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
-			      unsigned long offset, size_t size,
-			      enum dma_data_direction direction)
+static inline void dma_free_coherent(struct device *dev, size_t size,
+				     void *cpu_addr, dma_addr_t dma_handle)
 {
-	/* just sync everything, that's all the pci API can do */
-	dma_sync_single_for_cpu(dev, dma_handle, offset+size, direction);
+	struct dma_map_ops *ops = get_dma_ops(dev);
+
+	BUG_ON(!ops);
+	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
+	ops->free_coherent(dev, size, cpu_addr, dma_handle);
 }
 
-static inline void
-dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
-				 unsigned long offset, size_t size,
-				 enum dma_data_direction direction)
+static inline int dma_get_cache_alignment(void)
 {
-	/* just sync everything, that's all the pci API can do */
-	dma_sync_single_for_device(dev, dma_handle, offset+size, direction);
+	return L1_CACHE_BYTES;
 }
 
-static inline void
-dma_cache_sync(struct device *dev, void *vaddr, size_t size,
-	       enum dma_data_direction direction)
+static inline void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+		enum dma_data_direction direction)
 {
-	/* could define this in terms of the dma_cache ... operations,
-	 * but if you get this on a platform, you should convert the platform
-	 * to using the generic device DMA API */
-	BUG();
+	BUG_ON(direction == DMA_NONE);
+	__dma_sync(vaddr, size, (int)direction);
 }
 
-#endif
-
+#endif	/* _ASM_MICROBLAZE_DMA_MAPPING_H */

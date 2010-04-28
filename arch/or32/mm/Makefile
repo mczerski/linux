@@ -6,4 +6,4 @@
 # unless it's something special (ie not a .c file).
 #
 
-obj-y	:= fault.o tlb.o init.o ioremap.o
+obj-y	:= fault.o tlb.o init.o ioremap.o consistent.o
