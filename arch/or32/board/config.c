@@ -113,7 +113,7 @@ void config_BSP(char *command, int len)
 #define ETHOC_IRQ      4
 #define ETHOC_IOBASE   0x92000000
 
-static unsigned char bdbuffer[(1<<15)];
+//static unsigned char bdbuffer[(1<<15)];
 
 static struct resource ethoc_resources[] = {
         {
@@ -121,10 +121,11 @@ static struct resource ethoc_resources[] = {
                 .end    = ETHOC_IOBASE + 0x53,
                 .flags  = IORESOURCE_MEM,
         }, {
-                .start  = bdbuffer,
+/*                .start  = bdbuffer,
                 .end    = bdbuffer + (1<<15) - 1,
                 .flags  = IORESOURCE_MEM,
         }, {
+*/
                 .start  = ETHOC_IRQ,
                 .end    = ETHOC_IRQ,
                 .flags  = IORESOURCE_IRQ,
