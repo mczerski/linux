@@ -96,15 +96,6 @@ extern inline void pte_free(struct mm_struct *mm, struct page *pte)
 
 #define __pte_free_tlb(tlb,pte,addr) tlb_remove_page((tlb),(pte))
 #define pmd_pgtable(pmd) pmd_page(pmd)
-/*
- * We don't have any real pmd's, and this code never triggers because
- * the pgd will always be present..
- */
-
-#define pmd_alloc_one(mm, addr)    ({ BUG(); ((pmd_t *)2); })
-#define pmd_free(mm,x)                do { } while (0)
-#define __pmd_free_tlb(tlb,x,addr)      do { } while (0)
-#define pgd_populate(mm, pmd, pte) BUG()
 
 #define check_pgt_cache()          do { } while (0)
 

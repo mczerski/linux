@@ -37,10 +37,6 @@ typedef struct {
         unsigned long pte;
 } pte_t;
 typedef struct {
-	unsigned long pmd;
-//        unsigned long pmd[16];
-} pmd_t;
-typedef struct {
         unsigned long pgd;
 } pgd_t;
 typedef struct {
@@ -49,13 +45,10 @@ typedef struct {
 typedef struct page *pgtable_t;
 
 #define pte_val(x)	((x).pte)
-#define pmd_val(x)	((x).pmd)
-//#define pmd_val(x)      ((&x)->pmd[0])
 #define pgd_val(x)	((x).pgd)
 #define pgprot_val(x)	((x).pgprot)
 
 #define __pte(x)	((pte_t) { (x) } )
-#define __pmd(x)	((pmd_t) { (x) } )
 #define __pgd(x)	((pgd_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
 

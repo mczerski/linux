@@ -89,7 +89,7 @@ pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pud_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr)), (vaddr))
 
 static void __init kmap_init(void)
 {
@@ -179,7 +179,7 @@ static void __init identical_mapping(unsigned long start, unsigned long size,
 			break;
 		pmd = (pmd_t *)pgd;
 
-		if (pmd != pmd_offset(pgd, 0))
+		if (pmd != pmd_offset(pud_offset(pgd, 0), 0))
 			BUG();
 		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
 			vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
@@ -244,7 +244,7 @@ void __init paging_init(void)
 			break;
 		pmd = (pmd_t *)pgd;
 
-		if (pmd != pmd_offset(pgd, 0))
+		if (pmd != pmd_offset(pud_offset(pgd, 0), 0))
 			BUG();
 		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
 			vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
