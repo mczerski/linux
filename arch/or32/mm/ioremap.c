@@ -51,12 +51,12 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 		        _PAGE_KERNEL | flags);
 
 	if (ioremap_page_range((unsigned long) addr, addr + size, phys_addr, prot)) {
-		vfree(addr);
+		vfree(area->addr);
 		return NULL;
 	}
 /* Is this flush necessary??  Can we get flush_cache_vmap to cover it??? */
 //	flush_tlb_all();
-	return addr;
+	return area->addr;
 }
 
 /*
