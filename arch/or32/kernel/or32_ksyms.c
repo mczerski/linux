@@ -22,8 +22,8 @@
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
+#include <linux/semaphore.h>
 
-#include <asm/semaphore.h>
 #include <asm/processor.h>
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
