@@ -165,7 +165,7 @@ static struct platform_device serial_device = {
 	},
 };
 
-void __init or1200_register_platform_devices(void)
+static void __init or1200_register_platform_devices(void)
 {
 	platform_device_register(&serial_device);
 	platform_device_register(&ethoc_device);
