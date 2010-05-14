@@ -59,11 +59,6 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 	return addr;
 }
 
-int map_page(unsigned long va, phys_addr_t pa, int flags)
-{
-	remap_area_pages(va, pa, PAGE_SIZE, (unsigned long) flags);
-}
-
 /*
  * Boot-time IO remapping core to use
  */

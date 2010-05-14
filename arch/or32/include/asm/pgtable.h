@@ -384,7 +384,6 @@ void consistent_free(void *vaddr);
 void consistent_sync(void *vaddr, size_t size, int direction);
 void consistent_sync_page(struct page *page, unsigned long offset,
         size_t size, int direction);
-int map_page(unsigned long va, phys_addr_t pa, int flags);
 
 /*
  * No page table caches to initialise

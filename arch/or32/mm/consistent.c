@@ -43,12 +43,35 @@
 #include <linux/uaccess.h>
 #include <asm/pgtable.h>
 
-#define _PAGE_KERNEL ( _PAGE_ALL | _PAGE_SRE | _PAGE_SWE | _PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC )
+
+static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
+{
+        pgd_t *pge;
+        pud_t *pue;
+        pmd_t *pme;
+        pte_t *pte;
+        int err = -ENOMEM;
+
+        /* Use upper 10 bits of VA to index the first level map */
+        pge = pgd_offset_k(va);
+        pue = pud_offset(pge, va);
+        pme = pmd_offset(pue, va);
+
+        /* Use middle 10 bits of VA to index the second-level map */
+        pte = pte_alloc_kernel(pme, va);
+        if (pte != 0) {
+                err = 0;
+                set_pte(pte, mk_pte_phys(pa & PAGE_MASK, prot));
+        }
+
+        return err;
+}
 
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
 	int order, err, i;
 	unsigned long page, va, flags;
+	pgprot_t prot;
 	phys_addr_t pa;
 	struct vm_struct *area;
 	void	 *ret;
@@ -85,7 +108,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 	*dma_handle = pa = virt_to_bus((void *)page);
 
 	/* MS: This is the whole magic - use cache inhibit pages */
-	flags = _PAGE_KERNEL | _PAGE_CI;
+	prot = PAGE_KERNEL_NOCACHE;
 
 	/*
 	 * Set refcount=1 on all pages in an order>0
@@ -100,7 +123,7 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 
 	err = 0;
 	for (i = 0; i < size && err == 0; i += PAGE_SIZE)
-		err = map_page(va+i, pa+i, flags);
+		err = map_page(va+i, pa+i, prot);
 
 	if (err) {
 		vfree((void *)va);
