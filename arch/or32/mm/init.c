@@ -351,6 +351,11 @@ void __init paging_init(void)
 	  *itlb_vector = ((unsigned long)&itlb_miss_handler - 
 			  (unsigned long)itlb_vector) >> 2;
 	}
+
+	/* Invalidate instruction caches after code modification */
+	mtspr(SPR_ICBIR, 0x900);
+	mtspr(SPR_ICBIR, 0xa00);
+
 	kmap_init();
 }
 
