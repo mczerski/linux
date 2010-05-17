@@ -127,7 +127,7 @@ static struct resource ethoc_resources[] = {
 
 static struct ethoc_platform_data ethoc_platdata = {
 	.hwaddr = { 0, },
-	.phy_id = 0
+	.phy_id = -1
 };
 
 static struct platform_device ethoc_device = {
