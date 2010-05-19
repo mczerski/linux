@@ -26,6 +26,13 @@
 
 static int kszphy_config_init(struct phy_device *phydev)
 {
+	int err;
+
+	err = phy_write(phydev, MII_BMCR, BMCR_RESET);
+
+	if (err < 0)
+		return err;
+
 	return 0;
 }
 
