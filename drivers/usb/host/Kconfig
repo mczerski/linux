@@ -4,6 +4,7 @@
 comment "USB Host Controller Drivers"
 	depends on USB
 
+
 config USB_C67X00_HCD
 	tristate "Cypress C67x00 HCD support"
 	depends on USB
@@ -191,7 +192,7 @@ config USB_ISP1362_HCD
 
 config USB_OHCI_HCD
 	tristate "OHCI HCD support"
-	depends on USB && USB_ARCH_HAS_OHCI
+	depends on USB 
 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
 	select USB_OTG_UTILS if ARCH_OMAP
 	---help---
@@ -424,4 +425,17 @@ config USB_IMX21_HCD
 
          To compile this driver as a module, choose M here: the
          module will be called "imx21-hcd".
+
+config USB_OHS900_HCD
+	tristate "OHS900 HCD support"
+	depends on USB 
+	help
+	  The OHS900 is a single-port USB controller that supports either
+	  host side or peripheral side roles.  Enable this option if your
+	  board has this core, and you want to use it as a host controller. 
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ohs900-hcd. 
+
 

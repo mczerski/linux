@@ -14,6 +14,7 @@ fhci-objs += fhci-dbg.o
 endif
 xhci-hcd-objs := xhci.o xhci-mem.o xhci-pci.o xhci-ring.o xhci-hub.o xhci-dbg.o
 
+obj-$(CONFIG_USB_OHS900_HCD)	+= ohs900-hcd.o
 obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
 
 obj-$(CONFIG_PCI)		+= pci-quirks.o
