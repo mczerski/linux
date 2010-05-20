@@ -15,6 +15,8 @@
 # Based on:
 # arch/i386/Makefile
 
+KBUILD_DEFCONFIG := usbeth_defconfig
+
 LDFLAGS         :=
 OBJCOPYFLAGS    := -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=
