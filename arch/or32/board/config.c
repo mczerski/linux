@@ -109,6 +109,7 @@ void config_BSP(char *command, int len)
 }
 
 #define UART_IRQ       2
+#define UART_IOBASE    0x90000000
 
 #define ETHOC_IRQ      4
 #define ETHOC_IOBASE   0x92000000
@@ -141,7 +142,7 @@ static struct platform_device ethoc_device = {
 
 static struct plat_serial8250_port serial_platform_data[] = {
 	{
-		.mapbase	= 0x90000000,
+		.mapbase	= UART_IOBASE,
 		.irq		= UART_IRQ,
 		.uartclk	= BASE_BAUD*16,
 		.regshift	= 0,
