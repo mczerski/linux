@@ -4,17 +4,12 @@
 
 #include <asm/board.h>
 
-/* JPB: Linux will set the default UART baud rate (for us this seems to be 9600)
- * based on the system clock. If you want a different baud rate, spoof the
- * system by giving a smaller value for BASE_BAUD, which Linux will use as the
- * system clock when computing baud rate.
- *
- * Original code placed an unwarranted divide by 16, thereby trying to set up
- * a 2 Mbit terminal!
- *
- * #define BASE_BAUD ( (SYS_CLK/(OR32_CONSOLE_BAUD)) * (9600/16) ) 
+/* There's a generic version of this file, but it assumes a 1.8MHz UART clk...
+ * this, on the other hand, assumes the UART clock is tied to the system 
+ * clock...
  */
-#define BASE_BAUD ( (SYS_CLK/(OR32_CONSOLE_BAUD)) * (9600) )
- 
+
+#define BASE_BAUD (SYS_CLK/16)
+
 #endif /* __ASM_SERIAL_H__ */
 #endif /* __KERNEL__ */
