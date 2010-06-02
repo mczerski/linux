@@ -49,10 +49,6 @@
 /* some defines to ease or32 assembly programming */
 #include "or32_funcs.S"
 	
-#define GET_CURRENT_THREAD_INFO(reg,ksp)			\
-	l.srli	reg,ksp,PAGE_SHIFT				;\
-	l.slli	reg,reg,PAGE_SHIFT
-	
 /* =========================================================[ macros ]=== */
 
 #define PUSH_PT_REGS_NO_TRANS					\

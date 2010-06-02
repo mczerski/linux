@@ -199,15 +199,6 @@
 /* =========================================================[ macros ]=== */
 
 
-#define LOAD_CURRENT_THREAD_INFO(reg,t1)			\
-	LOAD_SYMBOL_2_GPR(reg,_current_thread_info_set)		;\
-	tophys  (t1,reg)					;\
-	l.lwz   reg,0(t1)
-
-#define GET_CURRENT_THREAD_INFO(reg,ksp)			\
-	l.srli	reg,ksp,PAGE_SHIFT				;\
-	l.slli	reg,reg,PAGE_SHIFT
-
 #define GET_CURRENT_PGD(reg,t1)					\
 	LOAD_SYMBOL_2_GPR(reg,_current_pgd)			;\
 	tophys  (t1,reg)					;\
