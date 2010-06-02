@@ -37,9 +37,6 @@
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-extern unsigned long wall_jiffies;
-
-
 static inline int set_rtc_mmss(unsigned long nowtime)
 {
   if (mach_set_clock_mmss)
