@@ -174,6 +174,7 @@ others it is also used in assembly file(s). */
  *
  */
 #define SPR_SR_CID      0xf0000000  /* Context ID */
+#define SPR_SR_SUMRA    0x00010000  /* Fixed one */
 #define SPR_SR_FO       0x00008000  /* Fixed one */
 #define SPR_SR_EPH      0x00004000  /* Exception Prefixi High */
 #define SPR_SR_DSX      0x00002000  /* Delay Slot Exception */
