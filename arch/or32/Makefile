@@ -37,7 +37,6 @@ head-y 		:= arch/or32/kernel/head.o arch/or32/kernel/init_task.o
 core-y		+= arch/or32/lib/ \
 		   arch/or32/kernel/ \
 		   arch/or32/mm/ \
-		   arch/or32/drivers/ \
 		   arch/or32/board/ 
 #		   arch/or32/support/
 libs-y		+= $(LIBGCC)

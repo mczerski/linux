@@ -62,12 +62,6 @@
 /* ============================================[ tmp store locations ]=== */
 
 /*
- * workaround for passing next open ethernet tx buffer descriptor number
- * when used prior linux. for details look into drivers/net/open_eth.[ch]
- */
-#define INIT_OETH_TX_NEXT		0x0
-
-/*
  * inital configuration
  */
 #define INIT_IC_ADDR			0x4

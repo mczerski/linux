@@ -266,14 +266,6 @@ endmenu
 endmenu
 
 
-# OpenRISC specific drivers
-
-menu "OpenRISC specific drivers"
-
-source "arch/or32/drivers/Kconfig"
-
-endmenu
-
 menu "Bus options"
 
 config PCI
