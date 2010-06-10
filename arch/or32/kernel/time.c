@@ -107,14 +107,6 @@ void do_gettimeofday(struct timeval *tv)
 	local_irq_disable();
 	usec = mach_gettimeoffset ? mach_gettimeoffset() : 0;
 
-	/*
-	 * If time_adjust is negative then NTP is slowing the clock
-	 * so make sure not to go into next possible interval.
-	 * Better to lose some accuracy than have time go backwards..
-	 */
-	if (unlikely(time_adjust < 0) && usec > tickadj)
-	  usec = tickadj;
-	
 	sec = xtime.tv_sec;
 	usec += xtime.tv_nsec / 1000;
 	local_irq_restore(flags);
@@ -155,7 +147,7 @@ int do_settimeofday(struct timespec *tv)
 	set_normalized_timespec(&xtime, sec, nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
 
-	time_adjust = 0;		/* stop active adjtime() */
+//	time_adjust = 0;		/* stop active adjtime() */
 	time_status |= STA_UNSYNC;
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
