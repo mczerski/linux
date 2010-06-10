@@ -51,118 +51,7 @@
 
 int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs);
 
-/*
- * Atomically swap in the new signal mask, and wait for a signal.  Define 
- * dummy arguments to be able to reach the regs argument.  (Note that this
- * arrangement relies on old_sigset_t occupying one register.)
- */
-int sys_sigsuspend(old_sigset_t mask, long r4, long r5, long mof, 
-		   long srp, struct pt_regs *regs)
-{
-	sigset_t saveset;
-	phx_signal("mask 0x%lx, r4 0x%lx, r5 0x%lx, mof 0x%lx, srp 0x%lx, regs %p",
-		   mask, r4, r5, mof, srp, regs);
-	
-
-	mask &= _BLOCKABLE;
-	spin_lock_irq(&current->sighand->siglock);
-	saveset = current->blocked;
-	siginitset(&current->blocked, mask);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	regs->gprs[1] = -EINTR;
-	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule();
-		if (do_signal(0, &saveset, regs))
-			/* We will get here twice: once to call the signal
-			   handler, then again to return from the
-			   sigsuspend system call.  When calling the
-			   signal handler, R10 holds the signal number as
-			   set through do_signal.  The sigsuspend call
-			   will return with the restored value set above;
-			   always -EINTR.  */
-			return regs->gprs[1];
-	}
-}
-
-/* Define dummy arguments to be able to reach the regs argument.  (Note that
- * this arrangement relies on size_t occupying one register.)
- */
-int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize, long r5, 
-		      long mof, long srp, struct pt_regs *regs)
-{
-	sigset_t saveset, newset;
-
-	phx_signal("unewset %p, sigsetsize 0x%x, r5 0x%lx, mof 0x%lx, srp 0x%lx, regs %p",
-		   unewset, sigsetsize, r5, mof, srp, regs);
-	
-	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t))
-		return -EINVAL;
-
-	if (copy_from_user(&newset, unewset, sizeof(newset)))
-		return -EFAULT;
-	sigdelsetmask(&newset, ~_BLOCKABLE);
-
-	spin_lock_irq(&current->sighand->siglock);
-	saveset = current->blocked;
-	current->blocked = newset;
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-
-	regs->gprs[1] = -EINTR;
-	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule();
-		if (do_signal(0, &saveset, regs))
-			/* We will get here twice: once to call the signal
-			   handler, then again to return from the
-			   sigsuspend system call.  When calling the
-			   signal handler, R10 holds the signal number as
-			   set through do_signal.  The sigsuspend call
-			   will return with the restored value set above;
-			   always -EINTR.  */
-			return regs->gprs[1];
-	}
-}
-
-int sys_sigaction(int sig, const struct old_sigaction *act,
-		  struct old_sigaction *oact)
-{
-	struct k_sigaction new_ka, old_ka;
-	int ret;
-
-	phx_signal("sig %d, old act %p, old oact %p",
-		   sig, act, oact);
-
-	if (act) {
-		old_sigset_t mask;
-		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
-		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
-		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
-			return -EFAULT;
-		__get_user(new_ka.sa.sa_flags, &act->sa_flags);
-		__get_user(mask, &act->sa_mask);
-		siginitset(&new_ka.sa.sa_mask, mask);
-	}
-
-	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
-
-	if (!ret && oact) {
-		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
-		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
-		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
-			return -EFAULT;
-		__put_user(old_ka.sa.sa_flags, &oact->sa_flags);
-		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
-	}
-
-	return ret;
-}
-
-int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+asmlinkage long _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regss)
 {
 	struct pt_regs *regs = (struct pt_regs *) &uss;
 	phx_signal("uss %p, uoss %p",
@@ -170,17 +59,6 @@ int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 	
 	return do_sigaltstack(uss, uoss, regs->sp);
 }
-
-
-/*
- * Do a signal return; undo the signal stack.
- */
-
-struct sigframe {
-	struct sigcontext sc;
-	unsigned long extramask[_NSIG_WORDS-1];
-	unsigned char retcode[16];  /* trampoline code */
-};
 
 struct rt_sigframe {
 	struct siginfo *pinfo;
@@ -236,66 +114,11 @@ badframe:
 	return 1;
 }
 
-/* Define dummy arguments to be able to reach the regs argument.  */
-
-asmlinkage int sys_sigreturn(long r3, long r4, long r5, long mof, 
-                             long srp, struct pt_regs *regs)
-{
-        struct sigframe *frame = (struct sigframe *)regs->sp;
-        sigset_t set;
-
-	phx_signal("r3 0x%lx, r4 0x%lx, r5 0x%lx, mof 0x%lx, srp 0x%lx, regs %p (regs->sp 0x%lx)",
-		   r3, r4, r5, mof, srp, regs, regs->sp);
-
-        /*
-         * Since we stacked the signal on a dword boundary,
-         * then frame should be dword aligned here.  If it's
-         * not, then the user is trying to mess with us.
-         */
-        if (((long)frame) & 3)
-                goto badframe;
-
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
-		goto badframe;
-	if (__get_user(set.sig[0], &frame->sc.oldmask)
-	    || (_NSIG_WORDS > 1
-		&& __copy_from_user(&set.sig[1], &frame->extramask,
-				    sizeof(frame->extramask))))
-		goto badframe;
-
-	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sighand->siglock);
-	current->blocked = set;
-	recalc_sigpending();
-
-	/* __PHX__ throw this out */
-	phx_signal("SIGPENDING: %d", signal_pending(current));
-
-	spin_unlock_irq(&current->sighand->siglock);
-	
-	if (restore_sigcontext(regs, &frame->sc))
-		goto badframe;
-
-	/* TODO: SIGTRAP when single-stepping as in arm ? */
-
-	return regs->gprs[1];
-
-badframe:
-	force_sig(SIGSEGV, current);
-	return 0;
-}	
-
-/* Define dummy arguments to be able to reach the regs argument.  */
-
-asmlinkage int sys_rt_sigreturn(long r3, long r4, long r5, 
-                                long mof, long srp, struct pt_regs *regs)
+asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe *)regs->sp;
 	sigset_t set;
 	stack_t st;
-
-	phx_signal("r3 0x%lx, r4 0x%lx, r5 0x%lx, mof 0x%lx, srp 0x%lx, regs %p (regs->sp 0x%lx)",
-		   r3, r4, r5, mof, srp, regs, regs->sp);
 
         /*
          * Since we stacked the signal on a dword boundary,
@@ -393,71 +216,6 @@ static inline void * get_sigframe(struct k_sigaction *ka,
  * trampoline which performs the syscall sigreturn, or a provided
  * user-mode trampoline.
  */
-
-static void setup_frame(int sig, struct k_sigaction *ka,
-			sigset_t *set, struct pt_regs * regs)
-{
-	struct sigframe *frame;
-	unsigned long return_ip;
-	int err = 0;
-
-	phx_signal("sig %d, ka %p, set %p, regs %p",
-		   sig, ka, set, regs);
-
-	frame = get_sigframe(ka, regs, sizeof(*frame));
-
-	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
-		goto give_sigsegv;
-
-	err |= setup_sigcontext(&frame->sc, regs, set->sig[0]);
-	if (err)
-		goto give_sigsegv;
-
-	if (_NSIG_WORDS > 1) {
-		err |= __copy_to_user(frame->extramask, &set->sig[1],
-				      sizeof(frame->extramask));
-	}
-	if (err)
-		goto give_sigsegv;
-
-	/* Set up to return from userspace.  If provided, use a stub
-	   already in userspace.  */
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		return_ip = (unsigned long)ka->sa.sa_restorer;
-		phx_signal("SA_RESTORER: return_ip 0x%lx", return_ip);
-	} else {
-		/* trampoline - the desired return ip is the retcode itself */
-		return_ip = (unsigned long)&frame->retcode;
-		phx_signal("ktrampoline: return_ip 0x%lx", return_ip);
-		/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
-		err |= __put_user(0xa960        , (short *)(frame->retcode+0));
-		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
-		err |= __put_user(0x20000001, (unsigned long *)(frame->retcode+4));
-		err |= __put_user(0x15000000, (unsigned long *)(frame->retcode+8));
-	}
-
-	if (err)
-		goto give_sigsegv;
-
-	/* Set up registers for signal handler */
-
-	regs->pc = (unsigned long) ka->sa.sa_handler;       /* what we enter NOW   */
-	regs->gprs[7] = return_ip;                          /* what we enter LATER */
-	regs->gprs[1] = sig;                                /* first argument is signo */
-
-	/* actually move the usp to reflect the stacked frame */
-
-	//	wrusp((unsigned long)frame);
-	regs->sp=(unsigned long) frame;
-
-	return;
-
-give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
-}
-
 static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 			   sigset_t *set, struct pt_regs * regs)
 {
@@ -475,7 +233,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	err |= __put_user(&frame->info, &frame->pinfo);
 	err |= __put_user(&frame->uc, &frame->puc);
-	err |= copy_siginfo_to_user(&frame->info, info);
+	if (info)
+		err |= copy_siginfo_to_user(&frame->info, info);
 	if (err)
 		goto give_sigsegv;
 
@@ -498,7 +257,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		phx_signal("ktrampoline: return_ip 0x%lx", return_ip);
 		/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
 		err |= __put_user(0xa960        , (short *)(frame->retcode+0));
-		err |= __put_user(__NR_sigreturn, (short *)(frame->retcode+2));
+		err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
 		err |= __put_user(0x20000001, (unsigned long *)(frame->retcode+4));
 		err |= __put_user(0x15000000, (unsigned long *)(frame->retcode+8));
 	}
@@ -532,6 +291,7 @@ give_sigsegv:
 /*
  * OK, we're invoking a handler
  */	
+
 
 extern inline void
 handle_signal(int canrestart, unsigned long sig,
@@ -571,11 +331,10 @@ handle_signal(int canrestart, unsigned long sig,
 		}
 	}
 
-	/* Set up the stack frame */
 	if (ka->sa.sa_flags & SA_SIGINFO)
 		setup_rt_frame(sig, ka, info, oldset, regs);
 	else
-		setup_frame(sig, ka, oldset, regs);
+		setup_rt_frame(sig, ka, NULL, oldset, regs);
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
@@ -648,4 +407,3 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 
 	return 0;
 }
-

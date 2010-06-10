@@ -24,146 +24,51 @@
  */
 
 #include <linux/errno.h>
-#include <linux/sched.h>
 #include <linux/syscalls.h>
 #include <linux/mm.h>
-#include <linux/smp.h>
-#include <linux/smp_lock.h>
-#include <linux/sem.h>
-#include <linux/msg.h>
-#include <linux/shm.h>
-#include <linux/stat.h>
-#include <linux/mman.h>
-#include <linux/file.h>
 
-#include <asm/uaccess.h>
-#include <asm/ipc.h>
-#include <asm/segment.h>
+#include <asm/syscalls.h>
 
-/* common code for old and new mmaps */
-static inline long
-do_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
-        unsigned long flags, unsigned long fd, unsigned long pgoff)
+asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
+        unsigned long prot, unsigned long flags,
+        unsigned long fd, unsigned long pgoff)
 {
-        int error = -EBADF;
-        struct file * file = NULL;
-
-        flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
-        if (!(flags & MAP_ANONYMOUS)) {
-                file = fget(fd);
-                if (!file)
-                        goto out;
-        }
-
-        down_write(&current->mm->mmap_sem);
-        error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-        up_write(&current->mm->mmap_sem);
-
-        if (file)
-                fput(file);
-out:
-        return error;
+        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
 }
 
-asmlinkage unsigned long old_mmap(unsigned long *args)
-{        
-	unsigned long buffer[6];
-	int err = -EFAULT;
+asmlinkage long sys_mmap(unsigned long addr, unsigned long len, 
+                        unsigned long prot, unsigned long flags, 
+                        unsigned long fd, off_t pgoff) 
+{ 
+        if (pgoff & ~PAGE_MASK) 
+                return -EINVAL; 
 
-	if (copy_from_user(&buffer, args, sizeof(buffer)))
-		goto out;
-
-	err = -EINVAL;
-	if (buffer[5] & ~PAGE_MASK) /* verify that offset is on page boundary */
-		goto out;
-
-	err = do_mmap2(buffer[0], buffer[1], buffer[2], buffer[3],
-                       buffer[4], buffer[5] >> PAGE_SHIFT);
-out:
-	return err;
+        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT); 
 }
 
-asmlinkage long
-sys_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
-          unsigned long flags, unsigned long fd, unsigned long pgoff)
-{
-        return do_mmap2(addr, len, prot, flags, fd, pgoff);
-}
-
-/*
- * sys_ipc() is the de-multiplexer for the SysV IPC calls..
- *
- * This is really horribly ugly. (same as arch/i386)
+/* These are secondary entry points as the primary entry points are defined in
+ * entry.S where we add the 'regs' parameter value 
  */
 
-asmlinkage long sys_ipc (unsigned int call, int first, unsigned long second,
-		unsigned long third, void __user *ptr, long fifth)
+asmlinkage long _sys_clone(unsigned long clone_flags, unsigned long newsp,
+                        void __user *parent_tid, void __user *child_tid,
+                        struct pt_regs *regs)
 {
-	int version, ret;
-
-	version = call >> 16; /* hack for backward compatibility */
-	call &= 0xffff;
-
-	switch (call) {
-	case SEMOP:
-		return sys_semtimedop (first, (struct sembuf __user *)ptr, second, NULL);
-	case SEMTIMEDOP:
-		return sys_semtimedop(first, (struct sembuf __user *)ptr, second,
-					(const struct timespec __user *)fifth);
-
-	case SEMGET:
-		return sys_semget (first, second, third);
-	case SEMCTL: {
-		union semun fourth;
-		if (!ptr)
-			return -EINVAL;
-		if (get_user(fourth.__pad, (void * __user *) ptr))
-			return -EFAULT;
-		return sys_semctl (first, second, third, fourth);
-	}
-
-	case MSGSND:
-		return sys_msgsnd (first, (struct msgbuf __user *) ptr, 
-				   second, third);
-	case MSGRCV:
-		switch (version) {
-		case 0: {
-			struct ipc_kludge tmp;
-			if (!ptr)
-				return -EINVAL;
-			
-			if (copy_from_user(&tmp,
-					   (struct ipc_kludge __user *) ptr, 
-					   sizeof (tmp)))
-				return -EFAULT;
-			return sys_msgrcv (first, tmp.msgp, second,
-					   tmp.msgtyp, third);
-		}
-		default:
-			return sys_msgrcv (first,
-					   (struct msgbuf __user *) ptr,
-					   second, fifth, third);
-		}
-	case MSGGET:
-		return sys_msgget ((key_t) first, second);
-	case MSGCTL:
-		return sys_msgctl (first, second, (struct msqid_ds __user *) ptr);
-
-	case SHMAT: {
-                ulong raddr;
-                ret = do_shmat (first, (char __user *) ptr, second, &raddr);
-                if (ret)
-                        return ret;
-                return put_user (raddr, (ulong __user *) third);
-        }
-	case SHMDT: 
-		return sys_shmdt ((char __user *)ptr);
-	case SHMGET:
-		return sys_shmget (first, second, third);
-	case SHMCTL:
-		return sys_shmctl (first, second,
-				   (struct shmid_ds __user *) ptr);
-	default:
-		return -ENOSYS;
-	}
+	return do_fork(clone_flags, regs->sp, regs, 0, NULL, NULL);
 }
+
+asmlinkage int _sys_fork(struct pt_regs *regs)
+{
+        return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
+}
+
+asmlinkage int _sys_vfork(struct pt_regs *regs)
+{
+	/* This doesn't seem to work */
+//        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gprs[1], regs, 0, NULL, NULL);
+
+	/* This works */
+        return do_fork(SIGCHLD, regs->gprs[1], regs, 0, NULL, NULL);
+}
+
+

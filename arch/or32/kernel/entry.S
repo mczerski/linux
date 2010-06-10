@@ -18,17 +18,12 @@
  *  31. 12. 2005: Gyorgy Jeney (nog@bsemi.com)
  *    Added syscall traceing code
  *
- * syscall table entries are based on ppc port, so they will probably 
- * need some more cleaning.
- *
  * Stack layout in 'ret_from_system_call':
  *      ptrace needs to have all regs on the stack.
  *      if the order here is changed, it needs to be
  *      updated in fork.c:copy_process, signal.c:do_signal,
  *      ptrace.c and ptrace.h
  *
- * syscall table entries are based on ppc port, so it will probably need
- * some more cleaning.
  */
 
 #include <linux/linkage.h>
@@ -42,7 +37,6 @@
 
 #include <asm/page.h>
 #include <asm/mmu.h>
-#include <asm/unistd.h>
 #include <asm/pgtable.h>
 #include <asm/asm-offsets.h>
 		
@@ -626,7 +620,7 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	/* check that userspace didn't try to fool us with 
 	 * syscall number greater then __NR_syscall. 
 	 */	
-	l.sfgeui r11,NR_syscalls
+	l.sfgeui r11,__NR_syscalls
 	l.bf	_syscall_badsys
 	l.nop
 	
@@ -641,7 +635,13 @@ _syscall_call:
         l.lwz   r30,0(r30)
 	
 	l.jalr  r30
-	l.addi  r8,r1,0                 // regs pointer
+
+# r8 is actually the 6th parameter of the syscall
+# stupid to overwrite it.
+# put a l.nop in the delay slot instead...
+# FIXME:  Does this have consequences????
+#	l.addi  r8,r1,0                 // regs pointer
+	l.nop
 
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
@@ -671,7 +671,7 @@ _syscall_trace_entry:
 	l.lwz	r5,GPR5(r1)
 	l.lwz	r6,GPR6(r1)
 	l.lwz	r7,GPR7(r1)
-	l.sfgeui r11,NR_syscalls
+	l.sfgeui r11,__NR_syscalls
 	l.bnf	_syscall_call
 	l.nop
 
@@ -919,253 +919,35 @@ ENTRY(__switch)
 	l.addi  r10,r5,0			/* set current (r10) to new */
 	RESTORE_ALL_NO_R11
 		
-/* =================================================[ syscall table ] === */
+ENTRY(_sys_clone)
+	l.addi	r7,r1,0
+	l.j	__sys_clone
+	l.nop
 	
-	.data
-	.align 4
-ENTRY(_sys_call_table)
-	.long _sys_ni_syscall	/* 0  -  old "setup()" system call */
-	.long _sys_exit
-	.long _sys_fork
-	.long _sys_read
-	.long _sys_write
-	.long _sys_open		/* 5 */
-	.long _sys_close
-	.long _sys_waitpid
-	.long _sys_creat
-	.long _sys_link
-	.long _sys_unlink	/* 10 */
-	.long _sys_execve
-	.long _sys_chdir
-	.long _sys_time
-	.long _sys_mknod
-	.long _sys_chmod	/* 15 */
-	.long _sys_lchown
-	.long _sys_ni_syscall		/* old break syscall holder */
-	.long _sys_ni_syscall           /* old stat syscall */
-	.long _sys_lseek
-	.long _sys_getpid	/* 20 */
-	.long _sys_mount
-	.long _sys_ni_syscall           /* oldumount */
-	.long _sys_setuid
-	.long _sys_getuid
-	.long _sys_stime	/* 25 */
-	.long _sys_ptrace
-	.long _sys_alarm
-	.long _sys_ni_syscall           /* old fstat */
-	.long _sys_pause
-	.long _sys_utime	/* 30 */
-	.long _sys_ni_syscall		/* old stty syscall holder */
-	.long _sys_ni_syscall		/* old gtty syscall holder */
-	.long _sys_access
-	.long _sys_nice
-	.long _sys_ni_syscall	/* 35:	 old ftime syscall holder */
-	.long _sys_sync
-	.long _sys_kill
-	.long _sys_rename
-	.long _sys_mkdir
-	.long _sys_rmdir	/* 40 */
-	.long _sys_dup
-	.long _sys_pipe
-	.long _sys_times
-	.long _sys_ni_syscall	/* old prof syscall holder */
-	.long _sys_brk		/* 45 */
-	.long _sys_setgid
-	.long _sys_getgid
-	.long _sys_signal
-	.long _sys_geteuid
-	.long _sys_getegid	/* 50 */
-	.long _sys_acct
-	.long _sys_umount		/* recycled never used phys() */
-	.long _sys_ni_syscall		/* old lock syscall holder */
-	.long _sys_ioctl
-	.long _sys_fcntl	/* 55 */
-	.long _sys_ni_syscall		/* old mpx syscall holder */
-	.long _sys_setpgid
-	.long _sys_ni_syscall		/* old ulimit syscall holder */
-	.long _sys_ni_syscall		/* old _sys_olduname holder */
-	.long _sys_umask	/* 60 */
-	.long _sys_chroot
-	.long _sys_ustat
-	.long _sys_dup2
-	.long _sys_getppid
-	.long _sys_getpgrp	/* 65 */
-	.long _sys_setsid
-	.long _sys_sigaction
-	.long _sys_sgetmask
-	.long _sys_ssetmask
-	.long _sys_setreuid	/* 70 */
-	.long _sys_setregid
-	.long _sys_sigsuspend
-	.long _sys_sigpending
-	.long _sys_sethostname
-	.long _sys_setrlimit	/* 75 */
-	.long _sys_ni_syscall           /* old_getrlimit */
-	.long _sys_getrusage
-	.long _sys_gettimeofday
-	.long _sys_settimeofday
-	.long _sys_getgroups	/* 80 */
-	.long _sys_setgroups
-	.long _sys_select		/* was old_select */
-	.long _sys_symlink
-	.long _sys_ni_syscall           /* old lstat */
-	.long _sys_readlink	/* 85 */
-	.long _sys_uselib
-	.long _sys_swapon
-	.long _sys_reboot
-	.long _sys_ni_syscall           /* old_readdir */
-	.long _old_mmap		/* 90 */
-	.long _sys_munmap
-	.long _sys_truncate
-	.long _sys_ftruncate
-	.long _sys_fchmod
-	.long _sys_fchown	/* 95 */
-	.long _sys_getpriority
-	.long _sys_setpriority
-	.long _sys_ni_syscall			/* old profil syscall holder */
-	.long _sys_statfs
-	.long _sys_fstatfs	/* 100 */
-	.long _sys_ni_syscall			/* _sys_ioperm in i386 */
-	.long _sys_socketcall
-	.long _sys_syslog
-	.long _sys_setitimer
-	.long _sys_getitimer	/* 105 */
-	.long _sys_newstat
-	.long _sys_newlstat
-	.long _sys_newfstat
-	.long _sys_ni_syscall			/* old _sys_uname holder */
-	.long _sys_ni_syscall	/* 110 */	/* _sys_iopl in i386 */
-	.long _sys_vhangup
-	.long _sys_ni_syscall	/* old 'idle' syscall */
-	.long _sys_ni_syscall			/* vm86 in i386 */
-	.long _sys_wait4
-	.long _sys_swapoff	/* 115 */
-	.long _sys_sysinfo
-	.long _sys_ipc
-	.long _sys_fsync
-	.long _sys_sigreturn
-	.long _sys_clone	/* 120 */
-	.long _sys_setdomainname
-	.long _sys_newuname
-	.long _sys_ni_syscall
-	.long _sys_adjtimex
-	.long _sys_mprotect	/* 125 */
-	.long _sys_sigprocmask
-	.long _sys_ni_syscall	/* old "create_module" */
-	.long _sys_init_module
-	.long _sys_delete_module
-	.long _sys_ni_syscall   /* 130:	old "get_kernel_syms" */
-	.long _sys_quotactl
-	.long _sys_getpgid
-	.long _sys_fchdir
-	.long _sys_bdflush
-	.long _sys_sysfs	/* 135 */
-	.long _sys_personality
-	.long _sys_ni_syscall	/* reserved for afs_syscall */
-	.long _sys_setfsuid
-	.long _sys_setfsgid
-	.long _sys_llseek	/* 140 */
-	.long _sys_getdents
-	.long _sys_select
-	.long _sys_flock
-	.long _sys_msync
-	.long _sys_readv	/* 145 */
-	.long _sys_writev
-	.long _sys_getsid
-	.long _sys_fdatasync
-	.long _sys_sysctl
-	.long _sys_mlock	/* 150 */
-	.long _sys_munlock
-	.long _sys_mlockall
-	.long _sys_munlockall
-	.long _sys_sched_setparam
-	.long _sys_sched_getparam	/* 155 */
-	.long _sys_sched_setscheduler
-	.long _sys_sched_getscheduler
-	.long _sys_sched_yield
-	.long _sys_sched_get_priority_max
-	.long _sys_sched_get_priority_min	/* 160 */
-	.long _sys_sched_rr_get_interval
-	.long _sys_nanosleep
-	.long _sys_mremap
-	.long _sys_setresuid
-	.long _sys_getresuid	/* 165 */
-	.long _sys_ni_syscall		/* old sys_query_module */
-	.long _sys_poll
-	.long _sys_nfsservctl
-	.long _sys_setresgid
-	.long _sys_getresgid	/* 170 */
-	.long _sys_prctl
-	.long _sys_rt_sigreturn
-	.long _sys_rt_sigaction
-	.long _sys_rt_sigprocmask	
-	.long _sys_rt_sigpending	/* 175 */
-	.long _sys_rt_sigtimedwait
-	.long _sys_rt_sigqueueinfo
-	.long _sys_rt_sigsuspend
-	.long _sys_pread64
-	.long _sys_pwrite64	/* 180 */
-	.long _sys_chown
-	.long _sys_getcwd
-	.long _sys_capget
-	.long _sys_capset
-	.long _sys_sigaltstack	/* 185 */
-	.long _sys_sendfile
-	.long _sys_ni_syscall	/* streams1 */
-	.long _sys_ni_syscall	/* streams2 */
-	.long _sys_ni_syscall	/* was 189 vfork */
-	.long _sys_getrlimit	/* 190 */
-	.long _sys_readahead
-	.long _sys_mmap2
-	.long _sys_truncate64
-	.long _sys_ftruncate64
-	.long _sys_stat64	/* 195 */
-	.long _sys_lstat64
-	.long _sys_fstat64
-	.long _sys_ni_syscall	/*	_sys_pciconfig_read */
-	.long _sys_ni_syscall	/*	_sys_pciconfig_write */
-	.long _sys_ni_syscall	/* 200	_sys_pciconfig_iobase */
-	.long _sys_ni_syscall	/* 201	- reserved - MacOnLinux */
-	.long _sys_getdents64
-	.long _sys_pivot_root
-	.long _sys_fcntl64
-	.long _sys_madvise	/* 205 */
-	.long _sys_mincore
-	.long _sys_gettid
-	.long _sys_tkill
-	.long _sys_setxattr
-	.long _sys_lsetxattr	/* 210 */
-	.long _sys_fsetxattr
-	.long _sys_getxattr
-	.long _sys_lgetxattr
-	.long _sys_fgetxattr
-	.long _sys_listxattr	/* 215 */
-	.long _sys_llistxattr
-	.long _sys_flistxattr
-	.long _sys_removexattr
-	.long _sys_lremovexattr
-	.long _sys_fremovexattr	/* 220  */
-	.long _sys_ni_syscall	/*	reserved for sys_futex */
-	.long _sys_ni_syscall	/*	reserved for sys_sched_setaffinity */
-	.long _sys_ni_syscall	/*	reserved for sys_sched_getaffinity */
-	.long _sys_ni_syscall	/*	reserved for sys_security */
-	.long _sys_ni_syscall	/* 225	reserved for Tux */
-	.long _sys_ni_syscall	/*	reserved for sys_sendfile64 */
-	.long _sys_ni_syscall	/*	reserved for sys_io_setup */
-	.long _sys_ni_syscall	/*	reserved for sys_io_destroy */
-	.long _sys_ni_syscall	/*	reserved for sys_io_getevents */
-	.long _sys_ni_syscall	/* 230	reserved for sys_io_submit */
-	.long _sys_ni_syscall	/*	reserved for sys_io_cancel */
+ENTRY(_sys_fork)
+	l.addi	r3,r1,0
+	l.j	__sys_fork
+	l.nop
 
-        /*
-         * NOTE!! This doesn't have to be exact - we just have
-         * to make sure we have _enough_ of the "sys_ni_syscall"
-         * entries. Don't panic if you notice that this hasn't
-         * been shrunk every time we add a new system call.
-         */
+ENTRY(_sys_vfork)
+	l.addi	r3,r1,0
+	l.j	__sys_vfork
+	l.nop
+	
+ENTRY(_sys_execve)
+	l.addi	r6,r1,0
+	l.j	__sys_execve
+	l.nop
 
-	.rept NR_syscalls-(.-_sys_call_table)/4
-		.long _sys_ni_syscall
-	.endr
+ENTRY(_sys_sigaltstack)
+	l.addi	r5,r1,0
+	l.j	__sys_sigaltstack
+	l.nop
+
+ENTRY(_sys_rt_sigreturn)
+	l.addi	r3,r1,0
+	l.j	__sys_rt_sigreturn
+	l.nop
 
 /* ============================================================[ EOF ]=== */
+

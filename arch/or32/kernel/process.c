@@ -134,23 +134,6 @@ void show_regs(struct pt_regs *regs)
 	show_registers(regs);
 }
 
-asmlinkage int sys_fork(int r3, int r4, int r5, int r6, int r7, struct pt_regs *regs)
-{
-	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
-}
-
-asmlinkage int sys_clone(int r3, int r4, int r5, int r6, int r7, struct pt_regs *regs)
-{
-	unsigned long clone_flags = (unsigned long)r3;
-	return do_fork(clone_flags, regs->sp, regs, 0, NULL, NULL);
-}
-
-/*asmlinkage int sys_vfork(int r3, int r4, int r5, int r6, int r7, struct pt_regs *regs)
-{
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gprs[1], regs, 0, NULL, NULL);
-}
-*/
-
 unsigned long thread_saved_pc(struct task_struct *t)
 {
 	return (unsigned long)user_regs(t->stack)->pc;
@@ -275,8 +258,8 @@ void dump_thread(struct pt_regs *regs, struct user *dump)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage int sys_execve(char *name, char **argv, char **envp,
-			  int r6, int r7, struct pt_regs *regs)
+asmlinkage long _sys_execve(char __user *name, char __user * __user *argv,
+                        char __user * __user *envp, struct pt_regs *regs)
 {
 	int error;
 	char * filename;
