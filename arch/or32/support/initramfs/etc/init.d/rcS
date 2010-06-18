@@ -20,10 +20,13 @@ mount -o remount,rw /
 #/sbin/udhcpc -n -q -s /usr/share/udhcpc/default.script
 
 # create some dirs to avoid warning messages
-mkdir /var
-mkdir /var/run
-mkdir /etc/network/if-up.d
-mkdir /etc/network/if-pre-up.d
+mkdir -p /var/run
+mkdir -p /etc/network/if-up.d
+mkdir -p /etc/network/if-pre-up.d
+
+# telnetd requires this
+mkdir -p /dev/pts
+mount -t devpts none /dev/pts
 
 echo "Configuring loopback device"
 #ifconfig lo 127.0.0.1
