@@ -24,6 +24,9 @@ mkdir -p /var/run
 mkdir -p /etc/network/if-up.d
 mkdir -p /etc/network/if-pre-up.d
 
+# make home directory for root user
+mkdir -p /root
+
 # telnetd requires this
 mkdir -p /dev/pts
 mount -t devpts none /dev/pts
