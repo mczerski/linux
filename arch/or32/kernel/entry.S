@@ -1113,7 +1113,7 @@ ENTRY(_sys_call_table)
 	.long _sys_sendfile
 	.long _sys_ni_syscall	/* streams1 */
 	.long _sys_ni_syscall	/* streams2 */
-	.long _sys_vfork
+	.long _sys_ni_syscall	/* was 189 vfork */
 	.long _sys_getrlimit	/* 190 */
 	.long _sys_readahead
 	.long _sys_mmap2

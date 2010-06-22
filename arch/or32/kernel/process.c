@@ -145,10 +145,11 @@ asmlinkage int sys_clone(int r3, int r4, int r5, int r6, int r7, struct pt_regs 
 	return do_fork(clone_flags, regs->sp, regs, 0, NULL, NULL);
 }
 
-asmlinkage int sys_vfork(int r3, int r4, int r5, int r6, int r7, struct pt_regs *regs)
+/*asmlinkage int sys_vfork(int r3, int r4, int r5, int r6, int r7, struct pt_regs *regs)
 {
 	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gprs[1], regs, 0, NULL, NULL);
 }
+*/
 
 unsigned long thread_saved_pc(struct task_struct *t)
 {
