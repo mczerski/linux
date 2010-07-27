@@ -21,12 +21,6 @@
 #define ETH_BASE_ADD    0x92000000
 #define KBD_BASE_ADD	0x94000000
 
-/* Define this if you want to use I and/or D cache */
-#define IC_SIZE         CONFIG_OR32_IC_SIZE
-#define IC_LINE         CONFIG_OR32_IC_LINE
-#define DC_SIZE         CONFIG_OR32_DC_SIZE
-#define DC_LINE         CONFIG_OR32_DC_LINE
-
 /* Define this if you want to use I and/or D MMU */
 
 #define DMMU_SET_NB     CONFIG_OR32_DTLB_ENTRIES

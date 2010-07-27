@@ -162,29 +162,9 @@ config OR32_ICACHE_ENABLED
 	bool "Enable iCACHE"
 	default n
 
-config OR32_IC_SIZE
-	int "iCACHE size [bytes]" if OR32_ICACHE_ENABLED
-	default 8192 if OR32_ICACHE_ENABLED
-	default 8192 if !OR32_ICACHE_ENABLED
-
-config OR32_IC_LINE
-	int "iCACHE line size [bytes]" if OR32_ICACHE_ENABLED
-	default 16 if OR32_ICACHE_ENABLED
-	default 16 if !OR32_ICACHE_ENABLED
-
 config OR32_DCACHE_ENABLED
 	bool "Enable dCACHE"
 	default n
-
-config OR32_DC_SIZE
-	int "dCACHE size [bytes]" if OR32_DCACHE_ENABLED
-	default 8192 if OR32_DCACHE_ENABLED
-	default 8192 if !OR32_DCACHE_ENABLED
-
-config OR32_DC_LINE
-	int "dCACHE line size [bytes]" if OR32_DCACHE_ENABLED
-	default 16 if OR32_DCACHE_ENABLED
-	default 16 if !OR32_DCACHE_ENABLED
 
 config OR32_ITLB_ENTRIES
 	int "Number of iTLB entries" if OR32_GENERIC
