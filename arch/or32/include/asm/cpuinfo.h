@@ -6,3 +6,5 @@ struct cpuinfo {
 	u32 dcache_size;
 	u32 dcache_block_size;	
 };
+
+extern struct cpuinfo cpuinfo;
