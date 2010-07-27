@@ -60,32 +60,7 @@
 //#define	DEBUG_TLB_EXCEPTIONS 1
  					
 /* ============================================[ tmp store locations ]=== */
-
-/*
- * inital configuration
- */
-#define INIT_IC_ADDR			0x4
-#define INIT_DC_ADDR			0x8
-
-#define SF_DISABLED(reg,ADDR)		l.lwz	reg,ADDR(r0)	;\
-					l.sfeqi	reg,0x0	
-		
-#ifdef CONFIG_OR32_ICACHE_ENABLED	
-#  define INIT_CONFIG_ICACHE(reg)	l.ori	reg,r0,1	;\
-					l.sw	INIT_IC_ADDR(r0),reg	
-#else
-#  define INIT_CONFIG_ICACHE(reg)	l.ori	reg,r0,0	;\
-					l.sw	INIT_IC_ADDR(r0),reg	
-#endif
-
-#ifdef CONFIG_OR32_DCACHE_ENABLED	
-#  define INIT_CONFIG_DCACHE(reg)	l.ori	reg,r0,1	;\
-					l.sw	INIT_DC_ADDR(r0),reg	
-#else
-#  define INIT_CONFIG_DCACHE(reg)	l.ori	reg,r0,0	;\
-					l.sw	INIT_DC_ADDR(r0),reg	
-#endif
-				
+			
 /* 
  * emergency_print temporary stores 
  */
@@ -753,10 +728,6 @@ _start:
 	LOAD_SYMBOL_2_GPR(r10,init_thread_union)	// setup current
 	tophys	(r31,r10)
 	l.sw	TI_KSP(r31), r1
-
-write_config:		
-	INIT_CONFIG_ICACHE(r3)	
-	INIT_CONFIG_DCACHE(r3)
 
 	l.ori	r4,r0,0x0
 	E_REGEN_STORE_STATUS(r4)			// 
