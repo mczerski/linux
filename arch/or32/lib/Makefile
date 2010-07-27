@@ -3,4 +3,4 @@
 #
 
 //obj-y  = string.o checksum.o
-obj-y  = string.o
+obj-y  = string.o delay.o
