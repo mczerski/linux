@@ -104,18 +104,6 @@ source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
 source "mm/Kconfig"
 
-#
-# Define implied and generic SoC options
-#
-
-config OR32_ICACHE_ENABLED
-	bool "Enable iCACHE"
-	default n
-
-config OR32_DCACHE_ENABLED
-	bool "Enable dCACHE"
-	default n
-
 config OR32_ITLB_ENTRIES
 	int "Number of iTLB entries" if OR32_GENERIC
 	default "64"
