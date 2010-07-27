@@ -40,6 +40,7 @@
 #include <linux/serial.h>
 #include <linux/initrd.h>
 #include <linux/of_fdt.h>
+#include <linux/of.h>
  
 #include <asm/board.h>
 #include <asm/segment.h>
@@ -49,6 +50,7 @@
 #include <asm/types.h>
 #include <asm/setup.h>
 #include <asm/io.h>
+#include <asm/cpuinfo.h>
 
 /*
  * Debugging stuff
@@ -139,9 +141,57 @@ static unsigned long __init setup_memory(void)
 }
 
 
+struct cpuinfo cpuinfo;
+
+static inline unsigned int fcpu(struct device_node *cpu, char *n)
+{
+        int *val;
+        return (val = (int *) of_get_property(cpu, n, NULL)) ? *val : 0;
+}
+
+extern void __ic_enable(u32 icache_size, u32 icache_block_size);
+extern void __dc_enable(u32 dcache_size, u32 dcache_block_size);
+
+void __init setup_cpuinfo(void)
+{
+        struct device_node *cpu = NULL;
+	unsigned long iccfgr,dccfgr;
+	unsigned long cache_set_size, cache_ways;;
+
+        cpu = (struct device_node *) of_find_node_by_type(NULL, "cpu");
+        if (!cpu) {
+                printk(KERN_ERR "Device tree missing CPU node\n");
+		return;
+	}
+
+	iccfgr = mfspr(SPR_ICCFGR);
+	cache_ways = 1 << (iccfgr & SPR_ICCFGR_NCW);
+	cache_set_size = 1 << ((iccfgr & SPR_ICCFGR_NCS) >> 3);
+	cpuinfo.icache_block_size = 16 << ((iccfgr & SPR_ICCFGR_BS) >> 7);
+	cpuinfo.icache_size = cache_set_size * cache_ways * cpuinfo.icache_block_size;
+
+	dccfgr = mfspr(SPR_DCCFGR);
+	cache_ways = 1 << (dccfgr & SPR_DCCFGR_NCW);
+	cache_set_size = 1 << ((dccfgr & SPR_DCCFGR_NCS) >> 3);
+	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_BS) >> 7);
+	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
+
+/*	cpuinfo.icache_size = fcpu(cpu, "i-cache-size");
+	cpuinfo.icache_block_size = fcpu(cpu, "i-cache-block-size");
+	cpuinfo.dcache_size = fcpu(cpu, "d-cache-size");
+	cpuinfo.dcache_block_size = fcpu(cpu, "d-cache-block-size");
+*/
+	of_node_put(cpu);
+
+//	printk("IC ENABLE........................\n");
+//	__ic_enable(cpuinfo.icache_size, cpuinfo.icache_block_size);
+//	__dc_enable(cpuinfo.dcache_size, cpuinfo.dcache_block_size);
+}
+
 void __init early_setup(/*unsigned long fdt*/) {
 
 	early_init_devtree((void *) &_fdt_start);
+
 
 /*	if (fdt)
 		printk("FDT at 0x%08x\n", fdt);
@@ -191,16 +241,24 @@ void __init detect_unit_config(unsigned long upr, unsigned long mask,
 			printk("present\n");
 	}
 	else
-		printk("N/A\n");
+		printk("not present\n");
 }
 
 
 void __init detect_soc_generic(unsigned long upr)
 {
 	detect_unit_config(upr, SPR_UPR_DCP,  "  dCACHE: ", NULL);
+        printk("  dCACHE: %4d bytes total, %2d bytes/line, %d way(s)\n",
+               cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
 	detect_unit_config(upr, SPR_UPR_ICP,  "  iCACHE: ", NULL);
+        printk("  iCACHE: %4d bytes total, %2d bytes/line, %d way(s)\n",
+               cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
 	detect_unit_config(upr, SPR_UPR_DMP,  "  dMMU\t: ", NULL);
+	printk("  dMMU\t: assumed %4d entries, %d way(s)", 
+	       CONFIG_OR32_DTLB_ENTRIES, 1);
 	detect_unit_config(upr, SPR_UPR_IMP,  "  iMMU\t: ", NULL);
+	printk("  iMMU\t: assumed %4d entries, %d way(s)", 
+	       CONFIG_OR32_ITLB_ENTRIES, 1);
 	detect_unit_config(upr, SPR_UPR_DUP,  "  debug : ", NULL);
 	detect_unit_config(upr, SPR_UPR_PCUP, "  PerfC : ", NULL);
 	detect_unit_config(upr, SPR_UPR_PMP,  "  PM    : ", NULL);
@@ -212,44 +270,13 @@ void __init detect_soc_generic(unsigned long upr)
  */
 }
 
-void __init detect_soc_rev_0(unsigned long upr)
-{
-	
-	printk("  WARNING, using default values !\n"
-               "           (some early revision 0 processors don't have unit present register\n"
-	       "            populated with all avaliable units)\n");
-
-	printk("  dCACHE: assumed %4d Kb size, %2d bytes/line, %d way(s)", 
-	       CONFIG_OR32_DC_SIZE, CONFIG_OR32_DC_LINE, 1);
-	detect_unit_config(upr, SPR_UPR_DCP,  ", detected: ", NULL);
-
-	printk("  iCACHE: assumed %4d Kb size, %2d bytes/line, %d way(s)", 
-	       CONFIG_OR32_IC_SIZE, CONFIG_OR32_IC_LINE, 1);
-	detect_unit_config(upr, SPR_UPR_ICP,  ", detected: ", NULL);
-
-	printk("  dMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_DTLB_ENTRIES, 1);
-	detect_unit_config(upr, SPR_UPR_DMP,  ", detected: ", NULL);
-
-	printk("  iMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_ITLB_ENTRIES, 1);
-	detect_unit_config(upr, SPR_UPR_IMP,  ", detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_DUP,  "  debug : unknown (guess yes), detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_PCUP, "  PerfC : unknown (guess no ), detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_PMP,  "  PM    : unknown (guess yes), detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_PICP, "  PIC   : unknown (guess yes), detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_TTP,  "  TIMER : unknown (guess yes), detected: ", NULL);
-	detect_unit_config(upr, SPR_UPR_CUST, "  CUs   : unknown (guess no ), detected: ", NULL);
-
-/* add amount configured memory 
- */
-}
-
 unsigned long su_asm(void);
 
 void __init detect_soc(void)
 {
 	unsigned long upr, cfg, version, revision;
+
+
 
 	upr = mfspr(SPR_UPR);
 	if (upr &  SPR_UPR_UP)
@@ -270,11 +297,7 @@ void __init detect_soc(void)
 	       (upr & (unsigned long)SPR_UPR_SRP) ? 
 	       "with shadow registers" : "with no shadow registers");
 
-	if ((version == 0x1200) & (revision == 0)) {
-		detect_soc_rev_0(upr);
-	} else {
-		detect_soc_generic(upr);
-	}
+	detect_soc_generic(upr);
 #endif /* CONFIG_OR32_ANONYMOUS */
 
 	printk("  Signed 0x%lx\n", su_asm());
@@ -288,6 +311,8 @@ void __init setup_arch(char **cmdline_p)
 //	early_setup(NULL);
 
 	unflatten_device_tree();
+
+	setup_cpuinfo();
 
 	config_BSP(&command_line[0], COMMAND_LINE_SIZE);
 
