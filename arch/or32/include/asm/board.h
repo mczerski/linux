@@ -3,7 +3,6 @@
 
 /* System clock frequecy */
 #define SYS_CLK		(CONFIG_OR32_SYS_CLK*1000000)
-#define SYS_CLK_PERIOD  (1000/CONFIG_OR32_SYS_CLK)
 
 /* Devices base address */
 #define UART_BASE_ADD   0x90000000
