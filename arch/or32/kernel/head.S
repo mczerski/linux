@@ -1124,67 +1124,6 @@ ENTRY(_mc_init_2)
 	 */
 	.align 0x2000
 
-#ifdef CONFIG_OR32_CACHE_DEBUG
-ENTRY(_ic_enable)
-	SF_DISABLED(r6,INIT_IC_ADDR)
-	l.bf	9f
-	l.nop
-
-	EMERGENCY_PRINT_STORE_GPR9
-	LOAD_SYMBOL_2_GPR(r4,_string_icache_clean)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-	
-        /* Disable IC */
-        l.mfspr r6,r0,SPR_SR
-        l.addi  r5,r0,-1
-        l.xori  r5,r5,SPR_SR_ICE
-        l.and   r5,r6,r5
-        l.mtspr r0,r5,SPR_SR
-	      
-        /* Invalidate IC */
-        l.addi  r6,r0,0
-        l.addi  r5,r0,IC_SIZE
-1:
-#if 0
-	LOAD_SYMBOL_2_GPR(r4,_string_ic_invalidate)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-
-	l.jal	_emergency_print_nr
-	l.addi	r3,r6,0
-#endif
-	l.mtspr r0,r6,SPR_ICBIR
-        l.sfne  r6,r5
-	l.bf    1b
-        l.addi  r6,r6,IC_LINE
-
-	LOAD_SYMBOL_2_GPR(r4,_string_ic_enable)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-		
-        /* Enable IC */
-        l.mfspr r6,r0,SPR_SR
-        l.ori   r6,r6,SPR_SR_ICE
-        l.mtspr r0,r6,SPR_SR
-        l.nop
-        l.nop
-        l.nop
-        l.nop
-        l.nop
-	l.nop
-	l.nop
-	l.nop
-	l.nop
-	l.nop
-	EMERGENCY_PRINT_LOAD_GPR9
-9:
-        l.jr    r9
-        l.nop
-#else
 ENTRY(_ic_enable)
 	/* Check if IC present and skip enabling otherwise */
 	l.mfspr r24,r0,SPR_UPR
@@ -1250,60 +1189,7 @@ ENTRY(_ic_enable)
 9:
         l.jr    r9
         l.nop
-#endif	
 
-#ifdef CONFIG_OR32_CACHE_DEBUG	
-ENTRY(_dc_enable)
-	SF_DISABLED(r6,INIT_DC_ADDR)
-	l.bf	9f
-	l.nop
-
-	EMERGENCY_PRINT_STORE_GPR9
-	LOAD_SYMBOL_2_GPR(r4,_string_dcache_clean)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop	
-	
-	/* Disable DC */
-	l.mfspr r6,r0,SPR_SR
-	l.addi  r5,r0,-1
-	l.xori  r5,r5,SPR_SR_DCE
-	l.and   r5,r6,r5
-	l.mtspr r0,r5,SPR_SR
-
-	/* Flush DC */
-	l.addi  r6,r0,0
-	l.addi  r5,r0,DC_SIZE
-1:
-#ifdef CONFIG_OR32_CACHE_DEBUG
-	LOAD_SYMBOL_2_GPR(r4,_string_dc_invalidate)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-	
-	l.jal	_emergency_print_nr
-	l.addi	r3,r6,0
-#endif
-	
-	l.mtspr r0,r6,SPR_DCBIR
-	l.sfne  r6,r5
-	l.bf    1b
-	l.addi  r6,r6,DC_LINE
-
-	LOAD_SYMBOL_2_GPR(r4,_string_dc_enable)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-	
-	/* Enable DC */
-	l.mfspr r6,r0,SPR_SR
-	l.ori   r6,r6,SPR_SR_DCE
-	l.mtspr r0,r6,SPR_SR
-	EMERGENCY_PRINT_LOAD_GPR9
-9:
-	l.jr    r9
-	l.nop
-#else
 ENTRY(_dc_enable)
 	/* Check if DC present and skip enabling otherwise */
 	l.mfspr r24,r0,SPR_UPR
@@ -1355,7 +1241,6 @@ ENTRY(_dc_enable)
 9:
 	l.jr    r9
 	l.nop
-#endif
 	
 /* ===============================================[ page table masks ]=== */
 
