@@ -38,12 +38,12 @@
 void BSP_sched_init(void)
 {
 	/* Set counter period, enable timer and interrupt */
-	mtspr(SPR_TTMR, SPR_TTMR_IE | SPR_TTMR_RT | (SYS_TICK_PER & SPR_TTMR_PERIOD));
+	mtspr(SPR_TTMR, SPR_TTMR_IE | SPR_TTMR_RT | (CLOCK_TICK_RATE & SPR_TTMR_PERIOD));
 }
 
 void BSP_tick(void)
 {
-	mtspr(SPR_TTMR, SPR_TTMR_IE | SPR_TTMR_RT | (SYS_TICK_PER & SPR_TTMR_PERIOD));
+	mtspr(SPR_TTMR, SPR_TTMR_IE | SPR_TTMR_RT | (CLOCK_TICK_RATE & SPR_TTMR_PERIOD));
 }
 
 unsigned long BSP_gettimeoffset(void)

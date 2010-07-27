@@ -9,9 +9,6 @@
 
 #include <asm/param.h>
 
-//TODO: replace SYS_TICK_PER with CLOCK_TICK_RATE
-#define SYS_TICK_PER    ((CONFIG_OR32_SYS_CLK*1000000)/HZ)
-
 //#define CLOCK_TICK_RATE	(CONFIG_OR32_SYS_CLK*1000000 / 4) /* Underlying HZ */
 #define CLOCK_TICK_RATE	(CONFIG_OR32_SYS_CLK*1000000 / HZ) /* Underlying HZ */ // --jb
 #if 0
