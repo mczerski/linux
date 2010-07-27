@@ -5,38 +5,16 @@
 #define SYS_CLK		(CONFIG_OR32_SYS_CLK*1000000)
 #define SYS_CLK_PERIOD  (1000/CONFIG_OR32_SYS_CLK)
 
-/* Memory organization */
-#define SRAM_BASE_ADD   0x00000000
-#define FLASH_BASE_ADD  0xf0000000
-
 /* Devices base address */
 #define UART_BASE_ADD   0x90000000
-#define CRT_BASE_ADD    0x97000000
-#define FBMEM_BASE_ADD  0xa8000000
-#define ETH_BASE_ADD    0x92000000
-#define KBD_BASE_ADD	0x94000000
 
 /* Define this if you want to use I and/or D MMU */
 
 #define DMMU_SET_NB     CONFIG_OR32_DTLB_ENTRIES
 #define IMMU_SET_NB     CONFIG_OR32_ITLB_ENTRIES
 
-/* Uart definitions */
-#define UART_DLL        0       /* Out: Divisor Latch Low (DLAB=1) */
-#define UART_DLM        1       /* Out: Divisor Latch High (DLAB=1) */
-
 #define OR32_CONSOLE_BAUD  115200
 #define UART_DEVISOR       SYS_CLK/(16*OR32_CONSOLE_BAUD)
-
-/* Define ethernet MAC address */
-#define MACADDR0	0x00
-#define MACADDR1	0x01
-#define MACADDR2	0x02
-#define MACADDR3	0x03
-#define MACADDR4	0x04
-#define MACADDR5	0x05
-
-#define N_CE        (8)
 
 #endif /* _OR32_BOARH_H */
 
