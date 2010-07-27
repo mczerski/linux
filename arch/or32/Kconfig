@@ -123,41 +123,6 @@ source "mm/Kconfig"
 # Define implied and generic SoC options
 #
 
-config OR32_MC_VERSION
-	int "Memory Controller Version (1 or 2)" if OR32_GENERIC
-	range 1 2
-	default "1" if OR32_MARVIN || OR32_GENERIC
-	default "2" if OR32_HIGHLAND
-
-config OR32_MC_INIT
-	bool "Initialise memory controller" if OR32_GENERIC
-	default n
-	---help---
-	  This option controls memory controler initizalization
-
-	  When using bootloader, memory controler initialization is
-	  usualy done by boot the bootloader. Memory timings might not
-	  be ideal, so if you know the right timings it woun't hurt to
-	  enable it.
-
-	  If booting directly from flash you need to enable this option
-	  and if neccessery provide memory timings.
-
-config OR32_HIGHLAND_DEFAULT_MEMORY_TIMINGS
-	bool "Default Highland memory timings" if OR32_MC_INIT
-	default n
-	---help---
-	  If you have Highland board with Micron MT48LC16M16A2 TC 75D
-	  memory than choose this option.
-       
-config OR32_GENERIC_MEMORY_TIMINGS
-	bool "Specify memory timings" if OR32_MC_INIT
-	default n
-	---help---
-	  This option allows you to specify memory timings for SDRAm & FLASH
-
-source "arch/or32/Kconfig.mc2"
-	  
 config OR32_ICACHE_ENABLED
 	bool "Enable iCACHE"
 	default n

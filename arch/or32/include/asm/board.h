@@ -15,7 +15,6 @@
 
 /* Devices base address */
 #define UART_BASE_ADD   0x90000000
-#define MC_BASE_ADD     0x93000000
 #define CRT_BASE_ADD    0x97000000
 #define FBMEM_BASE_ADD  0xa8000000
 #define ETH_BASE_ADD    0x92000000
@@ -42,22 +41,6 @@
 #define MACADDR5	0x05
 
 #define N_CE        (8)
-
-#ifdef CONFIG_OR32_MC_INIT
-#define MC_CSR      (0x00)
-#define MC_POC      (0x04)
-#define MC_BA_MASK  (0x08)
-#define MC_CSC(i)   (0x10 + (i) * 8)
-#define MC_TMS(i)   (0x14 + (i) * 8)
-
-/* memory controler initialization constants */
-#  include "mc2.h"
-#endif
-
-/* sdram organization */
-#  define MC_OSR_VAL              0x7e000033
-#  define MC_CCR_4_VAL_DISABLED   0x00ef0004
-#  define MC_CCR_4_VAL_ENABLED    (MC_CCR_4_VAL_DISABLED | 0xc0000000)
 
 #endif /* _OR32_BOARH_H */
 
