@@ -75,6 +75,25 @@ extern void paging_init(void);
  * io.h for ioremap_nocache() too.
  */
 
+/* 
+ * An OR32 PTE looks like this:
+ *
+ * |  31 ... 10 |  9  |  8 ... 6  |  5  |  4  |  3  |  2  |  1  |  0  |
+ *  Phys pg.num    L     PP Index    D     A    WOM   WBC   CI    CC
+ * 
+ *  L  : link
+ *  PPI: Page protection index
+ *  D  : Dirty
+ *  A  : Accessed
+ *  WOM: Weakly ordered memory
+ *  WBC: Write-back cache
+ *  CI : Cache inhibit
+ *  CC : Cache coherent
+ *
+ * The protection bits below should correspond to the layout of the actual
+ * PTE as per above
+ */
+
 #define _PAGE_CC       0x001 /* software: pte contains a translation */
 #define _PAGE_CI       0x002 /* cache inhibit          */
 #define _PAGE_WBC      0x004 /* write back cache       */
