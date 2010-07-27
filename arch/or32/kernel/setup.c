@@ -371,7 +371,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 			  "cpu revision\t: %lu\n"
 			  "cpu model\t: %s\n"
 			  "icache size\t: %d kB\n"
+			  "icache block size\t: %d bytes\n"
 			  "dcache size\t: %d kB\n"
+			  "dcache block size\t: %d bytes\n"
 			  "immu\t\t: %s\n"
 			  "dmmu\t\t: %s\n"
 			  "fpu\t\t: %s\n"
@@ -391,15 +393,19 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 #else /* CONFIG_OR32_ANONYMOUS */
 	return seq_printf(m,
 			  "cpu revision\t: %lu\n"
-			  "icache size\t: %d kB\n"
-			  "dcache size\t: %d kB\n"
+			  "icache size\t: %d bytes\n"
+			  "icache block size\t: %d bytes\n"
+			  "dcache size\t: %d bytes\n"
+			  "dcache block size\t: %d bytes\n"
 			  "immu\t\t: %s\n"
 			  "dmmu\t\t: %s\n"
 			  "ethernet\t: %s Mbps\n",
 			  
 			  0UL,
-			  8,
-			  8,
+			  cpuinfo.icache_size,
+			  cpuinfo.icache_block_size,
+			  cpuinfo.dcache_size,
+			  cpuinfo.dicache_block_size,
 			  "64 entries, 1 way",
 			  "64 entries, 1 way",
 			  "10/100");
@@ -410,7 +416,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
-	/* We only got one CPU... */
+	/* We only have one CPU... */
 	return *pos < 1 ? (void *)1 : NULL;
 }
  
