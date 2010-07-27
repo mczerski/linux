@@ -119,8 +119,7 @@ static unsigned long __init setup_memory(void)
 	 */ 
 	start_pfn   = PFN_UP(__pa(&_end));
 	max_low_pfn = PFN_DOWN(CONFIG_OR32_MEMORY_SIZE
-			       -CONFIG_FB_OC_SHMEM_SIZE
-			       -CONFIG_OR32_RESERVED_MEM_SIZE);
+			       -CONFIG_FB_OC_SHMEM_SIZE);
 //	min_low_pfn = PAGE_OFFSET >> PAGE_SHIFT;
 
 #undef CONFIG_FB_OC_SHMEM_SIZE

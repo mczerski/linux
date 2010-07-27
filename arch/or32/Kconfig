@@ -81,14 +81,6 @@ config OR32_MEMORY_SIZE
 	hex "System memory size [hex, bytes]"
 	default 01000000
 
-config OR32_RESERVED_MEM_SIZE
-	hex "Reserved memory size [hex, bytes]"
-	default 0
-	help
-	  Amount of memory (in bytes) that will be left unused by Linux
-          starting from MEMORY_SIZE-RESERVED_MEM_SIZE and ending at
-          MEMORY_SIZE.
-
 config OR32_FLASH_BOOT
 	bool "Boot from FLASH"
 	default n
