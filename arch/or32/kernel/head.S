@@ -789,8 +789,7 @@ clear_bss:
 
 enable_ic:
 	l.jal	_ic_enable
-	l.nop	
-
+	l.nop
 
 enable_dc:
 	l.jal	_dc_enable
@@ -812,6 +811,9 @@ flush_tlb:
 	l.sfeq	r7,r0
 	l.bnf	1b
 	l.addi	r7,r7,-1
+
+
+/* The MMU needs to be enabled before _early_setup is called */
 
 enable_mmu:
 	/* 
@@ -842,7 +844,6 @@ enable_mmu:
 	LOAD_SYMBOL_2_GPR(r24, early_setup)
 	l.jalr r24
 	l.nop
-
 
 hw_breakpoint:
 #if 0
@@ -1185,7 +1186,10 @@ ENTRY(_ic_enable)
         l.nop
 #else
 ENTRY(_ic_enable)
-	SF_DISABLED(r6,INIT_IC_ADDR)
+	/* Check if IC present and skip enabling otherwise */
+	l.mfspr r24,r0,SPR_UPR
+	l.andi  r26,r24,SPR_UPR_ICP
+	l.sfeq  r26,r0
 	l.bf	9f
 	l.nop
 
@@ -1196,14 +1200,38 @@ ENTRY(_ic_enable)
         l.and   r5,r6,r5
         l.mtspr r0,r5,SPR_SR
 	      
+	/* Establish cache block size
+	   If BS=0, 16;
+	   If BS=1, 32;
+	   r14 contain block size
+	*/
+	l.mfspr r24,r0,SPR_ICCFGR
+	l.andi	r26,r24,SPR_ICCFGR_BS
+	l.srli	r28,r26,7
+	l.ori	r30,r0,16
+	l.sll	r14,r30,r28
+
+	/* Establish number of cache sets
+	   r16 contains number of cache sets
+	   r28 contains log(# of cache sets)
+	*/
+	l.andi  r26,r24,SPR_ICCFGR_NCS
+	l.srli 	r28,r26,3
+	l.ori   r30,r0,1
+	l.sll   r16,r30,r28
+
         /* Invalidate IC */
         l.addi  r6,r0,0
-        l.addi  r5,r0,IC_SIZE
+	l.sll   r5,r14,r28
+//        l.mul   r5,r14,r16
+//	l.trap  1
+//	l.addi  r5,r0,IC_SIZE
 1:
 	l.mtspr r0,r6,SPR_ICBIR
         l.sfne  r6,r5
 	l.bf    1b
-        l.addi  r6,r6,IC_LINE
+        l.add   r6,r6,r14
+ //       l.addi   r6,r6,IC_LINE
 
         /* Enable IC */
         l.mfspr r6,r0,SPR_SR
@@ -1277,7 +1305,10 @@ ENTRY(_dc_enable)
 	l.nop
 #else
 ENTRY(_dc_enable)
-	SF_DISABLED(r6,INIT_DC_ADDR)
+	/* Check if DC present and skip enabling otherwise */
+	l.mfspr r24,r0,SPR_UPR
+	l.andi  r26,r24,SPR_UPR_DCP
+	l.sfeq  r26,r0
 	l.bf	9f
 	l.nop
 
@@ -1288,14 +1319,34 @@ ENTRY(_dc_enable)
 	l.and   r5,r6,r5
 	l.mtspr r0,r5,SPR_SR
 
-	/* Flush DC */
-	l.addi  r6,r0,0
-	l.addi  r5,r0,DC_SIZE
+	/* Establish cache block size
+	   If BS=0, 16;
+	   If BS=1, 32;
+	   r14 contain block size
+	*/
+	l.mfspr r24,r0,SPR_DCCFGR
+	l.andi	r26,r24,SPR_DCCFGR_BS
+	l.srli	r28,r26,7
+	l.ori	r30,r0,16
+	l.sll	r14,r30,r28
+
+	/* Establish number of cache sets
+	   r16 contains number of cache sets
+	   r28 contains log(# of cache sets)
+	*/
+	l.andi  r26,r24,SPR_DCCFGR_NCS
+	l.srli 	r28,r26,3
+	l.ori   r30,r0,1
+	l.sll   r16,r30,r28
+
+        /* Invalidate DC */
+        l.addi  r6,r0,0
+	l.sll   r5,r14,r28
 1:
 	l.mtspr r0,r6,SPR_DCBIR
-	l.sfne  r6,r5
+        l.sfne  r6,r5
 	l.bf    1b
-	l.addi  r6,r6,DC_LINE
+        l.add   r6,r6,r14
 
 	/* Enable DC */
 	l.mfspr r6,r0,SPR_SR
