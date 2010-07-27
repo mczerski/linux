@@ -1943,8 +1943,20 @@ trampoline_out:
 	// immu_trampoline is (4x) CACHE_LINE aligned
 	// and only 6 instructions long,
 	// so we need to invalidate only 2 lines
+	
+	/* Establish cache block size
+	   If BS=0, 16;
+	   If BS=1, 32;
+	   r14 contain block size
+	*/
+	l.mfspr r21,r0,SPR_ICCFGR
+	l.andi	r21,r21,SPR_ICCFGR_BS
+	l.srli	r21,r21,7
+	l.ori	r23,r0,16
+	l.sll	r14,r23,r21
+	
 	l.mtspr	r0,r5,SPR_ICBIR
-	l.addi	r5,r5,IC_LINE
+	l.add	r5,r5,r14
 	l.mtspr	r0,r5,SPR_ICBIR
 	
 	l.jr	r9
