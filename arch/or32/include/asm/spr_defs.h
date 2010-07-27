@@ -50,6 +50,8 @@ others it is also used in assembly file(s). */
 /* System control and status group */
 #define SPR_VR          (SPRGROUP_SYS + 0)
 #define SPR_UPR         (SPRGROUP_SYS + 1)
+#define SPR_DCCFGR      (SPRGROUP_SYS + 5)
+#define SPR_ICCFGR      (SPRGROUP_SYS + 6)
 #define SPR_PC          (SPRGROUP_SYS + 16)  /* CZ 21/06/01 */
 #define SPR_SR          (SPRGROUP_SYS + 17)  /* CZ 21/06/01 */
 #define SPR_EPCR_BASE   (SPRGROUP_SYS + 32)  /* CZ 21/06/01 */
@@ -168,6 +170,17 @@ others it is also used in assembly file(s). */
 #define SPR_UPR_SRP     0x00010000  /* Shadow registers present */
 #define SPR_UPR_RES     0x00fe0000  /* ORVDX32 present */
 #define SPR_UPR_CUST    0xff000000  /* Custom units */
+
+
+#define SPR_DCCFGR_NCW  0x00000003  /* Cache ways */
+#define SPR_DCCFGR_NCS  0x00000078  /* Cache set size */
+#define SPR_DCCFGR_BS   0x00000080  /* Cache block size */
+
+#define SPR_ICCFGR_NCW  0x00000003  /* Cache ways */
+#define SPR_ICCFGR_NCS  0x00000078  /* Cache set size */
+#define SPR_ICCFGR_BS   0x00000080  /* Cache block size */
+
+
 
 /*
  * Bit definitions for the Supervision Register
