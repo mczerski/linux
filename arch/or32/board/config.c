@@ -35,9 +35,6 @@
 
 // extern void register_console(void (*proc)(const char *));
 
-/* Tick timer period */
-unsigned long tick_period = SYS_TICK_PER;
-
 void BSP_sched_init(void)
 {
 	/* Set counter period, enable timer and interrupt */
