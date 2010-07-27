@@ -63,27 +63,12 @@ menu "Processor type and features"
 
 choice 
 	prompt "Subarchitecture/SoC type"
-	default OR32_MARVIN
-
-config	OR32_MARVIN
-	bool "or1200/Marvin"
-	help 
-	  Marvin SoC
-
-          revision 0 prototype hardware implementation
-
-
-config OR32_HIGHLAND
-	bool "or1200/Highland"
-	help
-	  Highland SoC
-
-	  revision 1
+	default OR32_GENERIC
 
 config OR32_GENERIC
 	bool "or1200/Generic"
 	help
-	  Generic or1200 platform
+	  Generic OpenRISC 1200 platform
 
 endchoice
 

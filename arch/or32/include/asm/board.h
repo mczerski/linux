@@ -1,10 +1,6 @@
 #ifndef _OR32_BOARH_H
 #define _OR32_BOARH_H 
 
-#ifdef CONFIG_OR32_HIGHLAND
-#include <asm/01-highland/highland.h>
-#endif
-
 /* System clock frequecy */
 #define SYS_CLK		(CONFIG_OR32_SYS_CLK*1000000)
 #define SYS_CLK_PERIOD  (1000/CONFIG_OR32_SYS_CLK)
