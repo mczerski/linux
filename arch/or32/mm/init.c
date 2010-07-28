@@ -180,6 +180,7 @@ static void __init identical_mapping(unsigned long start, unsigned long size,
 			break;
 		pmd = (pmd_t *)pgd;
 
+		/* FIXME: account for 4-level page tables */
 		if (pmd != pmd_offset(pud_offset(pgd, 0), 0))
 			BUG();
 		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
@@ -202,6 +203,58 @@ static void __init identical_mapping(unsigned long start, unsigned long size,
 		}
 	}
 }
+
+static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
+{
+        pgd_t *pge;
+        pud_t *pue;
+        pmd_t *pme;
+        pte_t *pte;
+        int err = -ENOMEM;
+
+        /* Use upper 10 bits of VA to index the first level map and
+	 * next 10 bits of VA to index the second-level map.  This is
+	 * hidden in the details of the following functions. */
+        pge = pgd_offset_k(va);
+        pue = pud_offset(pge, va);
+        pme = pmd_offset(pue, va);
+
+        pte = pte_alloc_kernel(pme, va);
+        if (pte != 0) {
+                err = 0;
+                set_pte(pte, mk_pte_phys(pa & PAGE_MASK, prot));
+        }
+
+        return err;
+}
+
+/*
+ * Map in all of physical memory.
+ *
+ * Loop over all the physical pages and map them into the kernel's
+ * address space.
+ */
+void __init map_ram(void)
+{
+        unsigned long v, p, s, f;
+	unsigned long memory_start = 0;
+
+        for (p = memory_start, v = PAGE_OFFSET; p < CONFIG_OR32_MEMORY_SIZE; p += PAGE_SIZE, v+= PAGE_SIZE) {
+		f = _PAGE_ALL | _PAGE_SRE | 
+		    _PAGE_SHARED | _PAGE_DIRTY | 
+		    _PAGE_EXEC;
+
+/*                if ((char *) v < _stext || (char *) v >= _etext)
+                        f |= _PAGE_WRENABLE;
+                else
+                        f |= _PAGE_USER;
+*/
+                map_page(v, p, __pgprot(f));
+                v += PAGE_SIZE;
+                p += PAGE_SIZE;
+        }
+}
+
 
 void __init paging_init(void)
 {
@@ -229,12 +282,12 @@ void __init paging_init(void)
          /* initialise the TLB (tlb.c) */
          tlb_init();
 
-	/*
-	 * This can be zero as well - no problem, in that case we exit
-	 * the loops anyway due to the PTRS_PER_* conditions.
-	 */
 	end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
 
+//	map_ram();
+
+#if 1
+	
 	pgd_base = swapper_pg_dir;
 	i = __pgd_offset(PAGE_OFFSET);
 	pgd = pgd_base + i;
@@ -295,7 +348,7 @@ void __init paging_init(void)
 	               PAGE_OFFSET + PAGE_SIZE, PAGE_MASK&((unsigned long)&(_e_protected_core)));
 	}
 #endif /* CONFIG_OR32_GUARD_PROTECTED_CORE */
-
+#endif
 	/* __PHX__: fixme, 
 	 * - detect units via UPR,
 	 * - set up only apropriate mappings
@@ -303,7 +356,7 @@ void __init paging_init(void)
 	 *   or make sure that it doesn't kill of the kernel when no oeth 
 	 *   present
 	 */
-
+#if 0
 	/* map the UART address space */
 	identical_mapping(0x80000000, 0x10000000, _PAGE_CI | 
 			  _PAGE_URE | _PAGE_UWE);
@@ -321,7 +374,7 @@ void __init paging_init(void)
 			  _PAGE_URE | _PAGE_UWE);
 	identical_mapping(0x1e50000, 0x150000, _PAGE_CI | 
 			  _PAGE_URE | _PAGE_UWE);
-
+#endif
 	zone_sizes_init();
 
 	/*

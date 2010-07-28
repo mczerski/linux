@@ -1012,6 +1012,8 @@ static void autoconfig_16550a(struct uart_8250_port *up)
 
 			serial_outp(up, UART_LCR, 0);
 
+			printk("*********************************JOOOOOOOOOOOOONNNNNNNNNNNNNNNNNAAAAAAAAAAAASSSSSSSSS***********************\n\n\n");
+
 			up->port.uartclk = 921600*16;
 			up->port.type = PORT_NS16550A;
 			up->capabilities |= UART_NATSEMI;

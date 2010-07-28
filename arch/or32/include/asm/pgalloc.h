@@ -45,6 +45,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 		memset(ret, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
 		memcpy(ret + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD,
 		       (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+
 	}
 	return ret;
 }

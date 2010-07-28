@@ -492,7 +492,7 @@ reset_start:
 1:
 
 #else /* CONFIG_OR32_FLASH_BOOT */
-	l.jal	_early_uart_init
+//	l.jal	_early_uart_init
 	l.nop
 
 #endif /* CONFIG_OR32_FLASH_BOOT */

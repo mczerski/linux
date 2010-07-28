@@ -2,6 +2,8 @@
 #ifndef _OR32_SERIAL_H__
 #define _OR32_SERIAL_H__
 
+//#include <asm-generic/serial.h>
+
 #include <asm/board.h>
 
 /* There's a generic version of this file, but it assumes a 1.8MHz UART clk...

@@ -152,11 +152,16 @@ kernel_thread:
 	l.jr    r9
 	l.addi	r1,r1,8
 
-#if 0
+/* FIXME: Delete this stuff  */
+#if 0 
 
 /*
+ * void ic_enable(u32 icache_size, u32 icache_block_size)
+ * @icache_size:       size of i-cache
+ * @icache_block_size: i-cache block size (line size)
+ *
  * Instruction cache enable
- *      ic_enable()
+ * 
  */
 	.global __ic_enable
 __ic_enable:
@@ -169,12 +174,12 @@ __ic_enable:
 
 	/* Invalidate IC */
 	l.addi  r13,r0,0
-	l.addi  r11,r0,IC_SIZE
+	l.add  r11,r0,r3
 1:
 	l.mtspr r0,r13,SPR_ICBIR
 	l.sfne  r13,r11
 	l.bf    1b
-	l.addi  r13,r13,IC_LINE
+	l.add  r13,r13,r4
 
 	/* Enable IC */
 	l.mfspr r13,r0,SPR_SR
@@ -205,6 +210,8 @@ __ic_disable:
 	l.jr    r9
 	l.nop
 	
+
+
 /*
  * Instruction cache invalidate
  *      ic_flush()
@@ -241,8 +248,12 @@ __ic_invalidate:
 	l.nop
 
 /*
+ * void __dc_enable(u32 dcache_size, u32 dcache_block_size)
+ * @dcache_size:       size of d-cache
+ * @dcache_block_size: d-cache block size (line size)
+ *
  * Data cache enable
- *      dc_enable()
+ * 
  */
 	.global __dc_enable
 __dc_enable:
@@ -255,12 +266,12 @@ __dc_enable:
 
 	/* Flush DC */
 	l.addi  r13,r0,0
-	l.addi  r11,r0,DC_SIZE
+	l.add  r11,r0,r3
 1:
 	l.mtspr r0,r13,SPR_DCBIR
 	l.sfne  r13,r11
 	l.bf    1b
-	l.addi  r13,r13,DC_LINE
+	l.add  r13,r13,r4
 
 	/* Enable DC */
 	l.mfspr r13,r0,SPR_SR
