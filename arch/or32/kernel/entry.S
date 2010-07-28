@@ -395,6 +395,13 @@ EXCEPTION_ENTRY(_timer_handler)
 	LOAD_SYMBOL_2_GPR(r8,timer_interrupt)
         l.jalr r8
 	l.nop
+
+	/* Clear the _pending_ bit to renable further timer exceptions */
+	l.mfspr r4,r0,SPR_TTMR
+	l.movhi r5,hi(SPR_TTMR_IP)
+	l.xor	r4,r4,r5
+	l.mtspr r0,r4,SPR_TTMR
+
 	l.j    _ret_from_intr
 	l.nop
 

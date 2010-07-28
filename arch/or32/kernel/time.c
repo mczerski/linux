@@ -66,9 +66,6 @@ irqreturn_t timer_interrupt(struct pt_regs * regs)
          */
 	/*profile_tick(CPU_PROFILING); broken on or32 why? RGD*/
 	
-	if (mach_tick) /*Not sure why we need to do this RGD*/
-	  mach_tick();
-	
 	do_timer(1); /*RGD*/
 	
 #ifndef CONFIG_SMP
