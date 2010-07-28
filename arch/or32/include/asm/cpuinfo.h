@@ -1,5 +1,7 @@
 
 struct cpuinfo {
+	u32 clock_frequency;
+
 	u32 icache_size;
 	u32 icache_block_size;
 

@@ -175,6 +175,9 @@ void __init setup_cpuinfo(void)
 	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_BS) >> 7);
 	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
 
+
+
+	cpuinfo.clock_frequency =  fcpu(cpu, "clock-frequency");
 /*	cpuinfo.icache_size = fcpu(cpu, "i-cache-size");
 	cpuinfo.icache_block_size = fcpu(cpu, "i-cache-block-size");
 	cpuinfo.dcache_size = fcpu(cpu, "d-cache-size");
@@ -292,7 +295,7 @@ void __init detect_soc(void)
 #ifndef CONFIG_OR32_ANONYMOUS
 	printk("  CPU\t: or32/OpenRISC-%lx, revision %lx, @%d MHz, %s\n", 
 	       version, revision,
-	       CONFIG_OR32_SYS_CLK,
+	       cpuinfo.clock_frequency / 1000000,
 	       (upr & (unsigned long)SPR_UPR_SRP) ? 
 	       "with shadow registers" : "with no shadow registers");
 
