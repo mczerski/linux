@@ -62,9 +62,6 @@ extern unsigned long memory_end;
 
 /* from linker script */
 
-/* JONAS: replace these with memory_[start|end] */
-extern unsigned long dram_start, dram_end;
-
 #define __va(x) ((void *)((unsigned long)(x) + PAGE_OFFSET))
 #define __pa(x) ((unsigned long) (x) - PAGE_OFFSET)
 

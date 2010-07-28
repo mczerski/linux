@@ -10,8 +10,6 @@
  *		- clean up __offset & stuff
  *		- change all 8192 aligment to PAGE !!!
  *		- recheck if all aligments are really needed
- *		- make ramsize an option (maybe config option) or suck it of
- * hardware and calculate dram_end acordingly
  */
 
 #ifdef CONFIG_OR32_FLASH_BOOT
@@ -34,7 +32,6 @@ SECTIONS
 {
         /* Read-only sections, merged into text segment: */
         . = LOAD_BASE ; 
-        _dram_start = .;
 
         _s_protected_core = .;
 	
