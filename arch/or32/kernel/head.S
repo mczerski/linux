@@ -33,6 +33,8 @@
 /* some defines to ease or32 assembly programming */	
 #include "or32_funcs.S"
 
+#define UART_BASE_ADD      0x90000000
+
 #define DRAM_END (PAGE_OFFSET+CONFIG_OR32_MEMORY_SIZE)
 
 #define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_SM)
@@ -2092,6 +2094,27 @@ ENTRY(_emergency_print_nr)
 	l.nop	
 			
 
+/*
+ * This should be used for debugging only.
+ * It messes up the Linux early serial output
+ * somehow, so use it sparingly and essentially
+ * only if you need to debug something that goes wrong
+ * before Linux gets the early serial going.
+ *
+ * Furthermore, you'll have to make sure you set the
+ * UART_DEVISOR correctly according to the system
+ * clock rate.
+ *
+ *
+ */
+
+
+
+#define SYS_CLK            20000000
+//#define SYS_CLK            1843200
+#define OR32_CONSOLE_BAUD  115200
+#define UART_DIVISOR       SYS_CLK/(16*OR32_CONSOLE_BAUD)
+
 ENTRY(_early_uart_init)
         l.movhi	r3,hi(UART_BASE_ADD)
 
@@ -2107,9 +2130,9 @@ ENTRY(_early_uart_init)
         l.lbz	r5,3(r3)
         l.ori	r4,r5,0x80
         l.sb	0x3(r3),r4
-	l.addi	r4,r0,((UART_DEVISOR>>8) & 0x000000ff)
+	l.addi	r4,r0,((UART_DIVISOR>>8) & 0x000000ff)
         l.sb	UART_DLM(r3),r4
-        l.addi  r4,r0,((UART_DEVISOR) & 0x000000ff)
+        l.addi  r4,r0,((UART_DIVISOR) & 0x000000ff)
         l.sb	UART_DLL(r3),r4
         l.sb	0x3(r3),r5
   
