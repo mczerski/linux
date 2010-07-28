@@ -32,6 +32,7 @@
 #include <asm/irq.h>
 #include <asm/machdep.h>
 #include <asm/serial.h>
+#include <asm/cpuinfo.h>
 
 // extern void register_console(void (*proc)(const char *));
 
@@ -49,12 +50,15 @@ void BSP_tick(void)
 unsigned long BSP_gettimeoffset(void)
 {
 	unsigned long count, result;
+	unsigned long factor;
+
+	factor = cpuinfo.clock_frequency / 1000000;
 
 	count = mfspr(SPR_TTCR);
-	result = count / CONFIG_OR32_SYS_CLK;
+	result = count / factor;
 #if 0
 	printk("gettimeofday offset :: cnt %d, sys_tick_per %d, result %d\n",
-	       count, CONFIG_OR32_SYS_CLK, result);
+	       count, factor, result);
 #endif
 	return(result);
 
