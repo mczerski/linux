@@ -88,6 +88,12 @@ config GPIO_XILINX
 	help
 	  Say yes here to support the Xilinx FPGA GPIO device
 
+config GPIO_JBTRIVIAL
+	bool "OpenCores JB-Trivial MM GPIO support"
+	depends on OR32
+	help
+	  Say yes here to support the JB-Trivial FPGA GPIO device
+
 config GPIO_VR41XX
 	tristate "NEC VR4100 series General-purpose I/O Uint support"
 	depends on CPU_VR41XX

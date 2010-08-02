@@ -45,6 +45,9 @@ config FRAME_POINTER
        bool
        default y
  
+config GENERIC_GPIO
+	def_bool y
+
 config GENERIC_TIME
 	def_bool y
 
@@ -66,6 +69,7 @@ config OR32
 	select OF
 	select OF_FLATTREE
 	select HAVE_MEMBLOCK
+	select ARCH_WANT_OPTIONAL_GPIOLIB
 
 menu "Processor type and features"
 
