@@ -24,10 +24,6 @@
  */
 #define current_text_addr() ({ __label__ _l; _l: &&_l;})
 
-/* or32has no problems with write protection */
-
-#define wp_works_ok 1
-
 /*
  * User space process size. This is hardcoded into a few places,
  * so don't change it unless you know what you are doing.
