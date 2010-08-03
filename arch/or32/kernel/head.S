@@ -536,8 +536,8 @@ _dispatch_do_ipage_fault:
 
 /* ---[ 0x600: Aligment exception ]-------------------------------------- */
     .org 0x600
-	UNHANDLED_EXCEPTION(_vector_0x600)
-//	EXCEPTION_HANDLE(_aligment_handler)
+//	UNHANDLED_EXCEPTION(_vector_0x600)
+	EXCEPTION_HANDLE(_alignment_handler)
 	
 /* ---[ 0x700: Illegal insn exception ]---------------------------------- */
     .org 0x700

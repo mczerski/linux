@@ -353,10 +353,37 @@ vmalloc_fault:
 		 * silently loop forever.
 		 */
 
+
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
 			goto no_context;
 
 		return;
 	}
+}
+
+
+
+asmlinkage void do_unaligned_access(struct pt_regs* regs, unsigned long address) {
+	struct task_struct *tsk;
+	siginfo_t info;
+
+	tsk = current;
+
+	/* Send a SIGSEGV */
+
+	if (user_mode(regs)) {
+		printk("USERSPACE: Unaligned access (SIGSEGV) (current %p, pid %d)\n",
+                       current, current->pid);
+                info.si_signo = SIGSEGV;
+                info.si_errno = 0;
+                /* info.si_code has been set above */
+                info.si_addr = (void *)address;
+                force_sig_info(SIGSEGV, &info, tsk);
+                DPG(show_regs(regs));
+                __asm__ __volatile__("l.nop 1");
+                return;
+        }
+
+
 }

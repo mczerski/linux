@@ -407,7 +407,17 @@ EXCEPTION_ENTRY(_timer_handler)
 
 /* ---[ 0x600: Aligment exception ]-------------------------------------- */
 
-#if 1
+EXCEPTION_ENTRY(_alignment_handler)
+	l.addi  r3,r1,0                    // pt_regs
+	/* r4 set be EXCEPTION_HANDLE */   // effective address of fault
+	l.jal   _do_unaligned_access
+	l.nop
+	l.j     _ret_from_exception
+	l.nop
+	
+	
+
+#if 0
 UNHANDLED_EXCEPTION(_vector_0x600,0x600)
 #endif
 		
