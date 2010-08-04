@@ -177,7 +177,7 @@
 	  EXCEPTION_DEBUG_STORE_GPR4				;\
 	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
 	  l.jal	_exception_debug 				;\
-	  l.mfspr	r4,r0,SPR_PC				;\
+	  l.mfspr	r4,r0,SPR_NPC				;\
 	  EXCEPTION_DEBUG_LOAD_GPR4				;\
 	  EXCEPTION_DEBUG_LOAD_F_GPR9
 
@@ -193,7 +193,7 @@
 	  EXCEPTION_DEBUG_STORE_GPR4				;\
 	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
 	  l.jal	_exception_debug				;\
-	  l.mfspr	r4,r0,SPR_PC				;\
+	  l.mfspr	r4,r0,SPR_NPC				;\
 	  l.jal	_exception_regenerate				;\
 	  l.nop							;\
 	  EXCEPTION_DEBUG_LOAD_GPR4				;\
@@ -232,7 +232,7 @@
 	  EXCEPTION_DEBUG_STORE_GPR4				;\
 	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
 	  l.jal	   _exception_debug 				;\
-	  l.mfspr  r4,r0,SPR_PC					;\
+	  l.mfspr  r4,r0,SPR_NPC					;\
 	  EXCEPTION_DEBUG_LOAD_GPR4				;\
 	  EXCEPTION_DEBUG_LOAD_F_GPR9
 #  define EXCEPTION_DEBUG_VALUE(value)				\
@@ -395,7 +395,7 @@
 	/* the string referenced by r3 must be low enough */	;\
 	l.jal	_emergency_print				;\
 	l.ori	r3,r0,lo(_string_unhandled_exception)		;\
-	l.mfspr	r3,r0,SPR_PC					;\
+	l.mfspr	r3,r0,SPR_NPC					;\
 	l.jal	_emergency_print_nr				;\
 	l.andi	r3,r3,0x1f00					;\
 	/* the string referenced by r3 must be low enough */	;\
@@ -911,7 +911,7 @@ ENTRY(_ic_enable)
 	   r14 contain block size
 	*/
 	l.mfspr r24,r0,SPR_ICCFGR
-	l.andi	r26,r24,SPR_ICCFGR_BS
+	l.andi	r26,r24,SPR_ICCFGR_CBS
 	l.srli	r28,r26,7
 	l.ori	r30,r0,16
 	l.sll	r14,r30,r28
@@ -977,7 +977,7 @@ ENTRY(_dc_enable)
 	   r14 contain block size
 	*/
 	l.mfspr r24,r0,SPR_DCCFGR
-	l.andi	r26,r24,SPR_DCCFGR_BS
+	l.andi	r26,r24,SPR_DCCFGR_CBS
 	l.srli	r28,r26,7
 	l.ori	r30,r0,16
 	l.sll	r14,r30,r28
@@ -1745,7 +1745,7 @@ trampoline_out:
 	   r14 contain block size
 	*/
 	l.mfspr r21,r0,SPR_ICCFGR
-	l.andi	r21,r21,SPR_ICCFGR_BS
+	l.andi	r21,r21,SPR_ICCFGR_CBS
 	l.srli	r21,r21,7
 	l.ori	r23,r0,16
 	l.sll	r14,r23,r21
@@ -1768,7 +1768,7 @@ ENTRY(_debug_tng)
 	l.sw	4(r1),r4
 	l.mfspr	r3,r0,SPR_SR
 	l.sw	8(r1),r3
-	l.mfspr	r3,r0,SPR_PC
+	l.mfspr	r3,r0,SPR_NPC
 	l.sw	12(r1),r3
 	
 	l.ori	r3,r0,0x8001
@@ -1792,7 +1792,7 @@ nommu_entry:
 	/* the string referenced by r3 must be low enough */	
 	l.jal	_emergency_print				
 	l.ori	r3,r0,lo(_string_ed)				
-	l.mfspr	r3,r0,SPR_PC					
+	l.mfspr	r3,r0,SPR_NPC
 	l.jal	_emergency_print_nr				
 	l.andi	r3,r3,0x1f00					
 	/* the string referenced by r3 must be low enough */	

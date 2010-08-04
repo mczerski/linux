@@ -154,13 +154,13 @@ void __init setup_cpuinfo(void)
 	iccfgr = mfspr(SPR_ICCFGR);
 	cache_ways = 1 << (iccfgr & SPR_ICCFGR_NCW);
 	cache_set_size = 1 << ((iccfgr & SPR_ICCFGR_NCS) >> 3);
-	cpuinfo.icache_block_size = 16 << ((iccfgr & SPR_ICCFGR_BS) >> 7);
+	cpuinfo.icache_block_size = 16 << ((iccfgr & SPR_ICCFGR_CBS) >> 7);
 	cpuinfo.icache_size = cache_set_size * cache_ways * cpuinfo.icache_block_size;
 
 	dccfgr = mfspr(SPR_DCCFGR);
 	cache_ways = 1 << (dccfgr & SPR_DCCFGR_NCW);
 	cache_set_size = 1 << ((dccfgr & SPR_DCCFGR_NCS) >> 3);
-	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_BS) >> 7);
+	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_CBS) >> 7);
 	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
 
 
@@ -254,7 +254,7 @@ void __init detect_soc_generic(unsigned long upr)
 	detect_unit_config(upr, SPR_UPR_PMP,  "  PM    : ", NULL);
 	detect_unit_config(upr, SPR_UPR_PICP, "  PIC   : ", NULL);
 	detect_unit_config(upr, SPR_UPR_TTP,  "  TIMER : ", detect_timer);
-	detect_unit_config(upr, SPR_UPR_CUST, "  CUs   : ", NULL);
+	detect_unit_config(upr, SPR_UPR_CUP,  "  CUs   : ", NULL);
 
 /* add amount configured memory 
  */
@@ -283,9 +283,7 @@ void __init detect_soc(void)
 #ifndef CONFIG_OR32_ANONYMOUS
 	printk("  CPU\t: or32/OpenRISC-%lx, revision %lx, @%d MHz, %s\n", 
 	       version, revision,
-	       cpuinfo.clock_frequency / 1000000,
-	       (upr & (unsigned long)SPR_UPR_SRP) ? 
-	       "with shadow registers" : "with no shadow registers");
+	       cpuinfo.clock_frequency / 1000000);
 
 	detect_soc_generic(upr);
 #endif /* CONFIG_OR32_ANONYMOUS */
