@@ -29,7 +29,6 @@ CFLAGS		+= -fsigned-char -pipe -ffixed-r10 \
 #		   -ffixed-r24 -ffixed-r25 -ffixed-r26 -ffixed-r27 \
 #		   -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 \
                    -Wno-uninitialized
-AFLAGS		+= 
 
 head-y 		:= arch/or32/kernel/head.o arch/or32/kernel/init_task.o
 
@@ -38,19 +37,9 @@ core-y		+= arch/or32/lib/ \
 		   arch/or32/kernel/ \
 		   arch/or32/mm/ \
 		   arch/or32/board/ 
-#		   arch/or32/support/
 libs-y		+= $(LIBGCC)
 
 
 core-y		+= arch/or32/boot/
 
 all: vmlinux
-
-#prepare: include/asm-$(ARCH)/offsets.h
-CLEAN_FILES +=  include/asm-$(ARCH)/offsets.h
- 
-#arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
-#				   include/config/MARKER
-
-#include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
-#	$(call filechk,gen-asm-offsets)
