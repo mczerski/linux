@@ -76,8 +76,6 @@ extern char __initramfs_start, __initramfs_end;
 
 extern u32 _fdt_start;
  
-#include <asm/machdep.h>
-
 unsigned long or32_mem_size;
 
 unsigned long fb_mem_start;

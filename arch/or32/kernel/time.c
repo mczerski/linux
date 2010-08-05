@@ -26,7 +26,6 @@
 #include <asm/irq_regs.h>
 
 #include <asm/cpuinfo.h>
-#include <asm/machdep.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/or32-hf.h>

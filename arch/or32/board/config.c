@@ -30,7 +30,6 @@
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
-#include <asm/machdep.h>
 #include <asm/serial.h>
 #include <asm/cpuinfo.h>
 
