@@ -391,11 +391,21 @@ EXCEPTION_ENTRY(_timer_handler)
 //	l.sw	SR(r1),r4
 1:	
 #endif
+/*	LOAD_SYMBOL_2_GPR(r14,0xd0000000)
+	l.lwz r16,0(r14)
+	l.ori r16,r16,0x8
+	l.sw 0(r14),r16
+*/
 	l.addi r3,r1,0
 	LOAD_SYMBOL_2_GPR(r8,timer_interrupt)
         l.jalr r8
-	l.nop
-
+	 l.addi r3,r1,0 /* Delay slot */
+/*
+	LOAD_SYMBOL_2_GPR(r14,0xd0000000)
+	l.lwz r16,0(r14)
+	l.andi r16,r16,~(0x8)
+	l.sw 0(r14),r16
+*/
 	/* Clear the _pending_ bit to renable further timer exceptions */
 /*	l.mfspr r4,r0,SPR_TTMR
 	l.movhi r5,hi(SPR_TTMR_IP)
@@ -936,35 +946,34 @@ ENTRY(_switch)
 	l.addi  r10,r5,0			/* set current (r10) to new */
 	RESTORE_ALL_NO_R11
 		
+/* ==================================================================== */
+
+/* These all use the delay slot for setting the argument register, so the
+ * jump is always happening after the l.addi instruction */
+
 ENTRY(sys_clone)
-	l.addi	r7,r1,0
 	l.j	_sys_clone
-	l.nop
+	l.addi	r7,r1,0
 	
 ENTRY(sys_fork)
-	l.addi	r3,r1,0
 	l.j	_sys_fork
-	l.nop
+	l.addi	r3,r1,0
 
 ENTRY(sys_vfork)
-	l.addi	r3,r1,0
 	l.j	_sys_vfork
-	l.nop
+	l.addi	r3,r1,0
 	
 ENTRY(sys_execve)
-	l.addi	r6,r1,0
 	l.j	_sys_execve
-	l.nop
+	l.addi	r6,r1,0
 
 ENTRY(sys_sigaltstack)
-	l.addi	r5,r1,0
 	l.j	_sys_sigaltstack
-	l.nop
+	l.addi	r5,r1,0
 
 ENTRY(sys_rt_sigreturn)
-	l.addi	r3,r1,0
 	l.j	_sys_rt_sigreturn
-	l.nop
+	l.addi	r3,r1,0
 
 /* ============================================================[ EOF ]=== */
 
