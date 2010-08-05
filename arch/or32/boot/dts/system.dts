@@ -85,6 +85,7 @@ properties.
 		   define a controller */
 
 		pic: pic@0 {
+			compatible = "opencores,or1k-pic";
 /*			#address-cells = <0>;*/
 			#interrupt-cells = <1>;
 			interrupt-controller;
@@ -94,7 +95,7 @@ properties.
 		serial0: serial@0000 {
 /* FIXME: device_type is still needed here... should remove requirement from of_serial driver */
 			device_type = "serial";
-			compatible = "ns16550a";
+			compatible = "opencores,uart", "ns16550a";
 			reg = <0x0000 0x100>;
 			interrupts = <2>;
 			clock-frequency = <20000000>;
@@ -102,7 +103,7 @@ properties.
 			
 
 		enet0: ethoc@2000000 {
-			compatible = "opencores,ethoc";
+			compatible = "opencores,ethoc", "ethoc";
 			reg = <0x2000000 0x53>;
 			interrupts = <4>;
 		};
