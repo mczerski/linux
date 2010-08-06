@@ -1061,7 +1061,7 @@ dtlb_miss_handler:
 	l.lwz	r3,0x0(r4)		// get *pmd value
 	l.sfne	r3,r0
 	l.bnf	d_pmd_none
-	l.andi	r3,r3,0x1fff		// ~PAGE_MASK
+	l.andi	r3,r3,~PAGE_MASK //0x1fff		// ~PAGE_MASK
 	/*
          * if (pmd_bad(*pmd))
 	 *   pmd_clear(pmd)
