@@ -39,8 +39,8 @@ static inline void or32_timer_stop(void)
 static int or32_timer_set_next_event(unsigned long delta,
                                         struct clock_event_device *dev)
 {
-	static int i = 0;
-	static u32 x[32];
+/*	static int i = 0;
+	static u32 x[32];*/
 	u32 c;
 
 //        printk("%s: next event, delta %ld\n", __func__, (u32)delta);
@@ -63,7 +63,7 @@ static int or32_timer_set_next_event(unsigned long delta,
 	mtspr(SPR_TTMR, SPR_TTMR_CR | SPR_TTMR_IE | c);
 
 	c = mfspr(SPR_TTMR);
-	pr_debug("SPR_TTMR = %lx\n", c);
+	pr_debug("SPR_TTMR = %x\n", c);
 
         return 0;
 }
@@ -172,8 +172,8 @@ static struct irqaction timer_irqaction = {
 static __init void or32_clockevent_init(void)
 {
 	clockevents_calc_mult_shift(&clockevent_or32_timer, cpuinfo.clock_frequency, 4);
-     	printk("TIMER INIT event **************** ******* mult = %ld\n", clockevent_or32_timer.mult);
-	printk("TIMER INIT  event ***********************shift = %ld\n", clockevent_or32_timer.shift);
+     	printk("TIMER INIT event **************** ******* mult = %d\n", clockevent_or32_timer.mult);
+	printk("TIMER INIT  event ***********************shift = %d\n", clockevent_or32_timer.shift);
 //   clockevent_or32_timer.mult =
 //                div_sc(cpuinfo.clock_frequency, NSEC_PER_SEC,
 //                                clockevent_or32_timer.shift);
@@ -229,9 +229,9 @@ static int __init or32_timer_init(void)
 
 //        or32_timer.mult = 
 //		clocksource_hz2mult(cpuinfo.clock_frequency, or32_timer.shift);
-	printk("clock frequency = %ld\n", cpuinfo.clock_frequency);
-	printk("TIMER INIT *********************** mult = %ld\n", or32_timer.mult);
-	printk("TIMER INIT *********************** mult = %ld\n", or32_timer.shift);
+	printk("clock frequency = %d\n", cpuinfo.clock_frequency);
+	printk("TIMER INIT *********************** mult = %d\n", or32_timer.mult);
+	printk("TIMER INIT *********************** mult = %d\n", or32_timer.shift);
         if (clocksource_register(&or32_timer))
                 panic("failed to register clocksource");
 
