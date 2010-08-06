@@ -24,8 +24,10 @@
 #include <linux/of.h>
 #include <linux/ftrace.h>
 #include <linux/irq.h>
+#include <linux/seq_file.h>
+#include <linux/kernel_stat.h>
 
-#include <asm/irqflags.h>
+#include <linux/irqflags.h>
 
 /* read interrupt enabled status */
 unsigned long __raw_local_save_flags(void) {
@@ -251,35 +253,47 @@ void __init init_IRQ(void)
 
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
+
+	printk("JONAS: IRQ ENABLED, picmr=%x\n", mfspr(SPR_PICMR));
 }
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	/* FIXME */
-#if 0
-	int i = *(loff_t *) v;
-	struct irqaction * action;
-	unsigned long flags;
-	
-	if (i < NR_IRQS) {
-                local_irq_save(flags);
-		action = irq_action[i];
-                if (!action) 
-                        goto skip;
-		seq_printf(p, "%2d: %10u %c %s",
-			   i, kstat_cpu(0).irqs[i],
-			   (action->flags & SA_INTERRUPT) ? '+' : ' ',
-			   action->name);
-                for (action = action->next; action; action = action->next) {
-                        seq_printf(p, ",%s %s",
-				   (action->flags & SA_INTERRUPT) ? " +" : "",
-				   action->name);
-                }
-		seq_putc(p, '\n');
-	skip:
-                local_irq_restore(flags);
+        int i = *(loff_t *) v, j;
+        struct irqaction *action;
+        unsigned long flags;
+
+        if (i == 0) {
+                seq_printf(p, "         ");
+                for_each_online_cpu(j)
+                        seq_printf(p, "CPU%-8d", j);
+                seq_putc(p, '\n');
         }
+
+        if (i < NR_IRQS) {
+                raw_spin_lock_irqsave(&irq_desc[i].lock, flags);
+                action = irq_desc[i].action;
+                if (!action)
+                        goto skip;
+                seq_printf(p, "%3d: ", i);
+#ifndef CONFIG_SMP
+                seq_printf(p, "%10u ", kstat_irqs(i));
+#else
+                for_each_online_cpu(j)
+                        seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
+                seq_printf(p, " %8s", irq_desc[i].status &
+                                        IRQ_LEVEL ? "level" : "edge");
+                seq_printf(p, " %8s", irq_desc[i].chip->name);
+                seq_printf(p, "  %s", action->name);
+
+                for (action = action->next; action; action = action->next)
+                        seq_printf(p, ", %s", action->name);
+
+                seq_putc(p, '\n');
+skip:
+                raw_spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+        }
         return 0;
 }
 
