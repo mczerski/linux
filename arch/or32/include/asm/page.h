@@ -1,5 +1,5 @@
-#ifndef _OR32_PAGE_H
-#define _OR32_PAGE_H
+#ifndef __ASM_OPENRISC_PAGE_H
+#define __ASM_OPENRISC_PAGE_H
 
 
 /* PAGE_SHIFT determines the page size */
@@ -88,4 +88,4 @@ extern unsigned long memory_end;
 #include <asm-generic/memory_model.h>
 #include <asm-generic/getorder.h>
 
-#endif /* __OR32_PAGE_H */
+#endif /* __ASM_OPENRISC_PAGE_H */

@@ -1,6 +1,6 @@
-#ifndef __OR32_CPUTIME_H
-#define __OR32_CPUTIME_H
+#ifndef __ASM_OPENRISC_CPUTIME_H
+#define __ASM_OPENRISC_CPUTIME_H
 
 #include <asm-generic/cputime.h>
 
-#endif /* __OR32_CPUTIME_H */
+#endif /* __ASM_OPENRISC_CPUTIME_H */

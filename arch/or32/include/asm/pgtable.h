@@ -4,8 +4,8 @@
  * include/asm-cris/pgtable.h
  */
 
-#ifndef _OR32_PGTABLE_H
-#define _OR32_PGTABLE_H
+#ifndef __ASM_OPENRISC_PGTABLE_H
+#define __ASM_OPENRISC_PGTABLE_H
 
 //#include <asm-generic/4level-fixup.h>
 #include <asm-generic/pgtable-nopmd.h>
@@ -413,4 +413,4 @@ void consistent_sync_page(struct page *page, unsigned long offset,
 typedef pte_t *pte_addr_t;
 
 #endif /* __ASSEMBLY__ */
-#endif /* _OR32_PGTABLE_H */
+#endif /* __ASM_OPENRISC_PGTABLE_H */

@@ -1,5 +1,5 @@
-#ifndef _OR32_TLBFLUSH_H
-#define _OR32_TLBFLUSH_H
+#ifndef __ASM_OPENRISC_TLBFLUSH_H
+#define __ASM_OPENRISC_TLBFLUSH_H
 
 #include <linux/mm.h>
 #include <asm/processor.h>
@@ -40,4 +40,4 @@ extern inline void flush_tlb(void)
 
 #define flush_tlb_kernel_range(start, end) flush_tlb_all()
 
-#endif /* _OR32_TLBFLUSH_H */
+#endif /* __ASM_OPENRISC_TLBFLUSH_H */

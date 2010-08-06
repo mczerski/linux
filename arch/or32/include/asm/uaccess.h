@@ -1,5 +1,5 @@
-#ifndef _OR32_UACCESS_H
-#define _OR32_UACCESS_H
+#ifndef __ASM_OPENRISC_UACCESS_H
+#define __ASM_OPENRISC_UACCESS_H
 
 /*
  * User space memory access functions
@@ -332,4 +332,4 @@ extern __inline__ int strnlen_user(const char *str, long len)
 
 #define strlen_user(str)	strnlen_user((str), 0x7ffffffe)
 
-#endif	/* _OR32_UACCESS_H */
+#endif	/* __ASM_OPENRISC_UACCESS_H */

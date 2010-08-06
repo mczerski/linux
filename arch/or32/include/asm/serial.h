@@ -2,8 +2,8 @@
 #if 0
 
 #ifdef __KERNEL__
-#ifndef _OR32_SERIAL_H__
-#define _OR32_SERIAL_H__
+#ifndef __ASM_OPENRISC_SERIAL_H__
+#define __ASM_OPENRISC_SERIAL_H__
 
 //#include <asm-generic/serial.h>
 

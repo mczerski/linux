@@ -1,5 +1,5 @@
-#ifndef _OR32_BOARD_H
-#define _OR32_BOARD_H 
+#ifndef __ASM_OPENRISC_BOARD_H
+#define __ASM_OPENRISC_BOARD_H 
 
 /* System clock frequecy */
 //#define SYS_CLK		(CONFIG_OR32_SYS_CLK*1000000)
@@ -15,5 +15,5 @@
 //#define OR32_CONSOLE_BAUD  115200
 //#define UART_DEVISOR       SYS_CLK/(16*OR32_CONSOLE_BAUD)
 
-#endif /* _OR32_BOARD_H */
+#endif /* __ASM_OPENRISC_BOARD_H */
 

@@ -1,5 +1,5 @@
-#ifndef __OR32_SIGNAL_H__
-#define __OR32_SIGNAL_H__
+#ifndef __ASM_OPENRISC_SIGNAL_H__
+#define __ASM_OPENRISC_SIGNAL_H__
 
 /* Both SA_RESTORER and old_sigaction are obsolete and
  * should be removed, but the code in arch/or32/kernel/signal.c
@@ -18,4 +18,4 @@ struct old_sigaction {
        void (*sa_restorer)(void);
 };
 
-#endif /* __OR32_SIGNAL_H__ */
+#endif /* __ASM_OPENRISC_SIGNAL_H__ */

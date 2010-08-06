@@ -3,8 +3,8 @@
  * include/asm-ppc/system.h
  * Copyright (C) 1999 Cort Dougan <cort@cs.nmt.edu>
  */
-#ifndef __OR32_SYSTEM_H
-#define __OR32_SYSTEM_H
+#ifndef __ASM_OPENRISC_SYSTEM_H
+#define __ASM_OPENRISC_SYSTEM_H
 
 #include <asm/processor.h>
 #include <linux/linkage.h>
@@ -131,4 +131,4 @@ extern void __print(const char *fmt, ...);
 #include <asm-generic/cmpxchg-local.h>
 
 #endif /* __KERNEL__ */
-#endif /* __OR32_SYSTEM_H */
+#endif /* __ASM_OPENRISC_SYSTEM_H */

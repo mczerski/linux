@@ -1,5 +1,5 @@
-#ifndef _OR32_POSIX_TYPES_H
-#define _OR32_POSIX_TYPES_H
+#ifndef __ASM_OPENRISC_POSIX_TYPES_H
+#define __ASM_OPENRISC_POSIX_TYPES_H
 
 /* These definitions are different from the defaults and override the
  * definitions in the generic header.  For everything else, the generic
@@ -20,4 +20,4 @@ typedef unsigned short  __kernel_old_dev_t;
 
 #include <asm-generic/posix_types.h>
 
-#endif /* _OR32_POSIX_TYPES_H */
+#endif /* __ASM_OPENRISC_POSIX_TYPES_H */

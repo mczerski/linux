@@ -1,5 +1,5 @@
-#ifndef _OR32_PGALLOC_H
-#define _OR32_PGALLOC_H
+#ifndef __ASM_OPENRISC_PGALLOC_H
+#define __ASM_OPENRISC_PGALLOC_H
 
 #include <asm/page.h>
 #include <linux/threads.h>

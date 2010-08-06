@@ -1,6 +1,6 @@
-#ifndef _ASM_OR32_CPUMASK_H
-#define _ASM_OR32_CPUMASK_H
+#ifndef __ASM_OPENRISC_CPUMASK_H
+#define __ASM_OPENRISC_CPUMASK_H
 
 #include <asm-generic/cpumask.h>
 
-#endif /* _ASM_OR32_CPUMASK_H */
+#endif /* __ASM_OPENRISC_CPUMASK_H */

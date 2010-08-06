@@ -1,5 +1,5 @@
-#ifndef _OR32_TIMEX_H
-#define _OR32_TIMEX_H
+#ifndef __ASM_OPENRISC_TIMEX_H
+#define __ASM_OPENRISC_TIMEX_H
 
 #include <asm-generic/timex.h>
 

@@ -1,5 +1,5 @@
-#ifndef _OR32_MODULE_H
-#define _OR32_MODULE_H
+#ifndef __ASM_OPENRISC_MODULE_H
+#define __ASM_OPENRISC_MODULE_H
 
 struct mod_arch_specific { };
 

@@ -1,5 +1,5 @@
-#ifndef __ASM_OR32_UNALIGNED_H
-#define __ASM_OR32_UNALIGNED_H
+#ifndef __ASM_OPENRISC_UNALIGNED_H
+#define __ASM_OPENRISC_UNALIGNED_H
 
 /*
  * This is copied from the generic implementation and the C-struct
@@ -30,4 +30,4 @@
 # error need to define endianess
 #endif
 
-#endif /* __ASM_OR32_UNALIGNED_H */
+#endif /* __ASM_OPENRISC_UNALIGNED_H */

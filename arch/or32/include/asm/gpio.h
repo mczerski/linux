@@ -14,8 +14,8 @@
  * (at your option) any later version.
  */
 
-#ifndef _ASM_OR32_GPIO_H
-#define _ASM_OR32_GPIO_H
+#ifndef __ASM_OPENRISC_GPIO_H
+#define __ASM_OPENRISC_GPIO_H
 
 #include <linux/errno.h>
 #include <asm-generic/gpio.h>
@@ -56,4 +56,4 @@ static inline int irq_to_gpio(unsigned int irq)
 
 #endif /* CONFIG_GPIOLIB */
 
-#endif /* _ASM_OR32_GPIO_H */
+#endif /* __ASM_OPENRISC_GPIO_H */

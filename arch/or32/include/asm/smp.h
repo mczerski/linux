@@ -1,4 +1,4 @@
-#ifndef _OR32_SMP_H
-#define _OR32_SMP_H
+#ifndef __ASM_OPENRISC_SMP_H
+#define __ASM_OPENRISC_SMP_H
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef _OR32_MMU_H
-#define _OR32_MMU_H
+#ifndef __ASM_OPENRISC_MMU_H
+#define __ASM_OPENRISC_MMU_H
 
 
 #ifndef __ASSEMBLY__

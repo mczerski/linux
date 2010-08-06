@@ -1,5 +1,5 @@
-#ifndef _OR32_STRING_H
-#define _OR32_STRING_H
+#ifndef __ASM_OPENRISC_STRING_H
+#define __ASM_OPENRISC_STRING_H
 
 
 /* __PHX_TODO__: these are optimizations, will do later */

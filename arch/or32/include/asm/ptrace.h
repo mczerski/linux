@@ -1,5 +1,5 @@
-#ifndef _OR32_PTRACE_H
-#define _OR32_PTRACE_H
+#ifndef __ASM_OPENRISC_PTRACE_H
+#define __ASM_OPENRISC_PTRACE_H
 
 #include <asm/spr_defs.h>
 /*
@@ -80,4 +80,4 @@ struct pt_regs {
 #define RESULT    136
 #define SYSCALLNO 140
 
-#endif /* _OR32_PTRACE_H */
+#endif /* __ASM_OPENRISC_PTRACE_H */

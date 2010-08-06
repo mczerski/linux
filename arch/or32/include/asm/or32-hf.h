@@ -1,10 +1,10 @@
 /*
- * or32 helper functions
+ * OpenRISC helper functions
  *
  */
 
-#ifndef _OR32_OR32_HF_H
-#define _OR32_OR32_HF_H
+#ifndef __ASM_OPENRISC_HF_H
+#define __ASM_OPENRISC_HF_H
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -73,4 +73,4 @@ static __inline__ void check_stack(struct pt_regs *regs, const char *file,
 #endif
 }
 
-#endif /* _OR32_OR32_HF_H */
+#endif /* __ASM_OPENRISC_HF_H */

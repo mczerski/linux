@@ -7,8 +7,8 @@
  *
  */
 
-#ifndef _OR32_PROCESSOR_H
-#define _OR32_PROCESSOR_H
+#ifndef __ASM_OPENRISC_PROCESSOR_H
+#define __ASM_OPENRISC_PROCESSOR_H
 
 #include <asm/spr_defs.h>
 #include <asm/page.h>
@@ -106,4 +106,4 @@ extern unsigned long thread_saved_pc(struct task_struct *t);
 #define cpu_relax()     do { } while (0)
 
 #endif /* __ASSEMBLY__ */
-#endif /* _OR32_PROCESSOR_H */
+#endif /* __ASM_OPENRISC_PROCESSOR_H */

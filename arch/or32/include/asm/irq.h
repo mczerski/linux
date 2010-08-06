@@ -1,6 +1,6 @@
 #ifdef __KERNEL__
-#ifndef __OR32_IRQ_H__
-#define __OR32_IRQ_H__
+#ifndef __ASM_OPENRISC_IRQ_H__
+#define __ASM_OPENRISC_IRQ_H__
 
 #if 0
 #include <linux/interrupt.h>
@@ -60,5 +60,5 @@ static inline void irq_dispose_mapping(unsigned int virq)
         return; 
 }
 #endif
-#endif /* __OR32_IRQ_H__ */
+#endif /* __ASM_OPENRISC_IRQ_H__ */
 #endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
-#ifndef __OR32_TLB_H__
-#define __OR32_TLB_H__
+#ifndef __ASM_OPENRISC_TLB_H__
+#define __ASM_OPENRISC_TLB_H__
 
 /*
  * or32 doesn't need any special per-pte or
@@ -12,5 +12,5 @@
 #define tlb_flush(tlb) flush_tlb_mm((tlb)->mm)
 #include <asm-generic/tlb.h>
 
-#endif /* __OR32_TLB_H__ */
+#endif /* __ASM_OPENRISC_TLB_H__ */
 

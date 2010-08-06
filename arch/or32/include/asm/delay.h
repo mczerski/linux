@@ -1,5 +1,5 @@
-#ifndef _OR32_DELAY_H
-#define _OR32_DELAY_H
+#ifndef __ASM_OPENRISC_DELAY_H
+#define __ASM_OPENRISC_DELAY_H
 
 #include <linux/linkage.h>
 #include <asm/param.h>			/* Added by JPB: for HZ */

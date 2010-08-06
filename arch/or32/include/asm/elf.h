@@ -1,5 +1,5 @@
-#ifndef _OR32_ELF_H
-#define _OR32_ELF_H
+#ifndef __ASM_OPENRISC_ELF_H
+#define __ASM_OPENRISC_ELF_H
 
 /*
  * ELF register definitions..

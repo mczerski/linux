@@ -5,8 +5,8 @@
  */
 
 #ifdef __KERNEL__
-#ifndef _OR32_NAMEI_H
-#define _OR32_NAMEI_H
+#ifndef __ASM_OPENRISC_NAMEI_H
+#define __ASM_OPENRISC_NAMEI_H
 
 /* This dummy routine maybe changed to something useful
  * for /usr/gnemul/ emulation stuff.
@@ -15,5 +15,5 @@
 
 #define __emul_prefix() NULL
 
-#endif /* _OR32_NAMEI_H */
+#endif /* __ASM_OPENRISC_NAMEI_H */
 #endif /* __KERNEL__ */

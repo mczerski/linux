@@ -2,8 +2,8 @@
  * BK Id: SCCS/s.user.h 1.5 05/17/01 18:14:26 cort
  */
 #ifdef __KERNEL__
-#ifndef _OR32_USER_H
-#define _OR32_USER_H
+#ifndef __ASM_OPENRISC_USER_H
+#define __ASM_OPENRISC_USER_H
 
 /* Adapted from <asm-alpha/user.h> */
 
@@ -53,5 +53,5 @@ struct user {
 #define HOST_DATA_START_ADDR	(u.start_data)
 #define HOST_STACK_END_ADDR	(u.start_stack + u.u_ssize * NBPG)
 
-#endif /* _OR32_USER_H */
+#endif /* __ASM_OPENRISC_USER_H */
 #endif /* __KERNEL__ */

@@ -1,7 +1,7 @@
 /* $Id: sigcontext.h,v 1.1 2000/07/10 16:32:31 bjornw Exp $ */
 
-#ifndef _OR32_SIGCONTEXT_H
-#define _OR32_SIGCONTEXT_H
+#ifndef __ASM_OPENRISC_SIGCONTEXT_H
+#define __ASM_OPENRISC_SIGCONTEXT_H
 
 #include <asm/ptrace.h>
 
@@ -20,5 +20,5 @@ struct sigcontext {
 	unsigned long usp;    /* usp before stacking this gunk on it */
 };
 
-#endif /* _OR32_SIGCONTEXT_H */
+#endif /* __ASM_OPENRISC_SIGCONTEXT_H */
 

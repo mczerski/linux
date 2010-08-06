@@ -1,5 +1,5 @@
-#ifndef _OR32_IO_H
-#define _OR32_IO_H
+#ifndef __ASM_OPENRISC_IO_H
+#define __ASM_OPENRISC_IO_H
 
 #include <asm/page.h>   /* for __va, __pa */
 

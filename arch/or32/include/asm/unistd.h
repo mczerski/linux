@@ -1,5 +1,5 @@
-#if !defined(_ASM_OR32_UNISTD_H) || defined(__SYSCALL)
-#define _ASM_OR32_UNISTD_H
+#if !defined(__ASM_OPENRISC_UNISTD_H) || defined(__SYSCALL)
+#define __ASM_OPENRISC_UNISTD_H
 
 #define __ARCH_HAVE_MMU
 
@@ -10,4 +10,4 @@
 
 #include <asm-generic/unistd.h>
 
-#endif /* _ASM_OR32_UNISTD_H */
+#endif /* __ASM_OPENRISC_UNISTD_H */

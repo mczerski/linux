@@ -1,5 +1,5 @@
-#ifndef _OR32_MMU_CONTEXT_H
-#define _OR32_MMU_CONTEXT_H
+#ifndef __ASM_OPENRISC_MMU_CONTEXT_H
+#define __ASM_OPENRISC_MMU_CONTEXT_H
 
 #include <asm-generic/mm_hooks.h>
 

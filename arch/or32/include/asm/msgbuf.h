@@ -1,5 +1,5 @@
-#ifndef _OR32_MSGBUF_H
-#define _OR32_MSGBUF_H
+#ifndef __ASM_OPENRISC_MSGBUF_H
+#define __ASM_OPENRISC_MSGBUF_H
 
 /* 
  * The msqid64_ds structure for the or32 architecture.
@@ -22,4 +22,4 @@ struct msqid64_ds {
 	unsigned long  __unused5;
 };
 
-#endif /* _OR32_MSGBUF_H */
+#endif /* __ASM_OPENRISC_MSGBUF_H */

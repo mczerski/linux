@@ -12,8 +12,8 @@
  * Copyright (C) 2004 IBM
  */
 
-#ifndef _ASM_OR32_DMA_MAPPING_H
-#define _ASM_OR32_DMA_MAPPING_H
+#ifndef __ASM_OPENRISC_DMA_MAPPING_H
+#define __ASM_OPENRISC_DMA_MAPPING_H
 
 /*
  * See Documentation/PCI/PCI-DMA-mapping.txt and

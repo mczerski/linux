@@ -1,6 +1,6 @@
-#ifndef _OR32_BYTEORDER_H
-#define _OR32_BYTEORDER_H
+#ifndef __ASM_OPENRISC_BYTEORDER_H
+#define __ASM_OPENRISC_BYTEORDER_H
 
 #include <linux/byteorder/big_endian.h>
 
-#endif /* _OR32_BYTEORDER_H */
+#endif /* __ASM_OPENRISC_BYTEORDER_H */

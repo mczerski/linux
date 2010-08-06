@@ -6,12 +6,12 @@
  * for more details.
  */
 
-#ifndef _ASM_OR32_MEMBLOCK_H
-#define _ASM_OR32_MEMBLOCK_H
+#ifndef __ASM_OPENRISC_MEMBLOCK_H
+#define __ASM_OPENRISC_MEMBLOCK_H
 
 /* MEMBLOCK limit is OFF */
 #define MEMBLOCK_REAL_LIMIT	0xFFFFFFFF
 
-#endif /* _ASM_OR32_MEMBLOCK_H */
+#endif /* __ASM_OPENRISC_MEMBLOCK_H */
 
 

@@ -1,6 +1,6 @@
-#ifndef _ASM_OR32_SYSCALLS_H
-#define _ASM_OR32_SYSCALLS_H
+#ifndef __ASM_OPENRISC_SYSCALLS_H
+#define __ASM_OPENRISC_SYSCALLS_H
 
 #include <asm-generic/syscalls.h>
 
-#endif /* _ASM_OR32_SYSCALLS_H */
+#endif /* __ASM_OPENRISC_SYSCALLS_H */
