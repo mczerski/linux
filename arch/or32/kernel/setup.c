@@ -127,6 +127,56 @@ static unsigned long __init setup_memory(void)
 
 struct cpuinfo cpuinfo;
 
+static void print_cpuinfo(void) {
+	unsigned long upr = mfspr(SPR_UPR);
+	unsigned long vr = mfspr(SPR_VR);
+	unsigned int version;
+	unsigned int revision;       
+
+	version = (vr & SPR_VR_VER) >> 24;
+	revision = (vr & SPR_VR_REV);
+
+	printk(KERN_INFO "CPU: OpenRISC-%x (revision %x) @%d MHz\n", 
+		version, revision, cpuinfo.clock_frequency / 1000000);
+
+	if (!(upr & SPR_UPR_UP)) {
+		printk(KERN_INFO "-- no UPR register... unable to detect configuration\n");
+		return;
+	}
+
+	if (upr & SPR_UPR_DCP) 
+		printk(KERN_INFO "-- dcache: %4d bytes total, %2d bytes/line, %d way(s)\n",
+			cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
+	else 
+		printk(KERN_INFO "-- dcache disabled\n");
+	if (upr & SPR_UPR_ICP) 
+		printk(KERN_INFO "-- icache: %4d bytes total, %2d bytes/line, %d way(s)\n",
+			cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
+	else 
+		printk(KERN_INFO "-- icache disabled\n");
+	
+	if (upr & SPR_UPR_DMP)
+		printk(KERN_INFO "-- dmmu: (assumed) %4d entries, %d way(s)\n",
+			CONFIG_OR32_DTLB_ENTRIES, 1);
+	if (upr & SPR_UPR_IMP)
+		printk(KERN_INFO "-- immu: (assumed) %4d entries, %d way(s)\n",
+			CONFIG_OR32_ITLB_ENTRIES, 1);
+
+	printk(KERN_INFO "-- additional features:\n");
+	if (upr & SPR_UPR_DUP)
+		printk(KERN_INFO "-- debug unit\n");
+	if (upr & SPR_UPR_PCUP)
+		printk(KERN_INFO "-- performance counters\n");
+	if (upr & SPR_UPR_PMP)
+		printk(KERN_INFO "-- power management\n");
+	if (upr & SPR_UPR_PICP)
+		printk(KERN_INFO "-- PIC\n");
+	if (upr & SPR_UPR_TTP)
+		printk(KERN_INFO "-- timer\n");
+	if (upr & SPR_UPR_CUP)
+		printk(KERN_INFO "-- custom unit(s)\n");
+}
+
 static inline unsigned int fcpu(struct device_node *cpu, char *n)
 {
         int *val;
@@ -169,6 +219,8 @@ void __init setup_cpuinfo(void)
 	cpuinfo.dcache_block_size = fcpu(cpu, "d-cache-block-size");
 */
 	of_node_put(cpu);
+
+	print_cpuinfo();
 
 //	printk("IC ENABLE........................\n");
 //	__ic_enable(cpuinfo.icache_size, cpuinfo.icache_block_size);
@@ -231,76 +283,13 @@ void __init detect_unit_config(unsigned long upr, unsigned long mask,
 		printk("not present\n");
 }
 
-
-void __init detect_soc_generic(unsigned long upr)
-{
-	detect_unit_config(upr, SPR_UPR_DCP,  "  dCACHE: ", NULL);
-        printk("  dCACHE: %4d bytes total, %2d bytes/line, %d way(s)\n",
-               cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
-	detect_unit_config(upr, SPR_UPR_ICP,  "  iCACHE: ", NULL);
-        printk("  iCACHE: %4d bytes total, %2d bytes/line, %d way(s)\n",
-               cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
-	detect_unit_config(upr, SPR_UPR_DMP,  "  dMMU\t: ", NULL);
-	printk("  dMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_DTLB_ENTRIES, 1);
-	detect_unit_config(upr, SPR_UPR_IMP,  "  iMMU\t: ", NULL);
-	printk("  iMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_ITLB_ENTRIES, 1);
-	detect_unit_config(upr, SPR_UPR_DUP,  "  debug : ", NULL);
-	detect_unit_config(upr, SPR_UPR_PCUP, "  PerfC : ", NULL);
-	detect_unit_config(upr, SPR_UPR_PMP,  "  PM    : ", NULL);
-	detect_unit_config(upr, SPR_UPR_PICP, "  PIC   : ", NULL);
-	detect_unit_config(upr, SPR_UPR_TTP,  "  TIMER : ", detect_timer);
-	detect_unit_config(upr, SPR_UPR_CUP,  "  CUs   : ", NULL);
-
-/* add amount configured memory 
- */
-}
-
-unsigned long su_asm(void);
-
-void __init detect_soc(void)
-{
-	unsigned long upr, cfg, version, revision;
-
-
-
-	upr = mfspr(SPR_UPR);
-	if (upr &  SPR_UPR_UP)
-		printk("Detecting Processor units:\n");
-	else {
-		printk("Unit Present Register not avaliable\n");
-		return;
-	}
-	       
-	cfg = mfspr(SPR_VR);
-	version=extract_value(cfg, SPR_VR_VER);
-	revision=extract_value(cfg, SPR_VR_REV);
-
-#ifndef CONFIG_OR32_ANONYMOUS
-	printk("  CPU\t: or32/OpenRISC-%lx, revision %lx, @%d MHz, %s\n", 
-	       version, revision,
-	       cpuinfo.clock_frequency / 1000000);
-
-	detect_soc_generic(upr);
-#endif /* CONFIG_OR32_ANONYMOUS */
-
-	printk("  Signed 0x%lx\n", su_asm());
-}
-
-
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long max_low_pfn;
 
-//	early_setup(NULL);
-
 	unflatten_device_tree();
 
 	setup_cpuinfo();
-
-	/* detect System on Chip parameters */
-	detect_soc();
 
 	/* process 1's initial memory region is the kernel code/data */
 	init_mm.start_code = (unsigned long) &_stext;
@@ -347,54 +336,34 @@ void __init setup_arch(char **cmdline_p)
 
 static int show_cpuinfo(struct seq_file *m, void *v)
 {
+	unsigned long vr;
+	int version, revision;
 
-#ifndef CONFIG_OR32_ANONYMOUS
+	vr = mfspr(SPR_VR);
+	version = (vr & SPR_VR_VER) >> 24;
+	revision = vr & SPR_VR_REV;
+
 	return seq_printf(m,
-			  "cpu\t\t: or32\n"
-			  "cpu revision\t: %lu\n"
-			  "cpu model\t: %s\n"
-			  "icache size\t: %d kB\n"
-			  "icache block size\t: %d bytes\n"
-			  "dcache size\t: %d kB\n"
-			  "dcache block size\t: %d bytes\n"
-			  "immu\t\t: %s\n"
-			  "dmmu\t\t: %s\n"
-			  "fpu\t\t: %s\n"
-			  "ethernet\t: %s Mbps\n"
-			  "bogomips\t: %lu.%02lu\n",
-			  
-			  0UL,
-			  "Marvin",
-			  8,
-			  8,
-			  "64 entries, 1 way",
-			  "64 entries, 1 way",
-			  "no",
-			  "10/100",
-			  (loops_per_jiffy * HZ) / 500000,
-			  ((loops_per_jiffy * HZ) / 5000) % 100);
-#else /* CONFIG_OR32_ANONYMOUS */
-	return seq_printf(m,
-			  "cpu revision\t: %lu\n"
-			  "icache size\t: %d bytes\n"
-			  "icache block size\t: %d bytes\n"
-			  "dcache size\t: %d bytes\n"
-			  "dcache block size\t: %d bytes\n"
-			  "immu\t\t: %s\n"
-			  "dmmu\t\t: %s\n"
-			  "ethernet\t: %s Mbps\n",
-			  
-			  0UL,
-			  cpuinfo.icache_size,
-			  cpuinfo.icache_block_size,
-			  cpuinfo.dcache_size,
-			  cpuinfo.dicache_block_size,
-			  "64 entries, 1 way",
-			  "64 entries, 1 way",
-			  "10/100");
-#endif /* CONFIG_OR32_ANONYMOUS */
-			  
-			  
+		"cpu\t\t: OpenRISC-%d\n"
+		"revision\t: %lu\n"
+		"dcache size\t: %d kB\n"
+		"dcache block size\t: %d bytes\n"
+		"icache size\t: %d kB\n"
+		"icache block size\t: %d bytes\n"
+		"immu\t\t: %s\n"
+		"dmmu\t\t: %s\n"
+		"bogomips\t: %lu.%02lu\n",
+
+		version,
+		revision,
+		cpuinfo.dcache_size,
+		cpuinfo.dcache_block_size,
+		cpuinfo.icache_size,
+		cpuinfo.icache_block_size,
+		"(assumed) 64 entries, 1 way",
+		"(assumed) 64 entries, 1 way",
+		(loops_per_jiffy * HZ) / 500000,
+		((loops_per_jiffy * HZ) / 5000) % 100);
 }
 
 static void *c_start(struct seq_file *m, loff_t *pos)
