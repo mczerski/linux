@@ -1,14 +1,9 @@
 LOAD_CURRENT_THREAD_INFO is not used anywhere
 
-Use __HEAD macro to install to .text.head
-Move init.c to head-y to get it into .text.head
-
-
-
-Use generic stat.h -- this requires syncing with libc (uClibc),
-thus we need to think about whether it's really possible to make
-this switch or if we have to live with what we've got.
-
 Implement memcpy and memset (string.h)
 
 DMA implementation
+
+Should interrupt handlers run with interrupts enabled??? Who enables the interrupts?
+
+switch bootmem allocation over to memblock
