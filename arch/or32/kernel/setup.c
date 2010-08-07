@@ -76,16 +76,18 @@ extern char __initramfs_start, __initramfs_end;
 extern u32 _fdt_start;
  
 unsigned long or32_mem_size;
-
 unsigned long fb_mem_start;
-/*static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=uart,mmio,0x90000000";*/
-//static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=ttyS0";
-static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200";
-//static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::";
-//static char command_line[COMMAND_LINE_SIZE] = "console=ttyS0";
+
+#ifdef CONFIG_CMDLINE
+char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
+#else
+char __initdata cmd_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200";
+//char __initdata cmd_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::";
+#endif
+
 extern const unsigned long text_start, edata; /* set by the linker script */ 
        
-char cmd_line[COMMAND_LINE_SIZE];
+//char cmd_line[COMMAND_LINE_SIZE];
 
 static unsigned long __init setup_memory(void)
 {
@@ -227,7 +229,7 @@ void __init setup_cpuinfo(void)
 //	__dc_enable(cpuinfo.dcache_size, cpuinfo.dcache_block_size);
 }
 
-void __init early_setup(/*unsigned long fdt*/) {
+void __init or32_early_setup(/*unsigned long fdt*/) {
 
 	early_init_devtree((void *) &_fdt_start);
 
@@ -311,7 +313,7 @@ void __init setup_arch(char **cmdline_p)
 	
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	//	early_serial_console_init(command_line); RGD
-	setup_early_serial8250_console(command_line);
+	//setup_early_serial8250_console(cmd_line);
 #endif
 
 #if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
@@ -319,7 +321,7 @@ void __init setup_arch(char **cmdline_p)
         	conswitchp = &dummy_con;
 #endif
 
-	*cmdline_p = command_line;
+	*cmdline_p = cmd_line;
 	
 	/* Save command line copy for /proc/cmdline RGD removed 2.6.21*/
 	//memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);

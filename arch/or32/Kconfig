@@ -150,6 +150,27 @@ config OR32_ANONYMOUS
 	bool "Enable anonymity"
 	default n
 
+config CMDLINE_BOOL
+        bool "Default bootloader kernel arguments"
+
+config CMDLINE
+        string "Default kernel command string"
+        depends on CMDLINE_BOOL
+        default "console=ttyUL0,115200"
+        help
+          On some architectures there is currently no way for the boot loader
+          to pass arguments to the kernel. For these architectures, you should
+          supply some command-line options at build time by entering them
+          here.
+
+config CMDLINE_FORCE
+        bool "Force default kernel command string"
+        depends on CMDLINE_BOOL
+        default n
+        help
+          Set this to have arguments from the default kernel command string
+          override those passed by the boot loader.
+
 menu "Debuging options"
 
 config DEBUG_STACKOVERFLOW

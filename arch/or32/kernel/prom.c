@@ -126,7 +126,7 @@ void __init early_init_devtree(void *params)
 
 	/* Save command line for /proc/cmdline and then parse parameters */
 	strlcpy(boot_command_line, cmd_line, COMMAND_LINE_SIZE);
-	parse_early_param();
+//	parse_early_param();
 
 	memblock_analyze();
 

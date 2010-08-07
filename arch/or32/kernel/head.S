@@ -719,7 +719,7 @@ clear_bss:
 	l.addi  r28,r28,4
 
 /*
-	LOAD_SYMBOL_2_GPR(r24, early_setup)
+	LOAD_SYMBOL_2_GPR(r24, or32_early_setup)
 	tophys(r28,r24)
 	CLEAR_GPR(r24)
 	l.jalr r28
@@ -752,7 +752,7 @@ flush_tlb:
 	l.addi	r7,r7,-1
 
 
-/* The MMU needs to be enabled before _early_setup is called */
+/* The MMU needs to be enabled before or32_early_setup is called */
 
 enable_mmu:
 	/* 
@@ -780,7 +780,7 @@ enable_mmu:
 	// reset the simulation counters
 	l.nop 5
 
-	LOAD_SYMBOL_2_GPR(r24, early_setup)
+	LOAD_SYMBOL_2_GPR(r24, or32_early_setup)
 	l.jalr r24
 	l.nop
 
