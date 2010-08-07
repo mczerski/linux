@@ -102,8 +102,8 @@ void flush_tlb_all(void)
 //	or32_disable_immu();
 
 	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
-		mtspr(SPR_DTLBMR_BASE(0) + i, 0);
-		mtspr(SPR_ITLBMR_BASE(0) + i, 0);
+		mtspr_off(SPR_DTLBMR_BASE(0), i, 0);
+		mtspr_off(SPR_ITLBMR_BASE(0), i, 0);
 	}
 	
 //	or32_enable_immu();

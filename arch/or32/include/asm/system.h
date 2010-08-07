@@ -104,15 +104,18 @@ static inline void * xchg_ptr(void * m, void * val)
 	return (void *) __xchg((unsigned long)m, val, sizeof(unsigned long));
 }
 
-static inline void mtspr(unsigned long add, unsigned long val)
-{
-	__asm__ __volatile__ ("l.mtspr %0,%1,0" :: "r" (add), "r" (val));
+#define mtspr(_spr, _val) __asm__ __volatile__ ("l.mtspr r0,%1,%0" :: "K" (_spr), "r" (_val))
+#define mtspr_off(_spr, _off, _val) __asm__ __volatile__ ("l.mtspr %0,%1,%2" :: "r" (_off), "r" (_val), "K" (_spr))
+
+/*static inline void mtspr(unsigned short spr, unsigned long val) {
+	__asm__ __volatile__ ("l.mtspr r0,%1,%0" :: "K" (spr), "r" (val)); 
 }
+*/
 
 static inline unsigned long mfspr(unsigned long add)
 {
 	unsigned long ret;
-	__asm__ __volatile__ ("l.mfspr %0,%1,0" : "=r" (ret) : "r" (add));
+	__asm__ __volatile__ ("l.mfspr %0,r0,%1" : "=r" (ret) : "K" (add));
 	return ret;
 }
 
