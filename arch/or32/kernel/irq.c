@@ -101,102 +101,12 @@ int pic_set_type(unsigned int irq, unsigned int flow_type) {
 	return 0;
 }
 
-int pic_get_irq()
-{
+static inline int pic_get_irq() {
 	int irq;
-	int i;
-	unsigned long mask;
-	unsigned long pend = mfspr(SPR_PICSR);
 
-	/* Bail if no IRQ pending */
-	if (pend == 0)
-		return -1;
+	irq = ffs(mfspr(SPR_PICSR));
 
-//	printk("Jonas IRQ\n");
-//	printk("pend = 0x%lx\n", pend);
-
-	i = 16;
-	irq = 0;
-	mask = (1UL << i) -1;
-	while (i > 0) {
-//		printk("JOnas IRQ trest\n");
-		if (!(pend & mask)) {
-			pend >>= i;
-			irq += i;
-//			printk("New pend = 0x%lx\n", pend);
-		}
-		i >>= 1;
-//		printk("New i = %d\n", i);
-		mask >>= i;
-	}
-
-//	printk("Got IRQ %d\n", irq);
-
-	return irq;
-#if 0
-	irq = 0;
-	while (!(pend & 1UL)) {
-		irq++;
-		pend >>= 1;
-	}
-
-
-	int irq;
-	int mask;
-
-	unsigned long pend = mfspr(SPR_PICSR) & 0xfffffffc;
-
-
-
-	if (pend & 0x0000ffff) {
-		if (pend & 0x000000ff) {
-			if (pend & 0x0000000f) {
-				mask = 0x00000001;
-				irq = 0;
-			} else {
-				mask = 0x00000010;
-				irq = 4;
-			}
-		} else {
-			if (pend & 0x00000f00) {
-				mask = 0x00000100;
-				irq = 8;
-			} else {
-				mask = 0x00001000;
-				irq = 12;
-			}
-		}
-	} else if(pend & 0xffff0000) {
-		if (pend & 0x00ff0000) {
-			if (pend & 0x000f0000) {
-				mask = 0x00010000;
-				irq = 16;
-			} else {
-				mask = 0x00100000;
-				irq = 20;
-			}
-		} else {
-			if (pend & 0x0f000000) {
-				mask = 0x01000000;
-				irq = 24;
-			} else {
-				mask = 0x10000000;
-				irq = 28;
-			}
-		}
-	} else {
-		return -1;
-	}
-
-	while (! (mask & pend)) {
-		mask <<=1;
-		irq++;
-	}
-
-//	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~mask);
-	return irq;
-
-#endif
+	return irq ? irq - 1 : -1;
 }
 
 /**
