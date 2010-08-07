@@ -132,18 +132,16 @@ static void __init fixrange_init (unsigned long start, unsigned long end, pgd_t 
 
 static void __init zone_sizes_init(void)
 {
-	unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
-	unsigned int max_dma, low;
+	unsigned long zones_size[MAX_NR_ZONES];
 
-	max_dma = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
-	low = max_low_pfn;
+	/* Clear the zone sizes */
+	memset(zones_size, 0, sizeof(zones_size)); 
+ 
+	/*
+	 * We use only ZONE_NORMAL 
+	*/ 
+	zones_size[ZONE_NORMAL] = max_low_pfn; 
 
-	if (low < max_dma)
-		zones_size[ZONE_DMA] = low;
-	else {
-		zones_size[ZONE_DMA] = max_dma;
-		zones_size[ZONE_NORMAL] = low - max_dma;
-	}
 	free_area_init(zones_size);
 }
 

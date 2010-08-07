@@ -13,10 +13,6 @@ config SYMBOL_PREFIX
         string
         default ""
 
-config ZONE_DMA
-	bool
-	default y
-
 config HAVE_DMA_ATTRS
 	bool
 	default y
