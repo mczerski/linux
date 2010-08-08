@@ -95,6 +95,20 @@ config OR32_GENERIC
 
 endchoice
 
+menu "Class II Instructions"
+
+config OPENRISC_HAVE_INST_FF1
+	bool "l.ff1"
+	help
+	  Have instruction l.ff1: find first bit
+
+config OPENRISC_HAVE_INST_FL1
+	bool "l.fl1"
+	help
+	  Have instruction l.fl1: find last bit
+
+endmenu
+
 
 config OR32_SYS_CLK
 	int "System clock frequency [MHz]"

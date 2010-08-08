@@ -18,10 +18,10 @@
 #define smp_mb__after_clear_bit()	smp_mb()
 #endif
 
-#include <asm-generic/bitops/__ffs.h>
+#include <asm/bitops/__ffs.h>
 #include <asm-generic/bitops/ffz.h>
-#include <asm-generic/bitops/fls.h>
-#include <asm-generic/bitops/__fls.h>
+#include <asm/bitops/fls.h>
+#include <asm/bitops/__fls.h>
 #include <asm-generic/bitops/fls64.h>
 #include <asm-generic/bitops/find.h>
 

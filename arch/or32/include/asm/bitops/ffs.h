@@ -1,6 +1,7 @@
-#define HAVE_FF1 1
+#ifndef __ASM_OPENRISC_FFS_H
+#define __ASM_OPENRISC_FFS_H
 
-#ifdef HAVE_FF1
+#ifdef CONFIG_OPENRISC_HAVE_INST_FF1
 
 static inline int ffs(int x) {
 	int ret;
@@ -16,3 +17,4 @@ static inline int ffs(int x) {
 #include <asm-generic/bitops/ffs.h>
 #endif
 
+#endif /* __ASM_OPENRISC_FFS_H */
