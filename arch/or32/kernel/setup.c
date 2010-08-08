@@ -225,7 +225,7 @@ void __init setup_cpuinfo(void)
 //	__dc_enable(cpuinfo.dcache_size, cpuinfo.dcache_block_size);
 }
 
-void __init or32_early_setup(/*unsigned long fdt*/) {
+void __init or32_early_setup(/*unsigned long fdt*/ void) {
 
 	early_init_devtree((void *) &_fdt_start);
 
@@ -341,7 +341,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	return seq_printf(m,
 		"cpu\t\t: OpenRISC-%d\n"
-		"revision\t: %lu\n"
+		"revision\t: %d\n"
 		"dcache size\t: %d kB\n"
 		"dcache block size\t: %d bytes\n"
 		"icache size\t: %d kB\n"
