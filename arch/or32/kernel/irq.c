@@ -101,7 +101,8 @@ int pic_set_type(unsigned int irq, unsigned int flow_type) {
 	return 0;
 }
 
-static inline int pic_get_irq() {
+static inline int pic_get_irq(void)
+{
 	int irq;
 
 	irq = ffs(mfspr(SPR_PICSR));
@@ -164,7 +165,7 @@ void __init init_IRQ(void)
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
 
-	printk("JONAS: IRQ ENABLED, picmr=%x\n", mfspr(SPR_PICMR));
+	printk("JONAS: IRQ ENABLED, picmr=%lx\n", mfspr(SPR_PICMR));
 }
 
 int show_interrupts(struct seq_file *p, void *v)
