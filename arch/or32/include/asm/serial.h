@@ -1,21 +1,18 @@
-#include <asm-generic/serial.h>
-#if 0
+#ifndef __ASM_OPENRISC_SERIAL_H
+#define __ASM_OPENRISC_SERIAL_H
 
 #ifdef __KERNEL__
-#ifndef __ASM_OPENRISC_SERIAL_H__
-#define __ASM_OPENRISC_SERIAL_H__
 
-//#include <asm-generic/serial.h>
-
-#include <asm/board.h>
+#include <asm/cpuinfo.h>
 
 /* There's a generic version of this file, but it assumes a 1.8MHz UART clk...
  * this, on the other hand, assumes the UART clock is tied to the system 
- * clock...
+ * clock... 8250_early.c (early 8250 serial console) actually uses this, so
+ * it needs to be correct to get the early console working.
  */
 
-#define BASE_BAUD (SYS_CLK/16)
+#define BASE_BAUD (cpuinfo.clock_frequency/16)
 
-#endif /* __ASM_SERIAL_H__ */
 #endif /* __KERNEL__ */
-#endif
+
+#endif /* __ASM_OPENRISC_SERIAL_H */
