@@ -5,6 +5,7 @@
  * definitions in the generic header.  For everything else, the generic
  * header applies.
  */
+/*
 
 typedef unsigned int    __kernel_ino_t;
 #define __kernel_ino_t __kernel_ino_t
@@ -17,6 +18,8 @@ typedef short           __kernel_ipc_pid_t;
 
 typedef unsigned short  __kernel_old_dev_t;
 #define __kernel_old_dev_t __kernel_old_dev_t
+
+*/
 
 #include <asm-generic/posix_types.h>
 
