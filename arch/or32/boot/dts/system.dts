@@ -22,6 +22,7 @@ properties.
 
 	chosen {
 		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000";
+/*		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::"; */
 	};
 
 	/*
