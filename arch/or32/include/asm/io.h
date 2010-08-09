@@ -38,6 +38,8 @@ extern void iounmap(void *addr);
 /*
  * IO bus memory addresses are also 1:1 with the physical address
  */
+
+/* Deprecated */
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
 
