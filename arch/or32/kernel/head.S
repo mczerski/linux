@@ -27,7 +27,6 @@
 #include <asm/cache.h>
 #include <asm/or32_asm.h>
 #include <asm/spr_defs.h>
-#include <asm/board.h>
 #include <asm/asm-offsets.h>
 	
 /* some defines to ease or32 assembly programming */	

@@ -16,7 +16,6 @@
  *
  */
 #include <asm/spr_defs.h>
-#include <asm/board.h>
 #include <asm/unistd.h>
 
 /* defined in <linux/sched.h> */
@@ -326,8 +325,12 @@ __dc_line_invalidate:
  */
 	.global __dmmu_enable
 __dmmu_enable:
+  /* TODO: account for number of ways */
   /* Invalidate all sets */
-  l.addi  r11,r0,DMMU_SET_NB
+  l.mfspr r11,r0,SPR_DMMUCFGR
+  l.andi  r11,r11,SPR_DMMUCFGR_NTS
+  l.srli  r11,r11,2
+/*  l.addi  r11,r0,DMMU_SET_NB */
   l.addi  r13,r0,0
 1:
   l.mtspr r13,r0,SPR_DTLBMR_BASE(0)
@@ -347,8 +350,12 @@ __dmmu_enable:
  */
 	.global __immu_enable
 __immu_enable:
+  /* TODO: account for number of ways */
   /* Invalidate all sets */
-  l.addi  r11,r0,IMMU_SET_NB
+  l.mfspr r11,r0,SPR_IMMUCFGR
+  l.andi  r11,r11,SPR_IMMUCFGR_NTS
+  l.srli  r11,r11,2
+/*  l.addi  r11,r0,IMMU_SET_NB */
   l.addi  r13,r0,0
 1:
   l.mtspr r13,r0,SPR_ITLBMR_BASE(0)

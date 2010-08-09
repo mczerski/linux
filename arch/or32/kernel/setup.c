@@ -41,7 +41,6 @@
 #include <linux/of_fdt.h>
 #include <linux/of.h>
  
-#include <asm/board.h>
 #include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/smp.h>
@@ -158,11 +157,13 @@ static void print_cpuinfo(void) {
 		printk(KERN_INFO "-- icache disabled\n");
 	
 	if (upr & SPR_UPR_DMP)
-		printk(KERN_INFO "-- dmmu: (assumed) %4d entries, %d way(s)\n",
-			CONFIG_OR32_DTLB_ENTRIES, 1);
+		printk(KERN_INFO "-- dmmu: %4d entries, %d way(s)\n",
+			1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
+			1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW));
 	if (upr & SPR_UPR_IMP)
-		printk(KERN_INFO "-- immu: (assumed) %4d entries, %d way(s)\n",
-			CONFIG_OR32_ITLB_ENTRIES, 1);
+		printk(KERN_INFO "-- immu: %4d entries, %d way(s)\n",
+			1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
+			1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW));
 
 	printk(KERN_INFO "-- additional features:\n");
 	if (upr & SPR_UPR_DUP)
@@ -346,8 +347,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		"dcache block size\t: %d bytes\n"
 		"icache size\t: %d kB\n"
 		"icache block size\t: %d bytes\n"
-		"immu\t\t: %s\n"
-		"dmmu\t\t: %s\n"
+		"immu\t\t: %d entries, %d ways\n"
+		"dmmu\t\t: %d entries, %d ways\n"
 		"bogomips\t: %lu.%02lu\n",
 
 		version,
@@ -356,8 +357,10 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		cpuinfo.dcache_block_size,
 		cpuinfo.icache_size,
 		cpuinfo.icache_block_size,
-		"(assumed) 64 entries, 1 way",
-		"(assumed) 64 entries, 1 way",
+		1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
+		1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW),
+		1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
+		1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW),
 		(loops_per_jiffy * HZ) / 500000,
 		((loops_per_jiffy * HZ) / 5000) % 100);
 }
