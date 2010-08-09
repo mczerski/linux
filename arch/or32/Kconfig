@@ -95,14 +95,14 @@ endchoice
 menu "Class II Instructions"
 
 config OPENRISC_HAVE_INST_FF1
-	bool "l.ff1"
+	bool "Have instruction l.ff1"
 	help
-	  Have instruction l.ff1: find first bit
+	  Select this if your implementation has the Class II instruction l.ff1
 
 config OPENRISC_HAVE_INST_FL1
-	bool "l.fl1"
+	bool "Have instruction l.fl1"
 	help
-	  Have instruction l.fl1: find last bit
+	  Select this if your implementation has the Class II instruction l.fl1
 
 endmenu
 
