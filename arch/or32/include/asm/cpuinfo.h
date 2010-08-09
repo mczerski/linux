@@ -1,3 +1,5 @@
+#ifndef __ASM_OPENRISC_CPUINFO_H
+#define __ASM_OPENRISC_CPUINFO_H
 
 struct cpuinfo {
 	u32 clock_frequency;
@@ -10,3 +12,6 @@ struct cpuinfo {
 };
 
 extern struct cpuinfo cpuinfo;
+
+#endif /* __ASM_OPENRISC_CPUINFO_H */
+

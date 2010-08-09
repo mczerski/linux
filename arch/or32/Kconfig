@@ -110,10 +110,6 @@ config OPENRISC_HAVE_INST_FL1
 endmenu
 
 
-config OR32_SYS_CLK
-	int "System clock frequency [MHz]"
-	default 100
-
 config OR32_MEMORY_SIZE
 	hex "System memory size [hex, bytes]"
 	default 01000000

@@ -1,3 +1,6 @@
+#include <asm-generic/serial.h>
+#if 0
+
 #ifdef __KERNEL__
 #ifndef _OR32_SERIAL_H__
 #define _OR32_SERIAL_H__
@@ -15,3 +18,4 @@
 
 #endif /* __ASM_SERIAL_H__ */
 #endif /* __KERNEL__ */
+#endif

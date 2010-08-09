@@ -21,7 +21,7 @@ properties.
 	#address-cells = <1>;
 
 	chosen {
-		bootargs = "console=uart,mmio,0x90000000,115200";
+		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000";
 	};
 
 	/*
