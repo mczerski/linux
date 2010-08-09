@@ -70,7 +70,7 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
 	int order, err, i;
-	unsigned long page, va, flags;
+	unsigned long page, va;
 	pgprot_t prot;
 	phys_addr_t pa;
 	struct vm_struct *area;
