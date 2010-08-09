@@ -8,12 +8,16 @@
 
 //#include <asm/arch/sam255.h>
 
-
+#define DEVELOP
+#define DEBUGING
 // base address of OHS900
+
 #define OHS900_BASE		0x9c000000 //(DIMI_USB_HOST_PHYS)
 #define OHS900_IRQ		20 //(SAM255_INTERRUPT_USB_HOST)
 #define OHS900SLAVE_BASE	0x9c000000 //(DIMI_USB_HOST_PHYS)
 #define OHS900SLAVE_IRQ		21 //(SAM255_INTERRUPT_USB_HOST)
+#define OHS900_IO_EXTENT 0x100
+#define OHS900_SLAVE_ADDRESS		0x54 
 
 
 /*
@@ -127,12 +131,20 @@ struct ohs900_platform_data {
     void (*reset) (struct device *dev);    
 };
 
+struct my_work_t {
+   struct work_struct my_work;
+   struct ohs900 *ohs900_s;    
+};
+
+
+
 
 
  
 struct ohs900 {
 	spinlock_t		lock;
 	void __iomem		*addr_reg;
+   
 	struct ohs900_platform_data	*board;
 	struct proc_dir_entry	*pde;
 
@@ -147,6 +159,10 @@ struct ohs900 {
     unsigned int        setup_len;
 	/* sw model */
 	struct timer_list	timer;
+     int	debug_timer;
+     int    fifo_op;
+ 
+     
 	struct ohs900h_ep	*next_periodic;
 	struct ohs900h_ep	*next_async;
 
@@ -154,7 +170,7 @@ struct ohs900 {
 	unsigned long		jiffies_a;
 	struct ohs900h_ep	*active_b;
 	unsigned long		jiffies_b;
-
+    unsigned int    irq_stat;
 	u32			port1;
 	u8			ctrl1, ctrl2, irq_enable;
 	u16			frame;
@@ -213,18 +229,16 @@ struct ohs900h_ep {
 static inline u8 ohs900_read(struct ohs900 *s_ohs900, int reg)
 {
 	u8 temp;
-    //static int i;
-    //temp = readl( s_ohs900->addr_reg + reg );
+  
 	temp = ( (volatile unsigned char *) s_ohs900->addr_reg) [reg];
-    //printk("-- %d READ %d : from reg %d \n", i,temp, reg);
+   
 	return temp;
 }
 
 static inline void ohs900_write(struct ohs900 *s_ohs900, int reg, u8 val)
-{   static int i;
-    // printk("-- %d WRITE %d : to reg %d \n",i, val, reg);
+{  
 	( (volatile unsigned char *) s_ohs900->addr_reg) [reg] = val;
-   // i++;
+  
 }
 
 static inline void
@@ -232,62 +246,57 @@ ohs900_write_buf(struct ohs900 *s_ohs900, int addr, const void *buf, size_t coun
 {
     void __iomem *addr_reg = s_ohs900->addr_reg;
 	const u8	*data;
-	const u8	*tempData;
-	size_t tempCnt;
-	   // printk("ohs900_write_buf %d", count);
+	    
+       
 	if (!count)
 		return;
 
-	//printk("ohs900_write_buf(): Writing 0x%x bytes:\n", count);
-	tempData = buf;
-	tempCnt = count;
-	//do {
-	//	printk("0x%02x ", *tempData++);
-	//} while (--tempCnt);
-	//printk("\n");
+
 
 	data = buf;
 	do {
 		( (volatile unsigned char  *) addr_reg) [addr] = *data++;
 	} while (--count);
 
-
+    
 }
 
+
 static inline void
-ohs900_read_buf(struct ohs900 *s_ohs900, int addr, void *buf, size_t count)
+ohs900_read_buf(struct ohs900 *s_ohs900, int addr, void *buf, size_t count, unsigned long urb_tot)
 {
     void __iomem *addr_reg = s_ohs900->addr_reg;
+   
 	u8 		*data;
-	u8 		*tempData;
-	size_t		tempCnt;
-    
-   // printk("ohs900_read_buf %d", count);
+	
+	     
 	if (!count)
 		return;
-
 	data = buf;
-	tempData = buf;
-	tempCnt = count;
-	//printk("ohs900_read_buf(): Reading 0x%x bytes\n", count);
-	do {
-		//*data++ = ( (int *) OHS900_BASE) [addr];
-		*data++ = ( (unsigned char  *) addr_reg) [addr];
+	
+	
+    do {
+		
+		*data++ = ( (volatile unsigned char  *) addr_reg) [addr];
 	} while (--count);
 
-	//do {
-	//	printk("0x%02x ",*tempData++);
-//	} while (--tempCnt);
-	//printk("\n");
+  
 }
 
 /*-------------------------------------------------------------------------*/
 
-#ifdef DEBUG
-#define DBG(stuff...)		printk(KERN_DEBUG "ohs900: " stuff)
+#ifdef DEBUGING
+#define DBGA(stuff...)		printk(KERN_DEBUG "ohs900: " stuff)
 #else
-#define DBG(stuff...)		do{}while(0)
+#define DBGA(stuff...)		do{}while(0)
 #endif
+
+#ifdef DEVELOP
+#define INFO(stuff...) 		printk(KERN_INFO "ohs900: " stuff)
+#else
+#define INFO(stuff...)		do{}while(0)
+#endif
+
 
 #ifdef VERBOSE
 #    define VDBG		DBG
@@ -303,5 +312,5 @@ ohs900_read_buf(struct ohs900 *s_ohs900, int addr, void *buf, size_t count)
 
 #define ERR(stuff...)		printk(KERN_ERR "ohs900: " stuff)
 #define WARNING(stuff...)	printk(KERN_WARNING "ohs900: " stuff)
-#define INFO(stuff...) //		printk(KERN_INFO "ohs900: " stuff)
+
 

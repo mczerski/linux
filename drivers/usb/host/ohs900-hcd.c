@@ -57,7 +57,7 @@
 #include <asm/system.h>
 #include <asm/byteorder.h>
 
-#include "../core/hcd.h"
+#include "linux/usb/hcd.h"
 #include "ohs900.h"
 
 
@@ -84,10 +84,11 @@ MODULE_ALIAS("platform:ohs900-hcd");
  */
 #define	DISABLE_ISO
 
-// #define	QUIRK2
+#define	QUIRK2
 #define	QUIRK3
 
 static const char hcd_name[] = "ohs900-hcd";
+static const char buff_name[] = "buff-hcd";
 
 void ohs900_release(struct device *dev);
 
@@ -100,10 +101,7 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
 	struct usb_hcd	*hcd = ohs900_to_hcd(s_ohs900);
 	u8			tmp;
 
-    INFO("PORTP S to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("PORTP S to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable); 
-
-	printk(KERN_INFO "IRQ!\n");
+   
 	INFO("driver %s, s_ohs900->addr_reg = 0x%x, s_ohs900_HWREVREG = 0x%x\n", 
 			hcd_name, (unsigned int) s_ohs900->addr_reg, OHS900_HWREVREG);
 	tmp = ohs900_read(s_ohs900, OHS900_HWREVREG);
@@ -121,18 +119,10 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
 		s_ohs900->irq_enable = 0;
 		hcd->state = HC_STATE_HALT;
 	}
- 
     
-	INFO("driver %s, setting ohs900->ctrl1\n", hcd_name);
+
 	s_ohs900->ctrl1 = OHS900_TXLCTL_MASK_FS_RATE & OHS900_TXLCTL_MASK_FS_POL;
-
-    
-
-	INFO("driver %s, disabling interrupts\n", hcd_name);
-	ohs900_write(s_ohs900, OHS900_IRQ_ENABLE, 0);
-    
-
-    
+	ohs900_write(s_ohs900, OHS900_IRQ_ENABLE, 0);    
 	INFO("driver %s, clearing interrupt status\n", hcd_name);
 	ohs900_write(s_ohs900, OHS900_IRQ_STATUS, ~0);
     
@@ -140,7 +130,7 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
     
 	if (s_ohs900->board && s_ohs900->board->port_power) {
 		/* switch VBUS, at 500mA unless hub power budget gets set */
-		DBG("power %s\n", is_on ? "on" : "off");
+		//DBG("power %s\n", is_on ? "on" : "off");
 		s_ohs900->board->port_power(hcd->self.controller, is_on);
 	}
     
@@ -148,24 +138,17 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
 	/* reset as thoroughly as we can */
 	//if (s_ohs900->board && s_ohs900->board->reset)
 	//	s_ohs900->board->reset(hcd->self.controller);
-    ohs900_write(s_ohs900, OHS900_HOSTSLAVECTLREG, OHS900_HSCTLREG_RESET_CORE);
-        
-
+    ohs900_write(s_ohs900, OHS900_HOSTSLAVECTLREG, OHS900_HSCTLREG_RESET_CORE);      
     
 	ohs900_write(s_ohs900, OHS900_IRQ_ENABLE, 0);
 	ohs900_write(s_ohs900, OHS900_TXLINECTLREG, s_ohs900->ctrl1);
 
-
 	ohs900_write(s_ohs900, OHS900_SOFENREG, 0);
 	ohs900_write(s_ohs900, OHS900_HOSTSLAVECTLREG, OHS900_HS_CTL_INIT);
 
- 
-
-	INFO("driver %s, OHS900_IRQ_ENABLE = %d\n", hcd_name, s_ohs900->irq_enable);
 	ohs900_write(s_ohs900, OHS900_IRQ_ENABLE, s_ohs900->irq_enable);
     
-    INFO("PORTP End to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("PORTP End to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable); 
+  
 	// if !is_on, put into lowpower mode now
 }
 
@@ -189,31 +172,28 @@ static void setup_packet(
 	u8			control
 )
 {
-    static u8 t1;
+ 
 	u8			addr;
 	u8			len;
-    // printk("SE: %d", t1);
-   
-    ohs900->setup_stage = 1;
+    
+
+ 
      
 	ohs900_write(ohs900, OHS900_TXFIFOCONTROLREG, OHS900_FIFO_FORCE_EMPTY);
 	addr = OHS900_HOST_TXFIFO_DATA;
 	len = sizeof(struct usb_ctrlrequest);
     ohs900->setup_len = len;
+    
 	ohs900_write_buf(ohs900, addr, urb->setup_packet, len);
-
 	ohs900_write(ohs900, OHS900_TXTRANSTYPEREG, OHS900_SETUP);
 	ohs900_write(ohs900, OHS900_TXENDPREG,  ep->epnum  );
 	ohs900_write(ohs900, OHS900_TXADDRREG, usb_pipedevice(urb->pipe));
-     // printk("Ctrl:%d, epnum: %d, len: %d addr:%d\n",control ,  ep->epnum, len, usb_pipedevice(urb->pipe));
+    
     wmb();
-	/* always OUT/data0 */ ;
      
-	ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, control);
-   
-   
+	ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, control);   
     ep->length = 0;
-	//PACKET("SETUP qh%p\n", ep);
+
 }
 
 /* STATUS finishes control requests, often after IN or OUT data packets */
@@ -224,21 +204,17 @@ static void status_packet(
 	u8			control
 )
 {
-	int			do_out;
-
-   // ohs900->setup_stage = 1;
-	do_out = urb->transfer_buffer_length && usb_pipein(urb->pipe);
-    //INFO("ST TRANSTYPE %d. epnum %d,  \n Addreg %d, control %d \n",(do_out ? OHS900_OUT_DATA1 : OHS900_IN),ep->epnum, usb_pipedevice(urb->pipe), control );
+	int			do_out;  
+	do_out = urb->transfer_buffer_length && usb_pipein(urb->pipe);    
     
 	ohs900_write(ohs900, OHS900_TXTRANSTYPEREG, (do_out ? OHS900_OUT_DATA1 : OHS900_IN));
 	ohs900_write(ohs900, OHS900_TXENDPREG,  ep->epnum );
 	ohs900_write(ohs900, OHS900_TXADDRREG, usb_pipedevice(urb->pipe));
     wmb();
-	/* always data1; sometimes IN */
+
 	ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, control);
 	ep->length = 0;
-//("STATUS%s/%s qh%p\n", ep->nak_count ? "/retry" : "",
-			//do_out ? "out" : "in", ep);
+
 }
 
 /* IN packets can be used with any type of endpoint. here we just
@@ -253,21 +229,20 @@ static void in_packet(
 )
 {
 	u8			len;
-    
-    //printk("IN\n");
-	/* avoid losing data on overflow */
-    //printk("IN \n");
+   
+   
 	len = ep->maxpacket;
-      //INFO("IN");//in_packet len %d  TXADDRREG %d, TXENDPREG %d, control %d ",len,usb_pipedevice(urb->pipe), ep->epnum, control );
-    
-	ohs900_write(ohs900, OHS900_RXFIFOCONTROLREG, OHS900_FIFO_FORCE_EMPTY);
+   
+      ep->length = min((int)len, urb->transfer_buffer_length - urb->actual_length);   
+      
+	ohs900_write(ohs900, OHS900_RXFIFOCONTROLREG, OHS900_FIFO_FORCE_EMPTY);    
 	ohs900_write(ohs900, OHS900_TXTRANSTYPEREG, OHS900_IN);
 	ohs900_write(ohs900, OHS900_TXADDRREG, usb_pipedevice(urb->pipe));
-	ohs900_write(ohs900, OHS900_TXENDPREG, ep->epnum);
+	ohs900_write(ohs900, OHS900_TXENDPREG, ep->epnum);    
     ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, control);    
-    ep->length = min((int)len, urb->transfer_buffer_length - urb->actual_length);    
-	//PACKET("IN%s/%d qh%p len%d\n", ep->nak_count ? "/retry" : "",
-		//	!!usb_gettoggle(urb->dev, ep->epnum, 0), ep, len);
+    
+    ohs900_write(ohs900, OHS900_IRQ_STATUS, 0xff);
+  
 }
 
 /* OUT packets can be used with any type of endpoint.
@@ -282,13 +257,15 @@ static void out_packet(
 {
 	void			*buf;
 	u8			len;
-         INFO("OP: \n");
+      
 	buf = urb->transfer_buffer + urb->actual_length;
 	prefetch(buf);
 
 	len = min((int)ep->maxpacket,
 			urb->transfer_buffer_length - urb->actual_length);
 
+      
+        
 	ohs900_write(ohs900, OHS900_TXFIFOCONTROLREG, OHS900_FIFO_FORCE_EMPTY);
 	if (!(control & OHS900_HCTLMASK_ISO_EN)
 			&& usb_gettoggle(urb->dev, ep->epnum, 1))
@@ -304,8 +281,7 @@ static void out_packet(
 	ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, control);
 
 	ep->length = len;
-	//PACKET("OUT%s/%d qh%p len%d\n", ep->nak_count ? "/retry" : "",
-		//	!!usb_gettoggle(urb->dev, ep->epnum, 1), ep, len);
+	
 }
 /*-------------------------------------------------------------------------*/
 
@@ -315,7 +291,7 @@ static inline void sofirq_on(struct ohs900 *ohs900)
 {
 	if (ohs900->irq_enable & OHS900_INTMASK_SOFINTR)
 		return;
-	INFO("sof irq on\n");
+	DBGA("sof irq on\n");
 	ohs900->irq_enable |= OHS900_INTMASK_SOFINTR;
 }
 
@@ -323,7 +299,7 @@ static inline void sofirq_off(struct ohs900 *ohs900)
 {
 	if (!(ohs900->irq_enable & OHS900_INTMASK_SOFINTR))
 		return;
-	INFO("sof irq off\n");
+	DBGA("sof irq off\n");
 	ohs900->irq_enable &= ~OHS900_INTMASK_SOFINTR;
 }
 
@@ -340,9 +316,7 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 	struct urb		*urb;
 	int			fclock;
 	u8			control;
-    
-    //INFO("0hs900-hcd start transaction");
-    //printk("START\n");    
+       
 	/* use endpoint at schedule head */
 	if (ohs900->next_periodic) {
 		ep = ohs900->next_periodic;
@@ -369,7 +343,7 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 	}
 
 	if (unlikely(list_empty(&ep->hep->urb_list))) {
-		DBG("empty %p queue?\n", ep);
+		DBGA("empty %p queue?\n", ep);
 		return NULL;
 	}
 
@@ -379,10 +353,12 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 	/* if this frame doesn't have enough time left to transfer this
 	 * packet, wait till the next frame.  too-simple algorithm...
 	 */
-	fclock = 12000 - (ohs900_read(ohs900, OHS900_SOFTMRREG) << 6);
-	fclock -= 100;		/* setup takes not much time */
-	fclock -= 1500; /* Margin to workaround too-long-frame bug */
+	  fclock = 12000 - (ohs900_read(ohs900, OHS900_SOFTMRREG) << 6);
+        fclock -= 100;		/* setup takes not much time */
+        fclock -= 1500; /* Margin to workaround too-long-frame bug */
 	if (urb->dev->speed == USB_SPEED_LOW) {
+      
+        
 		if (control & OHS900_HCTLMASK_PREAMBLE_EN) {
 			/* also note erratum 1: some hubs won't work */
 			fclock -= 800;
@@ -396,7 +372,11 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 			sofirq_on(ohs900);
 			return NULL;
 		}
-	} else {
+	} 
+
+     else {
+      
+    
 		fclock -= 12000 / 19;	/* 19 64byte packets/msec */
 		if (fclock < 0) {
 			if (ep->period)
@@ -408,7 +388,11 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 			control |= OHS900_HCTLMASK_SOF_SYNC;
 	}
 
-
+   //FIX Here.
+   //control = 1;
+   
+  // if (control !=1)
+   // printk("ERROR control not 1\n"); 
 	switch (ep->nextpid) {
 	case USB_PID_IN:
 		in_packet(ohs900, ep, urb, control);
@@ -420,10 +404,10 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 		setup_packet(ohs900, ep, urb, control);
 		break;
 	case USB_PID_ACK:		/* for control status */
-		status_packet(ohs900, ep, urb, control);
+		status_packet(ohs900, ep, urb,control);
 		break;
 	default:
-		DBG("bad ep%p pid %02x\n", ep, ep->nextpid);
+		DBGA("bad ep%p pid %02x\n", ep, ep->nextpid);
 		ep = NULL;
 	}
 	return ep;
@@ -433,7 +417,8 @@ static struct ohs900h_ep	*start(struct ohs900 *ohs900)
 
 static inline void start_transfer(struct ohs900 *ohs900)
 {  
-	if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND))
+	 //printk("start_transfer(\n");
+    if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND))
 		return;
 	if (ohs900->active_a == NULL) {
 		ohs900->active_a = start(ohs900);
@@ -447,24 +432,27 @@ static void finish_request(
 	struct ohs900h_ep	*ep,
 	struct urb		*urb,
 	int			status
-) __releases(ohs900->lock)
+) __releases(ohs900->lock) __acquires(ohs900->lock)
 {
 	unsigned		i;
-      //INFO("Enter static void finish_request ");
+      
+   
+     if (urb->error_count >0)
+        DBGA("URB ERROR: %d \n", urb->error_count);
+     
 	urb->hcpriv = NULL;
 
 	if (usb_pipecontrol(urb->pipe))
 		ep->nextpid = USB_PID_SETUP;
- 
-	usb_hcd_unlink_urb_from_ep(ohs900_to_hcd(ohs900),urb);    
-	spin_unlock(&ohs900->lock);
-    usb_hcd_giveback_urb(ohs900_to_hcd(ohs900), urb, status);
-    spin_lock(&ohs900->lock);
 
+	usb_hcd_unlink_urb_from_ep(ohs900_to_hcd(ohs900),urb);
+    spin_lock(&ohs900->lock);
+	usb_hcd_giveback_urb(ohs900_to_hcd(ohs900), urb, status);	
+	spin_unlock(&ohs900->lock);
 	/* leave active endpoints in the schedule */
-	if (!list_empty(&ep->hep->urb_list))
-		return;
- 
+	if (!list_empty(&ep->hep->urb_list)){
+      
+		return; }
 	/* async deschedule? */
 	if (!list_empty(&ep->schedule)) {
       
@@ -476,7 +464,7 @@ static void finish_request(
 	}
  
 	/* periodic deschedule */
-	DBG("deschedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
+	DBGA("deschedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
 	for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
 		struct ohs900h_ep	*temp;
 		struct ohs900h_ep	**prev = &ohs900->periodic[i];
@@ -487,17 +475,20 @@ static void finish_request(
 			*prev = ep->next;
 		ohs900->load[i] -= ep->load;
 	}	
-       INFO("C");
+ 
 	ep->branch = PERIODIC_SIZE;
 	ohs900->periodic_count--;
 	ohs900_to_hcd(ohs900)->self.bandwidth_allocated
 		-= ep->load / ep->period;
 	if (ep == ohs900->next_periodic)
 		ohs900->next_periodic = ep->next;
-       INFO("D");
+      
 	/* we might turn SOFs back on again for the async schedule */
 	if (ohs900->periodic_count == 0)
 		sofirq_off(ohs900);
+    
+   
+        
 }
 
 static void
@@ -506,27 +497,19 @@ done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 	u8			status;
 	struct urb		*urb;
 	int			urbstat = -EINPROGRESS;
-     
+                     
 	if (unlikely(!ep))
-		return;
+        return;
 
-	status = ohs900_read(ohs900, OHS900_HRXSTATREG);
-    //printk("DO\n"); 
-    
-    ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, 0);
-    
-    
+	status = ohs900_read(ohs900, OHS900_HRXSTATREG);        
 	urb = container_of(ep->hep->urb_list.next, struct urb, urb_list);
 
 	/* we can safely ignore NAKs */
 	if (status & OHS900_STATMASK_NAK_RXED) {
-		//INFO("...NAK qh%p\n", ep);
-        //if (ohs900->setup_stage == 1)
-           //ep->nextpid = USB_PID_SETUP;
+		
 		if (!ep->period)
 			ep->nak_count++;
-		ep->error_count = 0;
-   
+		ep->error_count = 0;  
 
      
 	/* ACK, or IN with no errors, advances transfer, toggle, and maybe queue */
@@ -541,7 +524,7 @@ done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 		ep->nak_count = ep->error_count = 0;
 		switch (ep->nextpid) {
 		case USB_PID_OUT:
-			INFO("ACK/out qh%p\n", ep);
+			
 			urb->actual_length += ep->length;
 			usb_dotoggle(udev, ep->epnum, 1);
 			if (urb->actual_length
@@ -560,44 +543,36 @@ done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 			break;
 		case USB_PID_IN:
 			 //INFO("ACK/in qh%p\n", ep);
-			
+			buf = urb->transfer_buffer + urb->actual_length;            
+			//prefetchw(buf);
 			len = ohs900_read(ohs900, OHS900_RXFIFOCNTLSBREG) 
 					+ (ohs900_read(ohs900,
 					OHS900_RXFIFOCNTMSBREG) << 8);
-			 INFO("(len) %d \n", len);
-            buf = urb->transfer_buffer + urb->actual_length;
-			prefetchw(buf);
+			
+            
 			if (len > ep->length) {
 				len = ep->length;
 				urbstat = -EOVERFLOW;
+                DBGA("EOVERFLOW\n");
 			}
 			urb->actual_length += len;
 			ohs900_read_buf(ohs900, OHS900_HOST_RXFIFO_DATA,
-					buf, len);
-        
-           
-           // INFO("urbstat: %d \n, actaul_length: %d \n, transfer_buffer: %d \n", urbstat, urb->actual_length,urb->transfer_buffer_length);
-			
-			
-            
-           //if (len==0  && ohs900->setup_len !=0  && ohs900->setup_stage == 1) {
-           //         ep->nextpid = USB_PID_SETUP;
-           //         urbstat = -EINPROGRESS;
-           //         printk("BR\n");
-           // }
-            // else 
+					buf, len,urb->actual_length);
+         
+            if  (urb->actual_length > urb->transfer_buffer_length)
+            DBGA("Actual len %d > buff len %d, ERROR\n", urb->actual_length, urb->transfer_buffer_length);
+            usb_dotoggle(udev, ep->epnum, 0);
               if (urbstat == -EINPROGRESS && (len < ep->maxpacket || urb->actual_length == urb->transfer_buffer_length)) {
-				  usb_dotoggle(udev, ep->epnum, 0);
+                
                 if (usb_pipecontrol(urb->pipe))
-					ep->nextpid = USB_PID_ACK;
-				else
-					urbstat = 0;
-                  
-			}
-                    
-			break;
-		case USB_PID_SETUP:
-			//printk("PSA\n");
+                    ep->nextpid = USB_PID_ACK;
+                else
+                    urbstat = 0;
+            }
+                
+            break;
+            
+		case USB_PID_SETUP:			
 			if (urb->transfer_buffer_length == urb->actual_length)
 				ep->nextpid = USB_PID_ACK;
 			else if (usb_pipeout(urb->pipe)) {
@@ -608,9 +583,7 @@ done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 				ep->nextpid = USB_PID_IN;
 			}
 			break;
-		case USB_PID_ACK:
-			//INFO("ACK/status qh%p\n", ep);
-            	//printk("PAA\n");
+		case USB_PID_ACK:			
              ohs900->setup_stage = 0;
 			urbstat = 0;
 			break;
@@ -631,24 +604,25 @@ done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 		else
 			urbstat = -EPROTO;
 		ep->error_count = 0;
-		INFO("...5STRIKES %02x qh%p stat %d\n",
+		DBGA("...5STRIKES %02x qh%p stat %d\n",
 				status, ep, urbstat);
 	}
 
-	if (urbstat != -EINPROGRESS || urb->unlinked)
-		finish_request(ohs900, ep, urb, urbstat);
+	if (urbstat != -EINPROGRESS || urb->unlinked) {  
+        finish_request(ohs900, ep, urb, urbstat); 
+    }
 }
 
 static inline u8 checkdone(struct ohs900 *ohs900)
 {
 	u8	ctl;
 	u8	irqstat = 0;
-     INFO("Enter static inline u8 checkdone(struct ohs900 *ohs900)");
+
 	if (ohs900->active_a && time_before_eq(ohs900->jiffies_a, jiffies)) {
 		ctl = ohs900_read(ohs900, OHS900_HOST_TX_CTLREG);
 		if (ctl & OHS900_HCTLMASK_TRANS_REQ)
 			ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, 0);
-		DBG("%s DONE_A: ctrl %02x sts %02x\n",
+		DBGA("%s DONE_A: ctrl %02x sts %02x\n",
 			(ctl & OHS900_HCTLMASK_TRANS_REQ) ? "timeout" : "lost",
 			ctl,
 			ohs900_read(ohs900, OHS900_HRXSTATREG));
@@ -662,32 +636,31 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 	struct ohs900	*ohs900 = hcd_to_ohs900(hcd);
 	u8		irqstat;
 	irqreturn_t	ret = IRQ_NONE;
-	unsigned	retries = 5;
-     //INFO("Enter static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)");
-	//printk("Entering ohs900h_irq\n");
+	
 	spin_lock(&ohs900->lock);
+    irqstat = ohs900_read(ohs900, OHS900_IRQ_STATUS);
 
-retry:
-	irqstat = ohs900_read(ohs900, OHS900_IRQ_STATUS);
-	if (irqstat) {
-		ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
-		irqstat &= ohs900->irq_enable;
-	}
+    wmb();
+    ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
+    wmb();
+    ohs900_write(ohs900, OHS900_IRQ_ENABLE, 0x00);
+
+    irqstat &= ohs900->irq_enable;	
 
 #ifdef	QUIRK2
-	/* this may no longer be necessary ... */
+	// this may no longer be necessary ... 
 	if (irqstat == 0) {
-		irqstat = checkdone(ohs900);
-		if (irqstat)
-			ohs900->stat_lost++;
+		DBGA("IRQ == 0? BUG \n");
 	}
-#endif
+#endif  
 
 	/* USB packets, not necessarily handled in the order they're
 	 * issued ... that's fine if they're different endpoints.
-	 */
-	if (irqstat & OHS900_INTMASK_TRANS_DONE) {
-		done(ohs900, ohs900->active_a);
+	 */     
+            
+	if (irqstat & OHS900_INTMASK_TRANS_DONE) 
+    {        
+        done(ohs900, ohs900->active_a);
 		ohs900->active_a = NULL;
 		ohs900->stat_a++;
 	}
@@ -695,10 +668,9 @@ retry:
 
 	if (irqstat & OHS900_INTMASK_SOFINTR) {
 		unsigned index;
-
+        DBGA("SOFINT\n");
 		index = ohs900->frame++ % (PERIODIC_SIZE - 1);
 		ohs900->stat_sof++;
-
 		/* be graceful about almost-inevitable periodic schedule
 		 * overruns:  continue the previous frame's transfers iff
 		 * this one has nothing scheduled.
@@ -714,7 +686,7 @@ retry:
 	/* khubd manages debouncing and wakeup */
 	if (irqstat & OHS900_INTMASK_INSRMV) {
 		ohs900->stat_insrmv++;
-
+        DBGA("INSRMV \n");
 		/* most stats are reset for each VBUS session */
 		ohs900->stat_wake = 0;
 		ohs900->stat_sof = 0;
@@ -748,9 +720,9 @@ retry:
 
 	} else if (irqstat & OHS900_INTMASK_RESUME_DET) {
 		if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND)) {
-			DBG("wakeup\n");
+			DBGA("wakeup\n");
 			ohs900->port1 |= 1 << USB_PORT_FEAT_C_SUSPEND;
-			ohs900->stat_wake++;
+			ohs900->stat_wake;
 		} else
 			irqstat &= ~OHS900_INTMASK_RESUME_DET;
 	}
@@ -758,17 +730,19 @@ retry:
 	if (irqstat) {
 		if (ohs900->port1 & (1 << USB_PORT_FEAT_ENABLE))
 			start_transfer(ohs900);
+   
 		ret = IRQ_HANDLED;
-		if (retries--)
-			goto retry;
+		
 	}
 
 	if (ohs900->periodic_count == 0 && list_empty(&ohs900->async)) 
 		sofirq_off(ohs900);
-	ohs900_write(ohs900, OHS900_IRQ_ENABLE, ohs900->irq_enable);
 
+   
+	ohs900_write(ohs900, OHS900_IRQ_ENABLE, ohs900->irq_enable);
 	spin_unlock(&ohs900->lock);
 
+   
 	return ret;
 }
 
@@ -783,7 +757,6 @@ retry:
 static int balance(struct ohs900 *ohs900, u16 period, u16 load)
 {
 	int	i, branch = -ENOSPC;
-        INFO("Enter static int balance(struct ohs900 *ohs900, u16 period, u16 load)");
 	/* search for the least loaded schedule branch of that period
 	 * which has enough bandwidth left unreserved.
 	 */
@@ -822,16 +795,7 @@ static int ohs900h_urb_enqueue(
 	int			i;
 	int			retval;
 	struct usb_host_endpoint	*hep = urb->ep;
-        //INFO("Enterstatic int ohs900h_urb_enqueue");
-        INFO("enqueue urb=%p ep=%p len=%d "
-		"buffer=%p dma=%08X \n setupBuf=%p setupDma=%08X\n",
-		urb, ep,
-		urb->transfer_buffer_length,
-		urb->transfer_buffer, urb->transfer_dma,
-		urb->setup_packet, urb->setup_dma);
-        
-            //INFO("ENQ to urb_enqueue %p", hcd->driver->urb_enqueue);    
-  //  INFO("ENQ ADD to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable); 
+    
         
 #ifdef	DISABLE_ISO
 	if (type == PIPE_ISOCHRONOUS)
@@ -936,7 +900,7 @@ static int ohs900h_urb_enqueue(
 		 * to share the faster parts of the tree without needing
 		 * dummy/placeholder nodes
 		 */
-		DBG("schedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
+		DBGA("schedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
 		for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
 			struct ohs900h_ep	**prev = &ohs900a->periodic[i];
 			struct ohs900h_ep	*here = *prev;
@@ -961,16 +925,17 @@ static int ohs900h_urb_enqueue(
 	urb->hcpriv = hep;
 
 	start_transfer(ohs900a);
+    //printk("IRQ ENA:: %d\n", ohs900a->irq_enable);
 	ohs900_write(ohs900a, OHS900_IRQ_ENABLE, ohs900a->irq_enable);
     if (retval)
 		usb_hcd_unlink_urb_from_ep(hcd,urb);
     spin_unlock_irqrestore(&ohs900a->lock, flags);
     return retval;
     
-fail: INFO("FAIL URB ENQUE");
+fail: DBGA("FAIL URB ENQUE");
 	if (retval)
 		usb_hcd_unlink_urb_from_ep(hcd,urb);
-fail_not_linked: INFO("FAIL URB ENQUE - not_linked");
+fail_not_linked: DBGA("FAIL URB ENQUE - not_linked");
 	spin_unlock_irqrestore(&ohs900a->lock, flags);
 	return retval;
 }
@@ -985,7 +950,7 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	unsigned long		flags;
 	struct ohs900h_ep	*ep;
 	int			retval;
-           INFO("Enterstatic int ohs900h_urb_dequeue");
+         
     if (!hep)
 		return -EINVAL;
         
@@ -1007,7 +972,7 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		} else if (ohs900->active_a == ep) {
 			if (time_before_eq(ohs900->jiffies_a, jiffies)) {
 				/* happens a lot with lowspeed?? */
-				DBG("giveup on DONE_A: ctrl %02x sts %02x\n",
+				DBGA("giveup on DONE_A: ctrl %02x sts %02x\n",
 					ohs900_read(ohs900,OHS900_HOST_TX_CTLREG),
 					ohs900_read(ohs900,OHS900_HRXSTATREG));
 				ohs900_write(ohs900, OHS900_HOST_TX_CTLREG,0);
@@ -1027,7 +992,7 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	} else
 	  
 fail:
-	spin_unlock_irqrestore(&ohs900->lock, flags);
+	spin_unlock_irqrestore(&ohs900->lock, flags);    
 	return retval;
 }
 
@@ -1035,7 +1000,7 @@ static void
 ohs900h_endpoint_disable(struct usb_hcd *hcd, struct usb_host_endpoint *hep)
 {
 	struct ohs900h_ep	*ep = hep->hcpriv;
-         INFO("Enters static void ohs900h_endpoint_disable");
+   
 	if (!ep)        
 		return;
     
@@ -1054,7 +1019,7 @@ static int
 ohs900h_get_frame(struct usb_hcd *hcd)
 {
 	struct ohs900 *ohs900 = hcd_to_ohs900(hcd);
-          INFO("Enters ohs900h_get_frame(struct usb_hcd *hcd)");
+        
 	/* wrong except while periodic transfers are scheduled;
 	 * never matches the on-the-wire frame;
 	 * subject to overruns.
@@ -1136,7 +1101,7 @@ ohs900h_timer(unsigned long _ohs900)
 				| (1 << USB_PORT_FEAT_ENABLE)
 				| (1 << USB_PORT_FEAT_LOWSPEED);
 	u8		sofEnReg = 0;
- INFO("Enters ohs900h_timer(unsigned long _ohs900)");
+
 	spin_lock_irqsave(&ohs900->lock, flags);
 
 	/* stop special signaling */
@@ -1145,10 +1110,12 @@ ohs900h_timer(unsigned long _ohs900)
 	udelay(3);
 
 	irqstat = ohs900_read(ohs900, OHS900_IRQ_STATUS);
-
+    
+ 
+            
 	switch (signaling) {
 	case OHS900_TXLCTL_MASK_SE0:
-		DBG("end reset\n");
+		DBGA("end reset\n");
 		ohs900->port1 = (1 << USB_PORT_FEAT_C_RESET)
 				| (1 << USB_PORT_FEAT_POWER);
 		ohs900->ctrl1 = 0;
@@ -1157,11 +1124,11 @@ ohs900h_timer(unsigned long _ohs900)
 			irqstat &= ~OHS900_INTMASK_RESUME_DET;
 		break;
 	case OHS900_TXLCTL_MASK_FS_K:
-		DBG("end resume\n");
+		DBGA("end resume\n");
 		ohs900->port1 &= ~(1 << USB_PORT_FEAT_SUSPEND);
 		break;
 	default:
-		DBG("odd timer signaling: %02x\n", signaling);
+		DBGA("odd timer signaling: %02x\n", signaling);
 		break;
 	}
 	ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
@@ -1207,6 +1174,7 @@ ohs900h_timer(unsigned long _ohs900)
 	ohs900_write(ohs900, OHS900_SOFENREG, sofEnReg);
 
 	/* reenable irqs */
+ 
 	ohs900_write(ohs900, OHS900_IRQ_ENABLE, ohs900->irq_enable);
 	spin_unlock_irqrestore(&ohs900->lock, flags);
 }
@@ -1223,75 +1191,75 @@ ohs900h_hub_control(
 	struct ohs900	*ohs900 = hcd_to_ohs900(hcd);
 	int		retval = 0;
 	unsigned long	flags;
- INFO("\n Enters ohs900h_hub_control(");
+
 	spin_lock_irqsave(&ohs900->lock, flags);
 
 	switch (typeReq) {
-	case ClearHubFeature: INFO("\n a");
-	case SetHubFeature: INFO("\n b");
+	case ClearHubFeature: 
+	case SetHubFeature:
 		switch (wValue) {
-		case C_HUB_OVER_CURRENT: INFO("\n c");
-		case C_HUB_LOCAL_POWER: INFO("\n d");
+		case C_HUB_OVER_CURRENT: 
+		case C_HUB_LOCAL_POWER:
 			break;
 		default:
 			goto error;
 		}
 		break;
-	case ClearPortFeature: INFO("\n e");
+	case ClearPortFeature: 
 		if (wIndex != 1 || wLength != 0)
 			goto error;
 
 		switch (wValue) {
-		case USB_PORT_FEAT_ENABLE: INFO("\n f");
-			ohs900->port1 &= (1 << USB_PORT_FEAT_POWER); INFO("\n f1 %d", ohs900->port1);
-			ohs900->ctrl1 = 0; INFO("\n f2");
-			ohs900_write(ohs900, OHS900_SOFENREG, 0); INFO("\n f3"); 
-			ohs900_write(ohs900, OHS900_TXLINECTLREG, ohs900->ctrl1); INFO("\n f4, ctrl1 %d", ohs900->ctrl1);
-			ohs900->irq_enable = OHS900_INTMASK_INSRMV; INFO("\n f5");
+		case USB_PORT_FEAT_ENABLE: 
+			ohs900->port1 &= (1 << USB_PORT_FEAT_POWER); 
+			ohs900->ctrl1 = 0; 
+			ohs900_write(ohs900, OHS900_SOFENREG, 0); 
+			ohs900_write(ohs900, OHS900_TXLINECTLREG, ohs900->ctrl1); 
+			ohs900->irq_enable = OHS900_INTMASK_INSRMV; 
 			ohs900_write(ohs900, OHS900_IRQ_ENABLE,
-						ohs900->irq_enable); INFO("\n f6 irq_enable %d", ohs900->irq_enable);
+						ohs900->irq_enable); 
 			break;
-		case USB_PORT_FEAT_SUSPEND: INFO("\n g");
+		case USB_PORT_FEAT_SUSPEND: 
 			if (!(ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND)))
 				break;
 
 			/* 20 msec of resume/K signaling, other irqs blocked */
-			DBG("start resume...\n");
+			DBGA("start resume...\n");
 			ohs900->irq_enable = 0;
 			ohs900_write(ohs900, OHS900_IRQ_ENABLE,
-						ohs900->irq_enable);
+						ohs900->irq_enable); 
 			ohs900->ctrl1 |= OHS900_TXLCTL_MASK_FS_K;
 			ohs900_write(ohs900, OHS900_TXLINECTLREG, ohs900->ctrl1);
 
 			mod_timer(&ohs900->timer, jiffies
 					+ msecs_to_jiffies(20));
 			break;
-		case USB_PORT_FEAT_POWER: INFO("\n h");
+		case USB_PORT_FEAT_POWER:
 			port_power(ohs900, 0);
 			break;
-		case USB_PORT_FEAT_C_ENABLE: INFO("\n CLEAR_ENABLE");
-		case USB_PORT_FEAT_C_SUSPEND: INFO("\n CLEAR_SUSPEND");
-		case USB_PORT_FEAT_C_CONNECTION: INFO("\n CLEAR_CONNECT");
-		case USB_PORT_FEAT_C_OVER_CURRENT: INFO("\n CLEAR_CURRENT");
-		case USB_PORT_FEAT_C_RESET: INFO("\n CLEAR_RESET");
+		case USB_PORT_FEAT_C_ENABLE: 
+		case USB_PORT_FEAT_C_SUSPEND: 
+		case USB_PORT_FEAT_C_CONNECTION: 
+		case USB_PORT_FEAT_C_OVER_CURRENT:
+		case USB_PORT_FEAT_C_RESET: 
 			break;
 		default:
 			goto error;
 		}
 		ohs900->port1 &= ~(1 << wValue);
 		break;
-	case GetHubDescriptor: INFO("\n i");
+	case GetHubDescriptor:
 		ohs900h_hub_descriptor(ohs900, (struct usb_hub_descriptor *) buf);
 		break;
-	case GetHubStatus: INFO("\n j");
+	case GetHubStatus: 
 		*(__le32 *) buf = cpu_to_le32(0);
 		break;
-	case GetPortStatus: INFO("\n k");
+	case GetPortStatus: 
         if (wIndex != 1)
 			goto error;
 		*(__le32 *) buf = cpu_to_le32(ohs900->port1);
 
-             INFO("\n k1 %d", ohs900->port1);
+             
 		
 
 #ifndef	VERBOSE
@@ -1303,25 +1271,25 @@ ohs900h_hub_control(
 
 #endif
 
-		DBG("GetPortStatus %08x\n", ohs900->port1);
+		DBGA("GetPortStatus %08x\n", ohs900->port1);
 		break;
-	case SetPortFeature: INFO("\n l");
+	case SetPortFeature: 
 		if (wIndex != 1 || wLength != 0)
 			goto error;
 		switch (wValue) {
-		case USB_PORT_FEAT_SUSPEND: INFO("\n m");
+		case USB_PORT_FEAT_SUSPEND: 
 			if (ohs900->port1 & (1 << USB_PORT_FEAT_RESET))
 				goto error;
 			if (!(ohs900->port1 & (1 << USB_PORT_FEAT_ENABLE)))
 				goto error;
 
-			DBG("suspend...\n");
+			DBGA("suspend...\n");
 			ohs900_write(ohs900, OHS900_SOFENREG, 0);
 			break;
-		case USB_PORT_FEAT_POWER: INFO("\n n");
+		case USB_PORT_FEAT_POWER:
 			port_power(ohs900, 1);
 			break;
-		case USB_PORT_FEAT_RESET: INFO("\n o");
+		case USB_PORT_FEAT_RESET: 
 			if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND))
 				goto error;
 			if (!(ohs900->port1 & (1 << USB_PORT_FEAT_POWER)))
@@ -1330,7 +1298,7 @@ ohs900h_hub_control(
 			/* 50 msec of reset/SE0 signaling, irqs blocked */
 			ohs900->irq_enable = 0;
 			ohs900_write(ohs900, OHS900_IRQ_ENABLE,
-						ohs900->irq_enable);
+						ohs900->irq_enable); 
 			ohs900_write(ohs900, OHS900_SOFENREG, 0);
 			ohs900->ctrl1 = OHS900_TXLCTL_MASK_SE0;
 			ohs900_write(ohs900, OHS900_TXLINECTLREG, ohs900->ctrl1);
@@ -1338,7 +1306,7 @@ ohs900h_hub_control(
 			mod_timer(&ohs900->timer, jiffies
 					+ msecs_to_jiffies(50));
 			break;
-		default: INFO("\n p");
+		default: 
 			goto error;
 		}
 		ohs900->port1 |= 1 << wValue;
@@ -1346,7 +1314,7 @@ ohs900h_hub_control(
 
 	default:
 error:
-		/* "protocol stall" on error */INFO("\n qqqqqqqqq");
+		
 		retval = -EPIPE;
 	}
 
@@ -1559,10 +1527,10 @@ static int
 ohs900h_start(struct usb_hcd *hcd)
 {
 	struct ohs900 *s_ohs900 = hcd_to_ohs900(hcd);
-   INFO("Enter ohs900h_start(struct usb_hcd *hcd)");
+ 
 	/* chip has been reset, VBUS power is off */
-        INFO("START to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("START to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);
+      //  INFO("START to urb_enqueue %p", hcd->driver->urb_enqueue);    
+   // INFO("START to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);
     
 	hcd->state = HC_STATE_RUNNING;
 
@@ -1652,7 +1620,7 @@ ohs900h_probe(struct platform_device *dev)
   
   struct usb_hcd		*hcd;
 	struct ohs900		*s_ohs900;
-	struct resource		*addr, *data, *ires;
+	struct resource		*addr,  *ires;
 	int			irq;
 	void __iomem		*addr_reg;
 	int			retval;
@@ -1677,7 +1645,7 @@ ohs900h_probe(struct platform_device *dev)
 
 	/* refuse to confuse usbcore */
 	if (dev->dev.dma_mask) {
-		DBG("no we won't dma\n");
+		DBGA("no we won't dma\n");
 		return -EINVAL;
 	}
 
@@ -1686,6 +1654,7 @@ ohs900h_probe(struct platform_device *dev)
 		       	hcd_name, (unsigned long)(addr->start), (unsigned long)(resource_len(addr)) );
 	
     addr = request_mem_region(addr->start, addr->end - addr->start, hcd_name);		
+      
             
 	retval = -EBUSY;
 	if (!addr) {
@@ -1697,24 +1666,20 @@ ohs900h_probe(struct platform_device *dev)
 		addr_reg = (void __iomem *) (unsigned long) addr->start;
 	} else {
 		addr_reg = ioremap(addr->start, addr->end - addr->start +1);
-		INFO("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", hcd_name, (unsigned long)(addr->start),(unsigned long)(addr->end), (unsigned long)addr_reg) ;
+		//printk("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", hcd_name, (unsigned long)(addr->start),(unsigned long)(addr->end), (unsigned long)addr_reg) ;
 		if (addr_reg == NULL) {
 			retval = -ENOMEM;
 			goto err2;
 		}
 	}
 
-       
-    
+  
+ 
+   
 	/* allocate and initialize hcd */
-	INFO("driver %s, allocating memory\n", hcd_name);
-	
-    INFO("BADD to urb_enqueue %p", ohs900h_hc_driver.urb_enqueue);    
-    INFO("BADD to ohs900h_endpoint_disable %p", ohs900h_hc_driver.endpoint_disable);  
-    
+
     hcd = usb_create_hcd(&ohs900h_hc_driver, &dev->dev, dev->name );
-    INFO("ADD to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("ADD to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);  
+    
     
     
 	if (!hcd) {
@@ -1732,17 +1697,13 @@ ohs900h_probe(struct platform_device *dev)
 	s_ohs900->timer.function = ohs900h_timer;
 	s_ohs900->timer.data = (unsigned long) s_ohs900;
 	s_ohs900->addr_reg = addr_reg;
+    
 	spin_lock_irq(&s_ohs900->lock);
 
 	port_power(s_ohs900, 0);
-	INFO("driver %s, returned from port_power\n", hcd_name);
-    INFO("Before spinlock to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("Before  spinlock  to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);  
+  
 	spin_unlock_irq(&s_ohs900->lock);
-	INFO("driver %s, returned from spin_unlock_irqrestore\n", hcd_name);
-    
-    INFO("After spinlock to urb_enqueue %p", hcd->driver->urb_enqueue);    
-    INFO("After spinlock  to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);  
+	
 	msleep(200);
 
 	
@@ -1769,12 +1730,14 @@ ohs900h_probe(struct platform_device *dev)
 	case 0x12:
 		hcd->product_desc = "OHS900 v1.2";
 		break;
+    case 0x20:
+		hcd->product_desc = "OHS900 v1.3";
+		break;
 	default:
 		/* reject other chip revisions */
-        INFO("driver %s, crappy revision  = %02x\n",hcd_name,tmp);    
-		//DBG("chiprev %02x\n", tmp);
-		//retval = -ENXIO;
-		//goto err6;
+           
+		
+		goto err6;
 	}
 	INFO("driver %s, hw version = %d\n", hcd_name, tmp);
     
@@ -1874,8 +1837,8 @@ static struct resource ohs900_resources[] = {
    .flags          = IORESOURCE_MEM,
  },
  [1] = {
-   .start          = (OHS900SLAVE_BASE),
-   .end            = ((OHS900SLAVE_BASE) + OHS900_IO_EXTENT - 1),
+    .start          = (OHS900_SLAVE_ADDRESS),
+   .end            = ((OHS900_SLAVE_ADDRESS) + OHS900_IO_EXTENT - 1),
    .flags          = IORESOURCE_MEM,
  },
  [2] = {
