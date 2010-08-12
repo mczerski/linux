@@ -100,7 +100,7 @@ properties.
 			reg = <0x2000000 0x53>;
 			interrupts = <4>;
 		};
-/*
+
 		gpio0: gpio@a0000000 {
                 	compatible = "opencores,jbtrivial";
                         reg = <0xa000000 0x6>;
@@ -154,6 +154,6 @@ properties.
                                 gpios = <&gpio0 7 0x0>;
                         };
                 };
-*/
+
 	};
 };
