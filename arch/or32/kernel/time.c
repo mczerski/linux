@@ -31,27 +31,6 @@
 #include <asm/or32-hf.h>
 
 
-/* last time the RTC clock got updated */
-// static long last_rtc_update;
-
-u32 arch_gettimeoffset(void)
-{
-        unsigned long count, result;
-        unsigned long factor;
-
-        factor = cpuinfo.clock_frequency / 1000000;
-
-        count = mfspr(SPR_TTCR);
-        result = count / factor;
-#if 0
-        printk("gettimeofday offset :: cnt %d, sys_tick_per %d, result %d\n",
-               count, factor, result);
-#endif
-        return(result);
-
-}
-EXPORT_SYMBOL(arch_gettimeoffset);
-
 static inline void or32_timer_stop(void)
 {
 	mtspr(SPR_TTMR, 0);
