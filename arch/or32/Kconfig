@@ -53,9 +53,6 @@ config FRAME_POINTER
 config GENERIC_GPIO
 	def_bool y
 
-config GENERIC_TIME
-	def_bool y
-
 config GENERIC_CLOCKEVENTS
 	def_bool y
 
