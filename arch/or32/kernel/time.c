@@ -225,17 +225,18 @@ static struct clocksource or32_timer = {
 static int __init or32_timer_init(void)
 {
 
-	clocksource_calc_mult_shift(&or32_timer, cpuinfo.clock_frequency, 4);
+//	clocksource_calc_mult_shift(&or32_timer, cpuinfo.clock_frequency, 4);
 
 //        or32_timer.mult = 
 //		clocksource_hz2mult(cpuinfo.clock_frequency, or32_timer.shift);
-	printk("clock frequency = %d\n", cpuinfo.clock_frequency);
-	printk("TIMER INIT *********************** mult = %d\n", or32_timer.mult);
-	printk("TIMER INIT *********************** mult = %d\n", or32_timer.shift);
-        if (clocksource_register(&or32_timer))
+        //if (clocksource_register(&or32_timer))
+        if (clocksource_register_hz(&or32_timer, cpuinfo.clock_frequency))
                 panic("failed to register clocksource");
 
-        /* Set counter period, enable timer and interrupt */
+       	printk("clock frequency = %d\n", cpuinfo.clock_frequency);
+	printk("TIMER INIT *********************** mult = %d\n", or32_timer.mult);
+	printk("TIMER INIT *********************** mult = %d\n", or32_timer.shift);
+ /* Set counter period, enable timer and interrupt */
 
 	/* Enable the incrementer in 'continuous' mode with interrupt disabled */
         mtspr(SPR_TTMR, SPR_TTMR_CR);
