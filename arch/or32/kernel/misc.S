@@ -126,6 +126,7 @@ __restore_flags:
 
 #endif
 
+#if 0
 /*
  * Create a kernel thread
  *   kernel_thread(fn, arg, flags)
@@ -157,7 +158,7 @@ kernel_thread:
 	l.lwz	r3,0x4(r1)
 	l.jr    r9
 	l.addi	r1,r1,8
-
+#endif
 /* FIXME: Delete this stuff  */
 #if 0 
 

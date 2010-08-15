@@ -255,6 +255,29 @@ void dump_thread(struct pt_regs *regs, struct user *dump)
 	phx_warn("TODO");
 }
 
+static void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
+{
+        do_exit(fn(arg));
+}
+
+/*
+ * Create a kernel thread.
+ */
+int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
+{
+        struct pt_regs regs;
+
+        memset(&regs, 0, sizeof(regs));
+
+        regs.gprs[1] = (unsigned long)fn;
+        regs.gprs[2] = (unsigned long)arg;
+        regs.sr = mfspr(SPR_SR);
+        regs.pc = (unsigned long)kernel_thread_helper;
+
+        return do_fork(flags | CLONE_VM | CLONE_UNTRACED, \
+                        0, &regs, 0, NULL, NULL);
+}
+
 /*
  * sys_execve() executes a new program.
  */
