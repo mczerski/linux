@@ -32,8 +32,8 @@
  * Enable interrupts
  *      sti()
  */
-	.global ___sti
-___sti:
+	.global __sti
+__sti:
 	l.addi	r1,r1,-0x4
 	l.sw	0x0(r1),r3
 	
@@ -48,8 +48,8 @@ ___sti:
  * Disable interrupts
  *      cli()
  */
-	.global ___cli
-___cli:
+	.global __cli
+__cli:
 	l.addi	r1,r1,-0x8
 	l.sw	0x0(r1),r4
 	l.sw	0x4(r1),r3
@@ -71,8 +71,8 @@ ___cli:
  * Get 'flags' (aka status register)
  *      save_flags(long *ptr)
  */
-	.global ___save_flags
-___save_flags:
+	.global __save_flags
+__save_flags:
 	l.addi	r1,r1,-0x4
 	l.sw	0x0(r1),r4
 	
@@ -89,8 +89,8 @@ ___save_flags:
  * Get 'flags' and disable interrupts
  *      save_and_cli(long *ptr)
  */
-	.global ___save_and_cli
-___save_and_cli:
+	.global __save_and_cli
+__save_and_cli:
 	l.addi	r1,r1,-0x8
 	l.sw	0x0(r1),r4
 	l.sw	0x4(r1),r3
@@ -114,8 +114,8 @@ ___save_and_cli:
  * Restore 'flags'
  *      restore_flags(long val)
  */
-	.global ___restore_flags
-___restore_flags:
+	.global __restore_flags
+__restore_flags:
 	l.mtspr r0,r3,SPR_SR
 	l.jr	r9
 	l.nop
@@ -124,8 +124,8 @@ ___restore_flags:
  * Create a kernel thread
  *   kernel_thread(fn, arg, flags)
  */
-  .global _kernel_thread
-_kernel_thread:
+  .global kernel_thread
+kernel_thread:
 	l.addi	r1,r1,-8
 	l.sw	0x0(r1),r6
 	l.sw	0x4(r1),r3
@@ -158,8 +158,8 @@ _kernel_thread:
  * Instruction cache enable
  *      ic_enable()
  */
-	.global ___ic_enable
-___ic_enable:
+	.global __ic_enable
+__ic_enable:
 	/* Disable IC */
 	l.mfspr r13,r0,SPR_SR
 	l.addi  r11,r0,-1
@@ -193,8 +193,8 @@ ___ic_enable:
  * Instruction cache disable
  *      ic_disable()
  */
-	.global ___ic_disable
-___ic_disable:
+	.global __ic_disable
+__ic_disable:
 	/* Disable IC */
 	l.mfspr r13,r0,SPR_SR
 	l.addi  r11,r0,-1
@@ -209,8 +209,8 @@ ___ic_disable:
  * Instruction cache invalidate
  *      ic_flush()
  */
-	.global ___ic_invalidate
-___ic_invalidate:
+	.global __ic_invalidate
+__ic_invalidate:
 	/* Disable IC */
 	l.mfspr r13,r0,SPR_SR
 	l.addi  r11,r0,-1
@@ -244,8 +244,8 @@ ___ic_invalidate:
  * Data cache enable
  *      dc_enable()
  */
-	.global ___dc_enable
-___dc_enable:
+	.global __dc_enable
+__dc_enable:
   /* Disable DC */
 	l.mfspr r13,r0,SPR_SR
 	l.addi  r11,r0,-1
@@ -274,8 +274,8 @@ ___dc_enable:
  * Data cache disable
  *      dc_disable()
  */
-	.global ___dc_disable
-___dc_disable:
+	.global __dc_disable
+__dc_disable:
 	/* Disable DC */
 	l.mfspr r13,r0,SPR_SR
 	l.addi  r11,r0,-1
@@ -290,8 +290,8 @@ ___dc_disable:
  * Invalidate data cache line
  *      dc_line_invalidate(long ph_add)
  */
-	.global ___dc_line_invalidate
-___dc_line_invalidate:
+	.global __dc_line_invalidate
+__dc_line_invalidate:
   l.mfspr r4,r0,SPR_SR
   l.addi  r5,r0,-1
   l.xori  r5,r5,SPR_SR_DCE
@@ -306,8 +306,8 @@ ___dc_line_invalidate:
  * Data MMU enable
  *      dmmu_enable()
  */
-	.global ___dmmu_enable
-___dmmu_enable:
+	.global __dmmu_enable
+__dmmu_enable:
   /* Invalidate all sets */
   l.addi  r11,r0,DMMU_SET_NB
   l.addi  r13,r0,0
@@ -327,8 +327,8 @@ ___dmmu_enable:
  * Instruction MMU enable
  *      immu_enable()
  */
-	.global ___immu_enable
-___immu_enable:
+	.global __immu_enable
+__immu_enable:
   /* Invalidate all sets */
   l.addi  r11,r0,IMMU_SET_NB
   l.addi  r13,r0,0
@@ -353,8 +353,8 @@ ___immu_enable:
  * Print utility
  *      print(const char *fmt, ...)
  */
-	.global ___print
-___print:
+	.global __print
+__print:
 	l.lwz	r3,0(r1)
 	l.addi	r4,r1,4
 #	l.sys	202

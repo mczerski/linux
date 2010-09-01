@@ -32,8 +32,8 @@
  * NOTE: it returns number of bytes NOT copied !!!
  *
  */
-	.global	___copy_tofrom_user
-___copy_tofrom_user:
+	.global	__copy_tofrom_user
+__copy_tofrom_user:
 	l.addi  r1,r1,-12
 	l.sw    0(r1),r6
 	l.sw    4(r1),r4
@@ -73,8 +73,8 @@ ___copy_tofrom_user:
  *
  * NOTE: it returns number of bytes NOT cleared !!!
  */
-	.global	___clear_user
-___clear_user:
+	.global	__clear_user
+__clear_user:
 	l.addi  r1,r1,-8
 	l.sw    0(r1),r4
 	l.sw    4(r1),r3
@@ -109,8 +109,8 @@ ___clear_user:
  *
  *
  */
-	.global	___strncpy_from_user
-___strncpy_from_user:
+	.global	__strncpy_from_user
+__strncpy_from_user:
 	l.addi  r1,r1,-16
 	l.sw    0(r1),r6
 	l.sw    4(r1),r5
@@ -165,8 +165,8 @@ ___strncpy_from_user:
  *       - on page fault 0
  */
 		
-	.global ___strnlen_user
-___strnlen_user:
+	.global __strnlen_user
+__strnlen_user:
 	l.addi  r1,r1,-8
 	l.sw    0(r1),r6
 	l.sw    4(r1),r3

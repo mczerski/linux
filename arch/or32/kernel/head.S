@@ -194,7 +194,7 @@
 
 
 #define GET_CURRENT_PGD(reg,t1)					\
-	LOAD_SYMBOL_2_GPR(reg,_current_pgd)			;\
+	LOAD_SYMBOL_2_GPR(reg,current_pgd)			;\
 	tophys  (t1,reg)					;\
 	l.lwz   reg,0(t1)
 
@@ -347,7 +347,7 @@
 	l.bnf   2f /* kernel_mode */				;\
 	l.nop							;\
 1: /* user_mode:   */						;\
-	LOAD_SYMBOL_2_GPR(r1,_current_thread_info_set)		;\
+	LOAD_SYMBOL_2_GPR(r1,current_thread_info_set)		;\
 	tophys  (r31,r1)					;\
 	/* r10: current_thread_info  */				;\
 	l.lwz   r10,0(r31)					;\
@@ -436,7 +436,7 @@
 	l.addi	r9,r10,0x0					;\
 	/* extract current, ksp from current_set */		;\
 	LOAD_SYMBOL_2_GPR(r1,_unhandled_stack_top)		;\
-	LOAD_SYMBOL_2_GPR(r10,_init_thread_union)		;\
+	LOAD_SYMBOL_2_GPR(r10,init_thread_union)		;\
 	/* create new stack frame, save only needed gprs */	;\
 	/* r1: KSP, r10: current, r31: __pa(KSP) */		;\
 	/* r12:	temp, syscall indicator, r13 temp */		;\
@@ -513,7 +513,7 @@ reset_start:
 	 */
 	LOAD_SYMBOL_2_GPR(r3,0xf0000000)	// source
 	LOAD_SYMBOL_2_GPR(r4,0x0)		// destination
-	LOAD_SYMBOL_2_GPR(r6,__end)		// last destination
+	LOAD_SYMBOL_2_GPR(r6,_end)		// last destination
 	tophys	(r5,r6)				// last destination
 
 	/*
@@ -744,8 +744,8 @@ _start:
 	/*
 	 * set up initial ksp and current
 	 */
-	LOAD_SYMBOL_2_GPR(r1,_init_thread_union+0x2000)	// setup kernel stack
-	LOAD_SYMBOL_2_GPR(r10,_init_thread_union)	// setup current
+	LOAD_SYMBOL_2_GPR(r1,init_thread_union+0x2000)	// setup kernel stack
+	LOAD_SYMBOL_2_GPR(r10,init_thread_union)	// setup current
 	tophys	(r31,r10)
 	l.sw	TI_KSP(r31), r1
 
@@ -762,8 +762,8 @@ write_config:
 	 * .bss contains uninitialized data - clear it up 
 	 */
 clear_bss:
-	LOAD_SYMBOL_2_GPR(r24, ___bss_start)
-	LOAD_SYMBOL_2_GPR(r26, __end)
+	LOAD_SYMBOL_2_GPR(r24, __bss_start)
+	LOAD_SYMBOL_2_GPR(r26, _end)
 	tophys(r28,r24)
 	tophys(r30,r26)
 	CLEAR_GPR(r24)
@@ -831,7 +831,7 @@ hw_breakpoint:
 #if 0
 	/* set effective address */
 	LOAD_SYMBOL_2_GPR(r3,SPR_DVR(0))
-	LOAD_SYMBOL_2_GPR(r4,_start_kernel)
+	LOAD_SYMBOL_2_GPR(r4,start_kernel)
 	l.mtspr	r3,r4,0x0
 
 	/* control register: present, equal to, instruction fetch EA */
@@ -922,7 +922,7 @@ jump_start_kernel:
 	/* 
 	 * jump to kernel entry (start_kernel) 
 	 */
-	LOAD_SYMBOL_2_GPR(r30, _start_kernel)
+	LOAD_SYMBOL_2_GPR(r30, start_kernel)
 	l.jr    r30
 	l.nop
 
@@ -1307,9 +1307,16 @@ ENTRY(_dc_enable)
 #define ITLB_SMP_CONVERT_MASK  0x3b
 
 /* ==============================================[ DTLB miss handler ]=== */
-		
-	.global _dtlb_miss_handler
-_dtlb_miss_handler:
+
+/*
+ * Comments:
+ *   Exception handlers are entered with MMU off so the following handler
+ *   needs to use physical addressing
+ *
+ */
+
+	.global dtlb_miss_handler
+dtlb_miss_handler:
 	EXCEPTION_DEBUG_VALUE_ER(0x900)
 
 	EXCEPTION_STORE_GPR2
@@ -1411,8 +1418,8 @@ d_pte_not_present:
 	l.nop
 		
 /* ==============================================[ ITLB miss handler ]=== */
-	.global _itlb_miss_handler
-_itlb_miss_handler:
+	.global itlb_miss_handler
+itlb_miss_handler:
 	EXCEPTION_DEBUG_VALUE_ER(0xa00)
 	
 	EXCEPTION_STORE_GPR2
@@ -2128,7 +2135,7 @@ nommu_entry:
 	l.addi	r3,r1,0						
 	/* r4 is exception EA */				
 	l.addi	r5,r0,0xdead					
-	l.jal	_nommu_dump_state						
+	l.jal	nommu_dump_state						
 	l.nop		
 	
 	
@@ -2442,12 +2449,12 @@ _string_esr_irq_bug:
 	.global  _sdata
 _sdata:
 	.align	8192
-        .global  _empty_zero_page
-_empty_zero_page:
+        .global  empty_zero_page
+empty_zero_page:
         .space  8192
 				    
-        .global  _swapper_pg_dir
-_swapper_pg_dir:
+        .global  swapper_pg_dir
+swapper_pg_dir:
         .space  8192
 
 	.global	_unhandled_stack

@@ -246,7 +246,7 @@ handler:							;\
 	l.addi	r3,r1,0						;\
 	/* r4 is exception EA */				;\
 	l.addi	r5,r0,vector					;\
-	l.jal	_unhandled_exception				;\
+	l.jal	unhandled_exception				;\
 	l.nop							;\
 	l.j	_ret_from_exception				;\
 	l.nop	1
@@ -342,7 +342,7 @@ EXCEPTION_ENTRY(_data_page_fault_handler)
 2:
 	
 	/* call fault.c handler in or32/mm/fault.c */
-	l.jal   _do_page_fault
+	l.jal   do_page_fault
 	l.nop
 	l.j     _ret_from_exception
 	l.nop
@@ -357,7 +357,7 @@ EXCEPTION_ENTRY(_insn_page_fault_handler)
 	l.ori	r6,r0,0x0		   // !write access
 	
 	/* call fault.c handler in or32/mm/fault.c */
-	l.jal   _do_page_fault
+	l.jal   do_page_fault
 	l.nop
 	l.j     _ret_from_exception
 	l.nop
@@ -377,7 +377,7 @@ EXCEPTION_ENTRY(_timer_handler)
         l.addi  r1,r1,-0x8
         LOAD_SYMBOL_2_GPR(r3,42f)
         l.sw    0x0(r1),r3
-        l.jal   _printk
+        l.jal   printk
         l.sw    0x4(r1),r4
         l.addi  r1,r1,0x8
 
@@ -392,7 +392,7 @@ EXCEPTION_ENTRY(_timer_handler)
 1:	
 #endif
 	l.addi r3,r1,0
-	LOAD_SYMBOL_2_GPR(r8,_timer_interrupt)
+	LOAD_SYMBOL_2_GPR(r8,timer_interrupt)
         l.jalr r8
 	l.nop
 	l.j    _ret_from_intr
@@ -572,7 +572,7 @@ EXCEPTION_ENTRY(_external_irq_handler)
         l.addi  r1,r1,-0x8
         LOAD_SYMBOL_2_GPR(r3,42f)
         l.sw    0x0(r1),r3
-        l.jal   _printk
+        l.jal   printk
         l.sw    0x4(r1),r4
         l.addi  r1,r1,0x8
 
@@ -587,7 +587,7 @@ EXCEPTION_ENTRY(_external_irq_handler)
 1:	
 #endif
 	l.addi r3,r1,0
-	LOAD_SYMBOL_2_GPR(r8,_do_IRQ)
+	LOAD_SYMBOL_2_GPR(r8,do_IRQ)
         l.jalr r8
 	l.nop
 	l.j    _ret_from_intr
@@ -628,8 +628,8 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	ENABLE_INTERRUPTS(r9)		// enable interrupts, r9 is temp
 
 _syscall_call:
-        l.movhi r30,hi(_sys_call_table)
-        l.ori   r30,r30,lo(_sys_call_table)
+        l.movhi r30,hi(sys_call_table)
+        l.ori   r30,r30,lo(sys_call_table)
         l.slli  r11,r11,2
         l.add   r30,r30,r11
         l.lwz   r30,0(r30)
@@ -661,7 +661,7 @@ _syscall_trace_entry:
 	l.sw	SYSCALLNO(r1),r11
 	l.addi	r3,r1,0
 	l.addi	r4,r0,0
-	l.jal	_do_syscall_trace
+	l.jal	do_syscall_trace
 	l.nop
 
 	/* Restore arguments */
@@ -701,7 +701,7 @@ _syscall_exit_work:
 
 	l.addi	r3,r1,0
 	l.addi	r4,r0,1
-	l.jal	_do_syscall_trace
+	l.jal	do_syscall_trace
 	l.nop
 
 	l.j	_resume_userspace
@@ -798,7 +798,7 @@ _work_pending:
 	l.nop
 
 work_resched:
-	l.jal   _schedule
+	l.jal   schedule
 	l.nop
 	DISABLE_INTERRUPTS(r3,r4)
 
@@ -823,14 +823,14 @@ work_notifysig:
 	l.addi	r3,r0,1
 	l.addi  r4,r0,0
 	l.addi  r5,r1,0
-	l.jal   _do_signal
+	l.jal   do_signal
 	l.nop
 	l.j	_resume_userspace
 	l.nop
 
 
-ENTRY(_ret_from_fork)
-	l.jal	_schedule_tail
+ENTRY(ret_from_fork)
+	l.jal	schedule_tail
 	l.nop
 
 	l.j	_syscall_exit
@@ -884,7 +884,7 @@ _resume_userspace:
  */
 
 
-/* __switch MUST never lay on page boundry, cause it runs from
+/* _switch MUST never lay on page boundry, cause it runs from
  * effective addresses and beeing interrupted by iTLB miss would kill it. 
  * dTLB miss seams to never accour in the bad place since data accesses
  * are from task structures which are always page aligned.
@@ -895,12 +895,12 @@ _resume_userspace:
  * garbled and we end up calling l.rfe with the wrong EPCR. (same probably
  * holds for ESR)
  *
- * To avoid this problems it is sufficient to align __switch to
+ * To avoid this problems it is sufficient to align _switch to
  * some nice round number smaller than it's size...
  */
 	
 	.align 0x400
-ENTRY(__switch)
+ENTRY(_switch)
 	l.sw    (GPR3-INT_FRAME_SIZE)(r1),r3
         l.mtspr r0,r9,SPR_EPCR_BASE		/* Link register to EPCR */
         l.mfspr r3,r0,SPR_SR			/* From SR to ESR */
@@ -919,34 +919,34 @@ ENTRY(__switch)
 	l.addi  r10,r5,0			/* set current (r10) to new */
 	RESTORE_ALL_NO_R11
 		
-ENTRY(_sys_clone)
+ENTRY(sys_clone)
 	l.addi	r7,r1,0
-	l.j	__sys_clone
+	l.j	_sys_clone
 	l.nop
 	
-ENTRY(_sys_fork)
+ENTRY(sys_fork)
 	l.addi	r3,r1,0
-	l.j	__sys_fork
+	l.j	_sys_fork
 	l.nop
 
-ENTRY(_sys_vfork)
+ENTRY(sys_vfork)
 	l.addi	r3,r1,0
-	l.j	__sys_vfork
+	l.j	_sys_vfork
 	l.nop
 	
-ENTRY(_sys_execve)
+ENTRY(sys_execve)
 	l.addi	r6,r1,0
-	l.j	__sys_execve
+	l.j	_sys_execve
 	l.nop
 
-ENTRY(_sys_sigaltstack)
+ENTRY(sys_sigaltstack)
 	l.addi	r5,r1,0
-	l.j	__sys_sigaltstack
+	l.j	_sys_sigaltstack
 	l.nop
 
-ENTRY(_sys_rt_sigreturn)
+ENTRY(sys_rt_sigreturn)
 	l.addi	r3,r1,0
-	l.j	__sys_rt_sigreturn
+	l.j	_sys_rt_sigreturn
 	l.nop
 
 /* ============================================================[ EOF ]=== */

@@ -1,5 +1,5 @@
-	.global _su_asm
-_su_asm:
+	.global su_asm
+su_asm:
 	l.addi   r1,r1,-8
 	l.sw     0x0(r1),r9
         l.sw     0x4(r1),r14

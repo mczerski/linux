@@ -11,7 +11,7 @@ config MMU
 
 config SYMBOL_PREFIX
         string
-        default "_"
+        default ""
 
 config ZONE_DMA
 	bool
