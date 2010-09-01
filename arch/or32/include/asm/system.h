@@ -94,7 +94,7 @@ static inline unsigned long __xchg(unsigned long x, volatile void * ptr, int siz
   return tmp;
 }
 
-extern inline void * xchg_ptr(void * m, void * val)
+static inline void * xchg_ptr(void * m, void * val)
 {
 	return (void *) __xchg((unsigned long)m, val, sizeof(unsigned long));
 }
