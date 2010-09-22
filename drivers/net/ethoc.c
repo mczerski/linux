@@ -209,7 +209,6 @@ struct ethoc {
 	struct napi_struct napi;
 	u32 msg_enable;
 
-	spinlock_t rx_lock;
 	spinlock_t lock;
 
 	struct phy_device *phy;
@@ -1052,7 +1051,6 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 	/* setup NAPI */
 	netif_napi_add(netdev, &priv->napi, ethoc_poll, 64);
 
-	spin_lock_init(&priv->rx_lock);
 	spin_lock_init(&priv->lock);
 
 	ret = register_netdev(netdev);
