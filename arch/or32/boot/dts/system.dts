@@ -67,7 +67,7 @@ properties.
 		/* Specify empty ranges here to indicates 1:1 mapping of SOC
 		   addresses (device addresses) to CPU addresses */
 		/*ranges;*/
-		ranges = <0 0x90000000 0x20000000>;
+		ranges = <0 0x90000000 0x30000000>;
 		/* This SOC has only a single, implicit PIC, so define it
 		  early and put the interrupt-parent property in the 'soc'
 		 node so that it's inherited by all the children using
@@ -200,6 +200,32 @@ properties.
 			#size-cells = <0>;
 		}; 
 
+
+		spi0: spi@b0000000 {
+			compatible = "opencores,spi-simple";
+			reg = <0x20000000 0x5>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices.  Address
+			 * for child is chip-select (slave select).
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+/*			mmc-spi-slot@0 {
+				compatible = "mmc-spi-slot";
+				reg = <0>;
+				spi-max-frequency = <10000000>;
+			};
+*/
+			spiflash0: mtd@0 {
+				compatible = "m25p10";
+				reg = <0>;
+				spi-max-frequency = <100000000>;
+			};
+		};
 
 		gpio0: gpio@1000000 {
                 	compatible = "opencores,jbtrivial";

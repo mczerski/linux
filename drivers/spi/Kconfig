@@ -189,6 +189,11 @@ config SPI_MPC8xxx
 	  This enables using the Freescale MPC8xxx SPI controllers in master
 	  mode.
 
+config SPI_OCSIMPLE
+	tristate "OpenCores Simple SPI Controller"
+	help
+	  Driver for Simple SPI core from OpenCores.org 
+
 config SPI_OMAP_UWIRE
 	tristate "OMAP1 MicroWire"
 	depends on ARCH_OMAP1
