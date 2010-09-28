@@ -89,7 +89,8 @@ void (*mach_debug_init)(void) = NULL;
 unsigned long fb_mem_start;
 /*static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=uart,mmio,0x90000000";*/
 //static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=ttyS0";
-static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000";
+static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200";
+//static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::";
 //static char command_line[COMMAND_LINE_SIZE] = "console=ttyS0";
 extern const unsigned long text_start, edata; /* set by the linker script */ 
        
