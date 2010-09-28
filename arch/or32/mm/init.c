@@ -35,6 +35,7 @@
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blkdev.h>          /* for initrd_* */
 #endif
+#include <linux/pagemap.h>
 
 #include <asm/system.h>
 #include <asm/segment.h>
