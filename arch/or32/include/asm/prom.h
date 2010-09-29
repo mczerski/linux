@@ -14,8 +14,8 @@
 
 #include <linux/of.h>	/* linux/of.h gets to determine #include ordering */
 
-#ifndef _ASM_MICROBLAZE_PROM_H
-#define _ASM_MICROBLAZE_PROM_H
+#ifndef _ASM_OPENRISC_PROM_H
+#define _ASM_OPENRISC_PROM_H
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
 
@@ -87,4 +87,4 @@ static inline void irq_dispose_mapping(unsigned int virq)
 
 #endif /* __ASSEMBLY__ */
 #endif /* __KERNEL__ */
-#endif /* _ASM_MICROBLAZE_PROM_H */
+#endif /* _ASM_OPENRISC_PROM_H */

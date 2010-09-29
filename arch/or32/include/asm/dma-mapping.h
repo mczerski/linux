@@ -140,4 +140,4 @@ static inline void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
 	__dma_sync(vaddr, size, (int)direction);
 }
 
-#endif	/* _ASM_MICROBLAZE_DMA_MAPPING_H */
+#endif	/* _ASM_OPENRISC_DMA_MAPPING_H */
