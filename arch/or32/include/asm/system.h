@@ -8,6 +8,9 @@
 
 #include <asm/processor.h>
 #include <linux/linkage.h>
+
+#include <linux/irqflags.h>
+
 /* Memory bariers */
 #define barrier() __asm__ __volatile__("": : :"memory")
 #define mb() barrier()
