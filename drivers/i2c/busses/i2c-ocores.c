@@ -227,10 +227,6 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 	if (!res2)
 		return -ENODEV;
 
-	pdata = (struct ocores_i2c_platform_data*) pdev->dev.platform_data;
-	if (!pdata)
-		return -ENODEV;
-
 	i2c = kzalloc(sizeof(*i2c), GFP_KERNEL);
 	if (!i2c)
 		return -ENOMEM;
@@ -249,8 +245,26 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 		goto map_failed;
 	}
 
-	i2c->regstep = pdata->regstep;
-	i2c->clock_khz = pdata->clock_khz;
+	pdata = (struct ocores_i2c_platform_data*) pdev->dev.platform_data;
+	if (pdata) {
+		i2c->regstep = pdata->regstep;
+		i2c->clock_khz = pdata->clock_khz;
+	} else {
+		int* val;
+		val = (int*) of_get_property(pdev->dev.of_node, "regstep", NULL);
+		if (!val) {
+			dev_err(&pdev->dev, "Missing required paramter 'regstep'");
+			return -ENODEV;
+		}
+		i2c->regstep = *val;
+		val = (int*) of_get_property(pdev->dev.of_node, "clock_khz", NULL);
+		if (!val) {
+			dev_err(&pdev->dev, "Missing required paramter 'clock_khz'");
+			return -ENODEV;
+		}
+		i2c->clock_khz = *val;
+	}
+
 	ocores_init(i2c);
 
 	init_waitqueue_head(&i2c->wait);
@@ -265,6 +279,7 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 	i2c->adap = ocores_adapter;
 	i2c_set_adapdata(&i2c->adap, i2c);
 	i2c->adap.dev.parent = &pdev->dev;
+	i2c->adap.dev.of_node = pdev->dev.of_node;
 
 	/* add i2c adapter to i2c tree */
 	ret = i2c_add_adapter(&i2c->adap);
@@ -274,8 +289,10 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 	}
 
 	/* add in known devices to the bus */
-	for (i = 0; i < pdata->num_devices; i++)
-		i2c_new_device(&i2c->adap, pdata->devices + i);
+	if (pdata) {
+		for (i = 0; i < pdata->num_devices; i++)
+			i2c_new_device(&i2c->adap, pdata->devices + i);
+	}
 
 	return 0;
 
@@ -344,6 +361,14 @@ static int ocores_i2c_resume(struct platform_device *pdev)
 #define ocores_i2c_resume	NULL
 #endif
 
+static struct of_device_id ocores_i2c_match[] = {
+        {
+                .compatible = "opencores,i2c-ocores",
+        },
+        {},
+};
+MODULE_DEVICE_TABLE(of, ocores_i2c_match);
+
 /* work with hotplug and coldplug */
 MODULE_ALIAS("platform:ocores-i2c");
 
@@ -355,6 +380,7 @@ static struct platform_driver ocores_i2c_driver = {
 	.driver  = {
 		.owner = THIS_MODULE,
 		.name = "ocores-i2c",
+                .of_match_table = ocores_i2c_match,
 	},
 };
 
