@@ -65,96 +65,18 @@ irqreturn_t timer_interrupt(struct pt_regs * regs)
          * locally disabled. -arca
          */
 	/*profile_tick(CPU_PROFILING); broken on or32 why? RGD*/
-	write_seqlock(&xtime_lock);
 	
 	if (mach_tick) /*Not sure why we need to do this RGD*/
 	  mach_tick();
 	
 	do_timer(1); /*RGD*/
 	
-	if (ntp_synced() &&
-	    xtime.tv_sec > last_rtc_update + 660 &&
-	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
-	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2
-	    ) {
-	  if (set_rtc_mmss(xtime.tv_sec) == 0)
-	    last_rtc_update = xtime.tv_sec;
-	  else
-	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
-	}
-
-	write_sequnlock(&xtime_lock);
-
 #ifndef CONFIG_SMP
 	update_process_times(user_mode(regs));
 #endif
         return IRQ_HANDLED;
 }
 
-/*
- * This version of gettimeofday has near microsecond resolution.
- *
- * Note: Division is quite slow on OR32 and do_gettimeofday is called
- *       rather often. Maybe we should do some kind of approximation here
- *       (a naive approximation would be to divide by 1024).  
- */
-
-void do_gettimeofday(struct timeval *tv)
-{
-	unsigned long flags;
-	signed long usec, sec;
-	local_irq_save(flags);
-	local_irq_disable();
-	usec = mach_gettimeoffset ? mach_gettimeoffset() : 0;
-
-	sec = xtime.tv_sec;
-	usec += xtime.tv_nsec / 1000;
-	local_irq_restore(flags);
-	
-	while (usec >= 1000000) {
-		usec -= 1000000;
-		sec++;
-	}
-	
-	tv->tv_sec = sec;
-	tv->tv_usec = usec;
-}
-
-EXPORT_SYMBOL(do_gettimeofday);
-
-int do_settimeofday(struct timespec *tv)
-{
-	time_t wtm_sec, sec = tv->tv_sec;
-	long wtm_nsec, nsec = tv->tv_nsec;
-
-	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
-	  return -EINVAL;
-
-		write_seqlock_irq(&xtime_lock);
-	/*
-	 * This is revolting. We need to set the xtime.tv_usec
-	 * correctly. However, the value in this location is
-	 * is value at the last tick.
-	 * Discover what correction gettimeofday
-	 * would have done, and then undo it!
-	 */
-	if (mach_gettimeoffset)
-		nsec -= (mach_gettimeoffset() * 1000);
-
-	wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
-	wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
-
-	set_normalized_timespec(&xtime, sec, nsec);
-	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
-
-//	time_adjust = 0;		/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	write_sequnlock_irq(&xtime_lock);
-	clock_was_set();
-	return 0;
-}
-
-EXPORT_SYMBOL(do_settimeofday);
 
 
 
@@ -181,8 +103,6 @@ void __init time_init(void)
 
 	if ((year += 1900) < 1970)
 		year += 100;
-	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
-	xtime.tv_nsec = 0;
 
 	
 	if (mach_sched_init)
