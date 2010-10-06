@@ -21,7 +21,7 @@ properties.
 	#address-cells = <1>;
 
 	chosen {
-		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000";
+		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 debug";
 /*		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::"; */
 	};
 
@@ -67,7 +67,7 @@ properties.
 		/* Specify empty ranges here to indicates 1:1 mapping of SOC
 		   addresses (device addresses) to CPU addresses */
 		/*ranges;*/
-		ranges = <0 0x90000000 0x10000000>;
+		ranges = <0 0x90000000 0x20000000>;
 		/* This SOC has only a single, implicit PIC, so define it
 		  early and put the interrupt-parent property in the 'soc'
 		 node so that it's inherited by all the children using
@@ -93,6 +93,22 @@ properties.
 			interrupts = <2>;
 			clock-frequency = <20000000>;
 		};			
+
+		serial1: serial@93000000 {
+			device_type = "serial";
+			compatible = "opencores,uart", "ns16550a";
+			reg = <0x3000000 0x7>;
+			interrupts = <3>;
+			clock-frequency = <20000000>;
+		};
+
+		serial2: serial@94000000 {
+			device_type = "serial";
+			compatible = "opencores,uart", "ns16550a";
+			reg = <0x4000000 0x7>;
+			interrupts = <5>;
+			clock-frequency = <20000000>;
+		};
 			
 
 		enet0: ethoc@2000000 {
@@ -101,9 +117,93 @@ properties.
 			interrupts = <4>;
 		};
 
-		gpio0: gpio@a0000000 {
+		i2c0: ocores@a0000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0x10000000 0x8>;
+			interrupts = <10>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dummy@60 {
+				compatible = "dummy";
+				reg = <60>;
+			};
+		}; 
+
+		i2c1: ocores@a1000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0x11000000 0x8>;
+			interrupts = <11>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			test@60 {
+				compatible = "dummy";
+				reg = <60>;
+			};
+
+			test2@64 {
+				compatible = "dummy";
+				reg = <64>;
+			};
+		}; 
+
+		i2c2: ocores@a2000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0x12000000 0x8>;
+			interrupts = <12>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+		}; 
+
+		i2c3: ocores@a3000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0x13000000 0x8>;
+			interrupts = <13>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+		}; 
+
+
+		gpio0: gpio@1000000 {
                 	compatible = "opencores,jbtrivial";
-                        reg = <0xa000000 0x6>;
+                        reg = <0x1000000 0x6>;
                         #gpio-cells = <2>;
                         gpio-controller;
 			xlnx,data-offset = <3>;
