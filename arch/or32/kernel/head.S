@@ -774,6 +774,14 @@ clear_bss:
 	l.bf    1b
 	l.addi  r28,r28,4
 
+/*
+	LOAD_SYMBOL_2_GPR(r24, early_setup)
+	tophys(r28,r24)
+	CLEAR_GPR(r24)
+	l.jalr r28
+	l.nop
+*/
+
 enable_ic:
 	l.jal	_ic_enable
 	l.nop	
@@ -825,6 +833,10 @@ enable_mmu:
 
 	// reset the simulation counters
 	l.nop 5
+
+	LOAD_SYMBOL_2_GPR(r24, early_setup)
+	l.jalr r24
+	l.nop
 
 
 hw_breakpoint:

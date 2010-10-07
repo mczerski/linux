@@ -39,6 +39,7 @@
 #include <linux/seq_file.h>
 #include <linux/serial.h>
 #include <linux/initrd.h>
+#include <linux/of_fdt.h>
  
 #include <asm/board.h>
 #include <asm/segment.h>
@@ -70,6 +71,8 @@ extern int __init setup_early_serial8250_console(char *cmdline);
 extern char __initrd_start, __initrd_end;
 extern char __initramfs_start, __initramfs_end;
 #endif
+
+extern u32 _fdt_start;
  
 #include <asm/machdep.h>
 
@@ -94,6 +97,8 @@ static char command_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,1152
 //static char command_line[COMMAND_LINE_SIZE] = "console=ttyS0";
 extern const unsigned long text_start, edata; /* set by the linker script */ 
        
+char cmd_line[COMMAND_LINE_SIZE];
+
 static unsigned long __init setup_memory(void)
 {
 	unsigned long bootmap_size, start_pfn, max_low_pfn;
@@ -131,6 +136,22 @@ static unsigned long __init setup_memory(void)
 
 	return(max_low_pfn);
 }
+
+
+void __init early_setup(/*unsigned long fdt*/) {
+
+	early_init_devtree((void *) &_fdt_start);
+
+/*	if (fdt)
+		printk("FDT at 0x%08x\n", fdt);
+	else*/
+		printk("Compiled-in FDT at 0x%08x\n",
+		       (unsigned int)&_fdt_start);
+
+
+}
+
+
 
 static inline unsigned long extract_value_bits(unsigned long reg, 
 					       short bit_nr, short width)
@@ -262,6 +283,10 @@ void __init detect_soc(void)
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long max_low_pfn;
+
+//	early_setup(NULL);
+
+	unflatten_device_tree();
 
 	config_BSP(&command_line[0], COMMAND_LINE_SIZE);
 

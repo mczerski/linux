@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 #include <linux/init.h>
+#include <linux/of.h>
 
 #include <asm/system.h>
 #include <asm/io.h>
@@ -378,3 +379,18 @@ void init_irq_proc(void)
 {
 	phx_warn("TODO");
 }
+
+/*
+unsigned int irq_create_mapping(struct irq_host *host, irq_hw_number_t hwirq)
+{
+        return hwirq;
+}
+EXPORT_SYMBOL_GPL(irq_create_mapping);
+*/
+
+unsigned int irq_create_of_mapping(struct device_node *controller,
+                                   const u32 *intspec, unsigned int intsize)
+{
+        return intspec[0];
+}
+EXPORT_SYMBOL_GPL(irq_create_of_mapping);

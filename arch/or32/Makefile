@@ -41,6 +41,9 @@ core-y		+= arch/or32/lib/ \
 #		   arch/or32/support/
 libs-y		+= $(LIBGCC)
 
+
+core-y		+= arch/or32/boot/
+
 all: vmlinux
 
 #prepare: include/asm-$(ARCH)/offsets.h

@@ -54,8 +54,10 @@ config GENERIC_CSUM
 source "init/Kconfig"
 
 config OR32
-	bool
-	default y
+	def_bool y
+	select OF
+	select OF_FLATTREE
+	select HAVE_MEMBLOCK
 
 menu "Processor type and features"
 

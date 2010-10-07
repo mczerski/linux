@@ -11,5 +11,7 @@ obj-y	:= setup.o misc.o idle.o or32_ksyms.o process.o dma.o \
 	   sys_call_table.o
 
 obj-$(CONFIG_MODULES)		+= module.o
+#obj-$(CONFIG_OF)		+= prom.o
+obj-$(CONFIG_OF)		+= prom.o
 
 clean:

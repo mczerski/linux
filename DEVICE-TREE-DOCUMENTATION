@@ -1,0 +1,138 @@
+
+
+Introduction
+------------
+
+There is no definitive documentation for the flattened device tree format so this 
+document attempts to establish what is relevant for Linux.  Hopefully this is
+in accordance with what everybody else is doing... if there's anybody else using
+this format???
+
+
+A node is formatted as follows:
+
+Format:
+
+ALIAS : NAME[@bus] {
+	PROPERTY : VALUE
+	...
+}
+
+
+Every device has a set of properties that can be divided into two groups: common
+properties and device-specific properties.
+
+Common Properties
+-----------------
+
+Common properties are applicable to all nodes and have the same meaning everywhere.
+Depending on a node's context, a property may or may not be required.  Nodes can
+be divided into a couple of different types:
+
+Top-level node
+--------------
+Requires:
+model
+compatible
+#address-cells
+#size-cells
+
+Special-nodes
+-------------
+cpu node
+memory node
+aliases???
+
+The 'compatible' property MUST NOT be used with these nodes.
+
+Device nodes under the top-level node MUST have the 'compatible' property in
+order to identify them as _real_ devices.  If the 'compatible' property is absent
+Linux will consider the node to be a 'special node' and not register the device.
+
+
+
+Container node
+--------------
+Requires:
+compatible
+#address-cells
+#size-cells
+
+Note that device nodes may be added to the device tree dynamically, so every container
+node must have the #address-cells and #size-cells properties, even if there are no
+children explicitly defined.
+
+If the node is a bus, then the 'ranges' parameter should be specified in one of
+three ways to determine how device I/O addresses are mapped to bus' parent's
+address space:
+
+[EXPLAIN]
+
+ranges = <bus-address parent-address size>;
+
+ranges;
+There is a 1:1 mapping 
+
+/* ranges; */
+The device nodes' 
+
+
+Device node
+-----------
+Requires:
+
+compatible: 
+
+The 'compatible' property determines which driver your device will bind to and
+consequently which additional, device-specific properties are available.  The
+available properties can be found in the documentation for the device driver.
+
+
+
+optional:
+
+reg:
+
+'reg' gets converted to one or ore IORESOURCE_MEM resources that are passed
+along when registering the device on the bus.
+
+interrupts:
+
+'interrupts' gets converted to one or more IORESOURCE_IRQ resources that are
+passed in when registerin the device on the bus.
+
+
+Top level node must have:
+
+memory node
+
+
+
+
+#address-cells and #size-cells define the sizes of the data properties for
+child nodes.  These properties are, however, NOT inherited.  Thus, if a child
+node is a container with children of its own, then the child MUST specify
+these properties again for its own children (i.e. every container node must have
+these properties).
+
+
+Interrupt Controllers
+---------------------
+
+Your platform may have an implicit interrupt controller that requires no 
+particular information from the device tree for initialization.  This is fine,
+however, every device that uses interrupts must still be able to point to
+a parent interrupt controller that at least specifies the #interrupt-cells
+property.
+
+To simplify the device tree when you have only a single PIC, put the PIC in
+the top level node.  The interrupt-parent property IS inherited, meaning that
+it applies to both children and deeper (grand-children) nodes. 
+
+
+NOTES:
+
+Probed devices:  If a bus is capable of finding it's own children then no
+device nodes should be specified.
+
+

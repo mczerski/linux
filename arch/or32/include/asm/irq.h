@@ -10,6 +10,8 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
+#define NO_IRQ		(0)
+
 #define	NR_IRQS		32
 
 static inline int irq_canonicalize(int irq)
@@ -43,6 +45,15 @@ struct irq_handler {
 	void            *dev_id;
 	const char      *devname;
 };
+
+/** FIXME - not implement 
+ * irq_dispose_mapping - Unmap an interrupt 
+ * @virq: linux virq number of the interrupt to unmap 
+ */ 
+static inline void irq_dispose_mapping(unsigned int virq) 
+{ 
+        return; 
+}
 
 #endif /* __OR32_IRQ_H__ */
 #endif /* __KERNEL__ */

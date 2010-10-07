@@ -2,6 +2,7 @@
 #define __OF_ADDRESS_H
 #include <linux/ioport.h>
 #include <linux/of.h>
+#include <linux/errno.h>
 
 extern u64 of_translate_address(struct device_node *np, const u32 *addr);
 extern int of_address_to_resource(struct device_node *dev, int index,

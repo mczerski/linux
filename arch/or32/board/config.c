@@ -25,6 +25,7 @@
 #include <linux/serial_8250.h>
 #include <linux/if.h>
 #include <net/ethoc.h>
+#include <linux/of_platform.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -107,7 +108,7 @@ void config_BSP(char *command, int len)
 	mach_reset           = BSP_reset;
 	mach_debug_init      = NULL;
 }
-
+#if 0
 #define UART_IRQ       2
 #define UART_IOBASE    0x90000000
 
@@ -160,9 +161,28 @@ static struct platform_device serial_device = {
 	},
 };
 
+
 static void __init or1200_register_platform_devices(void)
 {
-	platform_device_register(&serial_device);
-	platform_device_register(&ethoc_device);
+//	platform_device_register(&serial_device);
+/*	platform_device_register(&ethoc_device);*/
 }
 arch_initcall(or1200_register_platform_devices);
+#endif
+
+const struct of_device_id or32_bus_ids[] = {
+        { .type = "soc", },
+        { .compatible = "soc", },
+        {},
+};
+
+static int __init or32_device_probe(void)
+{
+	printk("JONASSSSSSSSSSSSSSSSSSSSSSS!!!!!");
+
+        of_platform_bus_probe(NULL, or32_bus_ids, NULL);
+/*        of_platform_reset_gpio_probe();*/
+        return 0;
+}
+device_initcall(or32_device_probe);
+

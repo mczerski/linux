@@ -55,6 +55,14 @@ SECTIONS
 
         _e_protected_core = .;
 
+	. = ALIGN (4) ;
+        _fdt_blob : AT(ADDR(_fdt_blob) - LOAD_OFFSET) {
+                _fdt_start = . ;                /* place for fdt blob */
+                *(_fdt_blob) ;                 /* Any link-placed DTB */
+                . = _fdt_start + 0x4000;        /* Pad up to 16kbyte */
+                _fdt_end = . ;
+        }
+
 	EXCEPTION_TABLE(4)
 
 	_sdata = .;

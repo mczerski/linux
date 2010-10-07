@@ -1,0 +1,111 @@
+/**
+Format:
+
+alias : name[@bus] {
+
+
+Note that size-cells and address-cells apply values of child nodes; furthermore, 
+they are not inherited, so every container with children needs to specify these
+properties.
+
+}
+
+**/
+
+
+
+/dts-v1/;
+/ {
+	model = "OrsocProto";
+	compatible = "orsoc,proto";
+	#size-cells = <1>;
+	#address-cells = <1>;
+
+	chosen {
+	};
+
+	/*
+	 * We'll get the size of the bootmem block from lv1 after startup,
+	 * so we'll put a null entry here.
+	 */
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x1800000>;
+	};
+
+	/*
+	 * The boot cpu is always zero.
+	 *
+	 * dtc expects a clock-frequency and timebase-frequency entries, so
+	 * we'll put a null entries here.  These will be initialized after
+	 * startup with data from lv1.
+	 *
+	 * Seems the only way currently to indicate a processor has multiple
+	 * threads is with an ibm,ppc-interrupt-server#s entry.  We'll put one
+	 * here so we can bring up both of ours.  See smp_setup_cpu_maps().
+	 */
+
+	cpus {
+		#size-cells = <0>;
+		#address-cells = <1>;
+
+		cpu@0 {
+			device_type = "cpu";
+			reg = <0x00000000>;
+			clock-frequency = <20000000>;
+/*			timebase-frequency = <20000000>;*/
+			i-cache-size = <8192>;
+			d-cache-size = <8192>;
+			i-cache-block-size = <16>;
+			d-cache-block-size = <16>;
+		};
+	};
+
+	/* The "soc" node */
+
+	soc {
+		/* Every node with children must specify address-cells and
+		   size-cells; they are not inherited */
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+		/* Specify empty ranges here to indicates 1:1 mapping of SOC
+		   addresses (device addresses) to CPU addresses */
+		/*ranges;*/
+		ranges = <0 0x90000000 0x10000000>;
+		/* This SOC has only a single, implicit PIC, so define it
+		  early and put the interrupt-parent property in the 'soc'
+		 node so that it's inherited by all the children using
+		  interrupts.
+		*/
+		interrupt-parent = <&pic>;
+		/* Devices with interrupts need a 'parent', so we need to
+		   define a controller */
+
+		pic: pic@0 {
+/*			#address-cells = <0>;*/
+			#interrupt-cells = <1>;
+			interrupt-controller;
+		};		
+
+
+		serial0: serial@0000 {
+/* FIXME: device_type is still needed here... should remove requirement from of_serial driver */
+			device_type = "serial";
+			compatible = "ns16550a";
+			reg = <0x0000 0x100>;
+			interrupts = <2>;
+			clock-frequency = <20000000>;
+		};			
+			
+
+		enet0: ethoc@2000000 {
+			compatible = "opencores,ethoc";
+			reg = <0x2000000 0x53>;
+			interrupts = <4>;
+		};
+
+
+	};
+};
