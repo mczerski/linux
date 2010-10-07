@@ -198,6 +198,11 @@
 	tophys  (t1,reg)					;\
 	l.lwz   reg,0(t1)
 
+#define GET_MEM_SIZE(reg,t1)					\
+	LOAD_SYMBOL_2_GPR(reg,_or32_mem_size)			;\
+	tophys  (t1,reg)					;\
+	l.lwz	reg,0(t1)
+
 #if defined(CONFIG_OR32_EXCEPTION_DEBUG) && defined(CONFIG_OR32_EXCEPTION_REGENERATE)
 #  define EXCEPTION_DEBUG					\
 	  EXCEPTION_DEBUG_STORE_GPR4				;\
@@ -1650,6 +1655,7 @@ boot_dtlb_miss_handler:
 
 	/* do not do any translation if EA is above DRAM_END */
 	LOAD_SYMBOL_2_GPR(r6,DRAM_END)
+//	GET_MEM_SIZE(r6,r24)
 	l.sfgtu r4,r6                      // flag if EA larger than DRAM_END
 	l.bf    exit_with_no_dtranslation
 	/* delay slot */
@@ -1779,6 +1785,7 @@ boot_itlb_miss_handler:
 
 	/* do not do any translation if EA is above DRAM_END */
 	LOAD_SYMBOL_2_GPR(r6,DRAM_END)
+//	GET_MEM_SIZE(r6,r24)
 	l.sfgtu  r4,r6                     // flag if EA larger than DRAM_END
 	l.bf     exit_with_no_itranslation
 	l.nop

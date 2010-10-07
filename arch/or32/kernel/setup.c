@@ -88,6 +88,7 @@ void (*mach_mksound)( unsigned int count, unsigned int ticks) = NULL;
 void (*mach_reset)( void ) = NULL;
 void (*mach_debug_init)(void) = NULL;
 
+unsigned long or32_mem_size;
 
 unsigned long fb_mem_start;
 /*static char command_line[COMMAND_LINE_SIZE] = "root=/dev/ram console=uart,mmio,0x90000000";*/

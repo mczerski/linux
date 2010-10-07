@@ -49,6 +49,8 @@
 #include <asm/pgtable.h>
 #include <asm/sections.h>
 
+extern unsigned long or32_mem_size;
+
 void __init early_init_dt_scan_chosen_arch(unsigned long node)
 {
 	/* No OR32 specific code here */
@@ -127,6 +129,10 @@ void __init early_init_devtree(void *params)
 	parse_early_param();
 
 	memblock_analyze();
+
+	or32_mem_size = memblock_end_of_DRAM();
+
+	pr_debug("OR32 mem size %lx\n", or32_mem_size);
 
 	pr_debug("Phys. mem: %lx\n", (unsigned long) memblock_phys_mem_size());
 
