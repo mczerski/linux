@@ -46,12 +46,12 @@ static int jbgpio_get(struct gpio_chip *gc, unsigned int gpio)
 	int bank;
 	int g;
 
-	bank = gpio >> 3;
-	g = gpio%8;
-
 	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
 	struct jbgpio_instance *chip =
 	    container_of(mm_gc, struct jbgpio_instance, mmchip);
+
+	bank = gpio >> 3;
+	g = gpio%8;
 
 	return (ioread8(mm_gc->regs + chip->data_offset + bank) >> g) & 1;
 }

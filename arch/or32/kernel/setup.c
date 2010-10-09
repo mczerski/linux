@@ -172,11 +172,11 @@ static void print_cpuinfo(void) {
 		printk(KERN_INFO "-- icache disabled\n");
 	
 	if (upr & SPR_UPR_DMP)
-		printk(KERN_INFO "-- dmmu: %4d entries, %d way(s)\n",
+		printk(KERN_INFO "-- dmmu: %4d entries, %lu way(s)\n",
 			1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
 			1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW));
 	if (upr & SPR_UPR_IMP)
-		printk(KERN_INFO "-- immu: %4d entries, %d way(s)\n",
+		printk(KERN_INFO "-- immu: %4d entries, %lu way(s)\n",
 			1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
 			1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW));
 
@@ -354,8 +354,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		"dcache block size\t: %d bytes\n"
 		"icache size\t: %d kB\n"
 		"icache block size\t: %d bytes\n"
-		"immu\t\t: %d entries, %d ways\n"
-		"dmmu\t\t: %d entries, %d ways\n"
+		"immu\t\t: %d entries, %lu ways\n"
+		"dmmu\t\t: %d entries, %lu ways\n"
 		"bogomips\t: %lu.%02lu\n",
 
 		version,
