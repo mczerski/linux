@@ -273,14 +273,6 @@ static inline unsigned long extract_value(unsigned long reg,
 	return(mask & reg);
 }
 
-void __init detect_timer(void) 
-{
-	unsigned long cfg;
-
-	cfg = mfspr(SPR_TTMR);
-	printk("period 0x%x\n", SPR_TTMR & SPR_TTMR_PERIOD);
-}
-
 void __init detect_unit_config(unsigned long upr, unsigned long mask,
 			       char *text, void (*func)(void))
 {
