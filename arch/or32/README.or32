@@ -1,11 +1,19 @@
 This is a port of Linux to OpenRISC 1000 family of microprocessors. 
 
 For more information about OpenRISC processors, licensing and design
-services you may contact Beyond Semiconductor at 
+services you may contact ORSoC AB. 
 
-	email:		sales@bsemi.com
+	email:		info@orsoc.se
 
-	website:	http://www.bsemi.com
+	website:	http://opencores.org
+			http://orsoc.se
+
+For information about Linux on OpenRISC, please contact South Pole AB
+
+	email:		info@southpole.se
+
+	website:	http://southpole.se
+			http://southpoleconsulting.com
 
 Changes:
 18. 11. 2003	Matjaz Breskvar (phoenix@bsemi.com)
@@ -29,3 +37,6 @@ Changes:
 30. 11. 2004	Matjaz Breskvar (phoenix@bsemi.com)
 	lots of bugfixes and enhancments.
 	added opencores framebuffer driver.
+
+09. 10. 2010    Jonas Bonn (jonas@southpole.se)
+	major rewrite to bring up to par with upstream Linux 2.6.36
