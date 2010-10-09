@@ -226,7 +226,7 @@ void _switch_to(struct task_struct *old,
 	extern struct thread_info *_switch(struct thread_info *old_ti,
 					   struct thread_info *new_ti);
 	struct thread_info *new_ti, *old_ti;
-	long flags;
+	unsigned long flags;
 
 	local_irq_save(flags);
 #if 0
@@ -281,8 +281,10 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage long _sys_execve(char __user *name, char __user * __user *argv,
-                        char __user * __user *envp, struct pt_regs *regs)
+asmlinkage long _sys_execve(const char __user *name,
+                           const char __user *const __user *argv,
+                           const char __user *const __user *envp,
+                           struct pt_regs *regs)
 {
 	int error;
 	char * filename;
