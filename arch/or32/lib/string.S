@@ -16,7 +16,6 @@
 	
 #include <linux/linkage.h>
 #include <asm/errno.h>
-#include <asm/or32_asm.h>
 
 	/*
 	 * this can be optimized by doing gcc inline assemlby with

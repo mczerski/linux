@@ -74,8 +74,7 @@ extern char __initramfs_start, __initramfs_end;
 
 extern u32 _fdt_start;
  
-unsigned long or32_mem_size;
-unsigned long fb_mem_start;
+unsigned long or32_mem_size = 0;
 
 #ifdef CONFIG_CMDLINE
 char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
@@ -104,16 +103,12 @@ static unsigned long __init setup_memory(void)
 	 * down.
 	 */ 
 	start_pfn   = PFN_UP(__pa(&_end));
-	max_low_pfn = PFN_DOWN(CONFIG_OR32_MEMORY_SIZE
-			       -CONFIG_FB_OC_SHMEM_SIZE);
+	max_low_pfn = PFN_DOWN(or32_mem_size);
+/*	max_low_pfn = PFN_DOWN(CONFIG_OR32_MEMORY_SIZE
+			       -CONFIG_FB_OC_SHMEM_SIZE);*/
 //	min_low_pfn = PAGE_OFFSET >> PAGE_SHIFT;
 
 #undef CONFIG_FB_OC_SHMEM_SIZE
-
-	/*
-	 * set the beginning of frame buffer
-	 */
-	fb_mem_start = PFN_PHYS(max_low_pfn);
 
 	/* 
 	 * initialize the boot-time allocator (with low memory only)

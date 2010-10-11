@@ -177,7 +177,7 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
  * This is explicitly coded for two-level page tables, so if you need
  * something else then this needs to change.
  */
-void __init map_ram(void)
+static void __init map_ram(void)
 {
         unsigned long v, p, s, e;
 	pgprot_t prot;
@@ -213,8 +213,6 @@ void __init map_ram(void)
 			pte = (pte_t*) alloc_bootmem_low_pages(PAGE_SIZE);
 			set_pmd(pme, __pmd(_KERNPG_TABLE + __pa(pte)));
 
-			printk("B: %x %x %x\n", pte, pme, pge);
-
 			/* Fill the newly allocated page with PTE'S */
 			for (j = 0; p < e && j < PTRS_PER_PGD; 
 			     v += PAGE_SIZE, p += PAGE_SIZE, j++, pte++) {
@@ -222,7 +220,6 @@ void __init map_ram(void)
 				    v < ((_s_kernel_ro >> PAGE_SHIFT) << PAGE_SHIFT))
 					prot = PAGE_KERNEL;
 				else
-//					prot = PAGE_KERNEL;
 					prot = PAGE_KERNEL_RO;
 
 				set_pte(pte, mk_pte_phys(p, prot));
@@ -268,11 +265,6 @@ void __init paging_init(void)
 
 	map_ram();
 
-	
-	pgd_base = swapper_pg_dir;
-	i = __pgd_offset(PAGE_OFFSET);
-	pgd = pgd_base + i;
-
 	zone_sizes_init();
 
 	/*
@@ -280,8 +272,8 @@ void __init paging_init(void)
 	 * created - mappings will be set by set_fixmap():
 	 */
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
+	pgd_base = swapper_pg_dir;
 	fixrange_init(vaddr, 0, pgd_base);
-
 
 	/*
 	 * enable EA translations via PT mechanism

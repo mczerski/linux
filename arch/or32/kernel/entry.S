@@ -32,7 +32,6 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 #include <asm/errno.h>
-#include <asm/or32_asm.h>
 #include <asm/spr_defs.h>
 
 #include <asm/page.h>
