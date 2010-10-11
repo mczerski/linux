@@ -103,11 +103,6 @@ config OPENRISC_HAVE_INST_FL1
 
 endmenu
 
-
-config OR32_MEMORY_SIZE
-	hex "System memory size [hex, bytes]"
-	default 01000000
-
 config OR32_FLASH_BOOT
 	bool "Boot from FLASH"
 	default n
