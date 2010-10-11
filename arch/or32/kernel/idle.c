@@ -46,43 +46,46 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
+#include <asm/pgalloc.h>
 
 void (*powersave)(void) = NULL;
 
+static inline void pm_idle() {
+	barrier();
+}
+
 void cpu_idle(void)
 {
-	int spr_sr;
+        unsigned int cpu = smp_processor_id();
 
-	for (;;) {
-		
-// __PHX__ TODO: make an config option or something
-#if 0
-		if (!(SPR_SR_TEE & (spr_sr = mfspr(SPR_SR)))) {
-			printk("idled: tick timer disabled, enabling...\n");
-			printk("idled: SR 0x%lx, ESR 0x%lx, EPCR 0x%lx, EEAR 0x%lx\n",
-			       mfspr(SPR_SR), mfspr(SPR_ESR_BASE), 
-			       mfspr(SPR_EPCR_BASE), mfspr(SPR_EEAR_BASE));
-			
-			mtspr(SPR_SR, spr_sr | SPR_SR_TEE);
-			// __PHX__ TODO: add trace
-		}
-#endif
+        set_thread_flag(TIF_POLLING_NRFLAG);
+
+        /* endless idle loop with no priority at all */
+        while (1) {
+		printk("Idle loop\n");
 
                 tick_nohz_stop_sched_tick(1);
-		if (!need_resched()) {
-			if (powersave != NULL) {
+
+                while (!need_resched()) {
+                        check_pgt_cache();
+                        rmb();
+
+/*                        if (cpu_is_offline(cpu))
+                                play_dead();
+*/
+
+                        local_irq_disable();
+                        /* Don't trace irqs off for idle */
+                        stop_critical_timings();
+			if (powersave != NULL )
 				powersave();
-			}
-		}
+			start_critical_timings();
+			local_irq_enable();
+                }
+
                 tick_nohz_restart_sched_tick();
- 
-#if 0
-		if (need_resched())
-			schedule();
-
-#else
-	schedule();
-#endif
-
-	}
+                preempt_enable_no_resched();
+                schedule();
+                preempt_disable();
+        }
 }
