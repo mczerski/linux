@@ -34,6 +34,7 @@
 #include <linux/delay.h>
 #include <linux/blkdev.h>          /* for initrd_* */
 #include <linux/pagemap.h>
+#include <linux/memblock.h>
 
 #include <asm/system.h>
 #include <asm/segment.h>
@@ -208,14 +209,15 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
         pte_t *pte;
         int err = -ENOMEM;
 
-        /* Use upper 10 bits of VA to index the first level map and
-	 * next 10 bits of VA to index the second-level map.  This is
+        /* Use upper 8 bits of VA to index the first level map and
+	 * next 11 bits of VA to index the second-level map.  This is
 	 * hidden in the details of the following functions. */
         pge = pgd_offset_k(va);
         pue = pud_offset(pge, va);
         pme = pmd_offset(pue, va);
 
-        pte = pte_alloc_kernel(pme, va);
+//        pte = pte_alloc_kernel(pme, va);
+	pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
         if (pte != 0) {
                 err = 0;
                 set_pte(pte, mk_pte_phys(pa & PAGE_MASK, prot));
@@ -225,30 +227,69 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 }
 
 /*
- * Map in all of physical memory.
+ * Map all physical memory into kernel's address space.
  *
- * Loop over all the physical pages and map them into the kernel's
- * address space.
+ * This is explicitly coded for two-level page tables, so if you need
+ * something else then this needs to change.
  */
 void __init map_ram(void)
 {
-        unsigned long v, p, s, f;
-	unsigned long memory_start = 0;
+        unsigned long v, p, s, e;
+	pgprot_t prot;
+	int i;
+        pgd_t *pge;
+        pud_t *pue;
+        pmd_t *pme;
+        pte_t *pte;
+	/* These mark extents of read-only kernel pages...
+	 * ...from vmlinux.lds.S
+ 	 */
+	extern const unsigned long _s_kernel_ro, _e_kernel_ro;
 
-        for (p = memory_start, v = PAGE_OFFSET; p < CONFIG_OR32_MEMORY_SIZE; p += PAGE_SIZE, v+= PAGE_SIZE) {
-		f = _PAGE_ALL | _PAGE_SRE | 
-		    _PAGE_SHARED | _PAGE_DIRTY | 
-		    _PAGE_EXEC;
+	v = PAGE_OFFSET;
 
-/*                if ((char *) v < _stext || (char *) v >= _etext)
-                        f |= _PAGE_WRENABLE;
-                else
-                        f |= _PAGE_USER;
-*/
-                map_page(v, p, __pgprot(f));
-                v += PAGE_SIZE;
-                p += PAGE_SIZE;
-        }
+	for (i = 0; i < memblock.memory.cnt; i++) {
+		p = (u32) memblock.memory.region[i].base & PAGE_MASK;
+		e = p + (u32) memblock.memory.region[i].size;
+
+		v = (u32) __va(p);
+		pge = pgd_offset_k(v);
+
+		while (p < e) {
+			int j;
+			pue = pud_offset(pge,v);
+			pme = pmd_offset(pue,v);
+
+			if (pue != pge || pme != pge) {
+				panic("%s: OR1K kernel hardcoded for two-level page tables", __func__);
+			}
+
+			/* Alloc one page for holding PTE's... */
+			pte = (pte_t*) alloc_bootmem_low_pages(PAGE_SIZE);
+			set_pmd(pme, __pmd(_KERNPG_TABLE + __pa(pte)));
+
+			printk("B: %x %x %x\n", pte, pme, pge);
+
+			/* Fill the newly allocated page with PTE'S */
+			for (j = 0; p < e && j < PTRS_PER_PGD; 
+			     v += PAGE_SIZE, p += PAGE_SIZE, j++, pte++) {
+				if (v > _e_kernel_ro || 
+				    v < ((_s_kernel_ro >> PAGE_SHIFT) << PAGE_SHIFT))
+					prot = PAGE_KERNEL;
+				else
+//					prot = PAGE_KERNEL;
+					prot = PAGE_KERNEL_RO;
+
+				set_pte(pte, mk_pte_phys(p, prot));
+			}
+
+			pge++;
+		}
+
+		printk(KERN_INFO "%s: Memory: 0x%x-0x%x\n", __func__,
+			(u32) memblock.memory.region[i].base,
+			(u32) memblock.memory.region[i].base + (u32) memblock.memory.region[i].size);
+	}
 }
 
 
@@ -280,71 +321,13 @@ void __init paging_init(void)
 
 	end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
 
-//	map_ram();
+	map_ram();
 
-#if 1
 	
 	pgd_base = swapper_pg_dir;
 	i = __pgd_offset(PAGE_OFFSET);
 	pgd = pgd_base + i;
 
-	for (; i < PTRS_PER_PGD; pgd++, i++) {
-		vaddr = i*PGDIR_SIZE;
-		if (end && (vaddr >= end))
-			break;
-		pmd = (pmd_t *)pgd;
-
-		if (pmd != pmd_offset(pud_offset(pgd, 0), 0))
-			BUG();
-		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
-			vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
-			if (end && (vaddr >= end))
-				break;
-
-			pte_base = pte = (pte_t *)alloc_bootmem_low_pages(PAGE_SIZE);
-
-			for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
-				vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
-				if (end && (vaddr >= end))
-					break;
-#ifdef CONFIG_OR32_GUARD_PROTECTED_CORE
-				{
-					extern char _e_protected_core;
-					unsigned long page_attrs, offset;
-					
-					offset = i*PGDIR_SIZE + j*PMD_SIZE;
-					page_attrs = _PAGE_ALL | _PAGE_SRE | 
-						_PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC;
-
-					/* make all but first and last page of .text and .rodata
-					 * sections write protected.
-					 */
-					if ((vaddr > (PAGE_SIZE + offset)) && 
-					    ((vaddr + PAGE_SIZE) < ((unsigned long)&(_e_protected_core))))
-						*pte = mk_pte_phys(__pa(vaddr), __pgprot(page_attrs));
-					else
-						*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
-				}
-#else
-				*pte = mk_pte_phys(__pa(vaddr), PAGE_KERNEL);
-#endif /* CONFIG_OR32_GUARD_PROTECTED_CORE */
-			}
-			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
-
-			if (pte_base != pte_offset_kernel(pmd, 0))
-			  BUG();
-		}
-	}
-
-#ifdef CONFIG_OR32_GUARD_PROTECTED_CORE
-	{
-	        extern char _e_protected_core;
-	
-		printk("write protecting ro sections (0x%lx - 0x%lx)\n", 
-	               PAGE_OFFSET + PAGE_SIZE, PAGE_MASK&((unsigned long)&(_e_protected_core)));
-	}
-#endif /* CONFIG_OR32_GUARD_PROTECTED_CORE */
-#endif
 	/* __PHX__: fixme, 
 	 * - detect units via UPR,
 	 * - set up only apropriate mappings
@@ -473,6 +456,7 @@ void __init mem_init(void)
 		(unsigned long) (0 << (PAGE_SHIFT-10))
 	       );
 
+	printk("mem_init_done ...........................................\n");
 	mem_init_done = 1;
 	return;
 }

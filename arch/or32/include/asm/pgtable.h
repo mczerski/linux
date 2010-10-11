@@ -140,6 +140,7 @@ extern void paging_init(void);
 #define PAGE_COPY_X     __pgprot(_PAGE_ALL | _PAGE_URE | _PAGE_SRE | _PAGE_EXEC)
 
 #define PAGE_KERNEL     __pgprot(_PAGE_ALL | _PAGE_SRE | _PAGE_SWE | _PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC)
+#define PAGE_KERNEL_RO  __pgprot(_PAGE_ALL | _PAGE_SRE | _PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC)
 #define PAGE_KERNEL_NOCACHE __pgprot(_PAGE_ALL | _PAGE_SRE | _PAGE_SWE | _PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC | _PAGE_CI)
 
 #define __P000	PAGE_NONE

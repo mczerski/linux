@@ -33,7 +33,6 @@ SECTIONS
         /* Read-only sections, merged into text segment: */
         . = LOAD_BASE ; 
 
-        _s_protected_core = .;
 	
         .text                   : AT(ADDR(.text) - LOAD_OFFSET)
 	{
@@ -47,10 +46,13 @@ SECTIONS
 	  *(.text.__*)
 	  _etext = .;
 	}
+	
+	/* FIXME: This should include the above .text bits but that currently
+	 * doesn't work... something's writing in there...
+	 */
+	_s_kernel_ro = .;
 
 	/* TODO: Check if fixup and text.__* are really necessary */
-
-        _e_protected_core = .;
 
 	. = ALIGN (4) ;
         _fdt_blob : AT(ADDR(_fdt_blob) - LOAD_OFFSET) {
@@ -67,14 +69,17 @@ SECTIONS
 	/* Jonas --> I'm making this page aligned, was 4096 */
 	/* TODO: NOTE THAT RODATA was inside e_protected_core before... is this necessary? */
 	RO_DATA_SECTION(8192)
+
+	_e_kernel_ro = .;
+
 	/* 32 here is cacheline size... recheck this <-- Jonas */
 	RW_DATA_SECTION(32, 8192, 8192)
 
         _edata  =  .;
- 
-        /* Init code and data */
-        . = ALIGN(8192);
-        __init_begin = .;
+
+	/* Init code and data */
+	. = ALIGN(8192);
+	__init_begin = .;
 
 	HEAD_TEXT_SECTION
 
@@ -101,8 +106,6 @@ SECTIONS
 	}
 
         __vmlinux_end = .;            /* last address of the physical file */
-        __data_end = . ;              /* Move to _edata ? */
-
 
 	BSS_SECTION(0, 0, 0x20)
 
