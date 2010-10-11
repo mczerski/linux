@@ -146,61 +146,6 @@ static void __init zone_sizes_init(void)
 	free_area_init(zones_size);
 }
 
-static void __init identical_mapping(unsigned long start, unsigned long size,
-				     unsigned long page_attrs)
-{
-
-	unsigned long vaddr, end;
-	pgd_t *pgd, *pgd_base;
-	int i, j, k;
-	pmd_t *pmd;
-	pte_t *pte, *pte_base;
-
-	printk("Setting up identical mapping (0x%lx - 0x%lx)\n",
-	       start, start + size);
-
-	page_attrs |= _PAGE_ALL | _PAGE_SRE | _PAGE_SWE |
-		_PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC;
-	/*
-	 * This can be zero as well - no problem, in that case we exit
-	 * the loops anyway due to the PTRS_PER_* conditions.
-	 */
-	end = start + size;
-
-	pgd_base = swapper_pg_dir;
-	i = __pgd_offset(start);
-	pgd = pgd_base + i;
-
-	for (; i < PTRS_PER_PGD; pgd++, i++) {
-		vaddr = i*PGDIR_SIZE;
-		if (end && (vaddr >= end))
-			break;
-		pmd = (pmd_t *)pgd;
-
-		/* FIXME: account for 4-level page tables */
-		if (pmd != pmd_offset(pud_offset(pgd, 0), 0))
-			BUG();
-		for (j = 0; j < PTRS_PER_PMD; pmd++, j++) {
-			vaddr = i*PGDIR_SIZE + j*PMD_SIZE;
-			if (end && (vaddr >= end))
-				break;
-
-			pte_base = pte = (pte_t *)alloc_bootmem_low_pages(PAGE_SIZE);
-
-			for (k = 0; k < PTRS_PER_PTE; pte++, k++) {
-				vaddr = i*PGDIR_SIZE + j*PMD_SIZE + k*PAGE_SIZE;
-				if (end && (vaddr >= end))
-					break;
-				*pte = mk_pte_phys(vaddr, __pgprot(page_attrs));
-			}
-			set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte_base)));
-
-			if (pte_base != pte_offset_kernel(pmd, 0))
-			  BUG();
-		}
-	}
-}
-
 static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 {
         pgd_t *pge;
@@ -328,32 +273,6 @@ void __init paging_init(void)
 	i = __pgd_offset(PAGE_OFFSET);
 	pgd = pgd_base + i;
 
-	/* __PHX__: fixme, 
-	 * - detect units via UPR,
-	 * - set up only apropriate mappings
-	 * - make oeth_probe not poke around if ethernet is not present in upr
-	 *   or make sure that it doesn't kill of the kernel when no oeth 
-	 *   present
-	 */
-#if 0
-	/* map the UART address space */
-	identical_mapping(0x80000000, 0x10000000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0x92000000, 0x2000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0xb8070000, 0x2000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0x97000000, 0x2000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0x99000000, 0x1000000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0x93000000, 0x2000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0xa6000000, 0x100000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-	identical_mapping(0x1e50000, 0x150000, _PAGE_CI | 
-			  _PAGE_URE | _PAGE_UWE);
-#endif
 	zone_sizes_init();
 
 	/*
