@@ -375,16 +375,4 @@ __immu_enable:
   l.nop
 #endif
 
- /*
- * Print utility
- *      print(const char *fmt, ...)
- */
-	.global __print
-__print:
-	l.lwz	r3,0(r1)
-	l.addi	r4,r1,4
-#	l.sys	202
-  l.nop 3
-	l.jr	r9
-	l.nop
 

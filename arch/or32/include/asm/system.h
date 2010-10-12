@@ -123,11 +123,6 @@ static inline unsigned long mfspr(unsigned long add)
 
 #define arch_align_stack(x) (x)
 
-/*
- * debugging aid
- */
-extern void __print(const char *fmt, ...);
-
 #include <asm-generic/cmpxchg-local.h>
 
 #endif /* __KERNEL__ */
