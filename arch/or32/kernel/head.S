@@ -34,9 +34,8 @@
 
 #define UART_BASE_ADD      0x90000000
 
-#define DRAM_END (PAGE_OFFSET+CONFIG_OR32_MEMORY_SIZE)
-
 #define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_SM)
+#define SYSCALL_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_IEE | SPR_SR_TEE | SPR_SR_SM)
 	
 #undef  CONFIG_DMMU_WORKS
 #define CONFIG_DMMU_WORKS 1
@@ -1055,7 +1054,7 @@ dtlb_miss_handler:
 	l.lwz	r3,0x0(r4)		// get *pmd value
 	l.sfne	r3,r0
 	l.bnf	d_pmd_none
-	l.andi	r3,r3,~PAGE_MASK //0x1fff		// ~PAGE_MASK
+	 l.andi	r3,r3,~PAGE_MASK //0x1fff		// ~PAGE_MASK
 	/*
          * if (pmd_bad(*pmd))
 	 *   pmd_clear(pmd)

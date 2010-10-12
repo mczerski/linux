@@ -50,7 +50,7 @@
 
 void (*powersave)(void) = NULL;
 
-static inline void pm_idle() {
+static inline void pm_idle(void) {
 	barrier();
 }
 
@@ -62,8 +62,6 @@ void cpu_idle(void)
 
         /* endless idle loop with no priority at all */
         while (1) {
-		printk("Idle loop\n");
-
                 tick_nohz_stop_sched_tick(1);
 
                 while (!need_resched()) {

@@ -31,20 +31,15 @@
 
 /* read interrupt enabled status */
 unsigned long __raw_local_save_flags(void) {
-//	printk("JONAS; raw_local_save_flags\n");
 	return (mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE));
 }
 EXPORT_SYMBOL(__raw_local_save_flags);
 
 /* set interrupt enabled status */
 void raw_local_irq_restore(unsigned long flags) {
-//	printk("JONAS; raw_local_irq_restore\n");
 	mtspr(SPR_SR, ((mfspr(SPR_SR) & ~(SPR_SR_IEE|SPR_SR_TEE)) | flags));
 }
 EXPORT_SYMBOL(raw_local_irq_restore);
-
-
-
 
 
 /* OR1K PIC implementation */
@@ -71,7 +66,7 @@ void pic_ack(unsigned int irq)
 	/* EDGE-triggered interrupts need to be ack'ed in order to clear
 	 * the latch.  
 	 * LEVER-triggered interrupts do not need to be ack'ed; however, 
-	 * ack'ing the interrupt has no ill-effect and is quicked than
+	 * ack'ing the interrupt has no ill-effect and is quicker than
 	 * trying to figure out what type it is...
 	 */
 

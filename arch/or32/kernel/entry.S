@@ -365,70 +365,21 @@ EXCEPTION_ENTRY(_insn_page_fault_handler)
 /* ---[ 0x500: Timer exception ]----------------------------------------- */
 
 EXCEPTION_ENTRY(_timer_handler)
-#ifdef CONFIG_OR32_ESR_EXCEPTION_BUG_CHECK
-	
-	l.lwz	r4,SR(r1)		// were interrupts enabled ?
-	l.andi	r4,r4,SPR_SR_TEE
-	l.sfeqi	r4,0
-	l.bnf	1f			// tick irq enabled, all ok.
-	l.nop
+        l.jal	timer_interrupt
+	 l.addi r3,r1,0 /* pt_regs */
 
-        l.addi  r1,r1,-0x8
-        LOAD_SYMBOL_2_GPR(r3,42f)
-        l.sw    0x0(r1),r3
-        l.jal   printk
-        l.sw    0x4(r1),r4
-        l.addi  r1,r1,0x8
-
-	.section .rodata, "a"
-42:	
-		.string "\n\rESR interrupt bug: in _timer_handler (ESR %x)\n\r"
-		.align 4
-	.previous
-
-	l.ori	r4,r4,SPR_SR_TEE	// fix the bug
-//	l.sw	SR(r1),r4
-1:	
-#endif
-/*	LOAD_SYMBOL_2_GPR(r14,0xd0000000)
-	l.lwz r16,0(r14)
-	l.ori r16,r16,0x8
-	l.sw 0(r14),r16
-*/
-	l.addi r3,r1,0
-	LOAD_SYMBOL_2_GPR(r8,timer_interrupt)
-        l.jalr r8
-	 l.addi r3,r1,0 /* Delay slot */
-/*
-	LOAD_SYMBOL_2_GPR(r14,0xd0000000)
-	l.lwz r16,0(r14)
-	l.andi r16,r16,~(0x8)
-	l.sw 0(r14),r16
-*/
-	/* Clear the _pending_ bit to renable further timer exceptions */
-/*	l.mfspr r4,r0,SPR_TTMR
-	l.movhi r5,hi(SPR_TTMR_IP)
-	l.xor	r4,r4,r5
-	l.mtspr r0,r4,SPR_TTMR
-*/
 	l.j    _ret_from_intr
-	l.nop
+	 l.nop
 
 /* ---[ 0x600: Aligment exception ]-------------------------------------- */
 
 EXCEPTION_ENTRY(_alignment_handler)
-	l.addi  r3,r1,0                    // pt_regs
-	/* r4 set be EXCEPTION_HANDLE */   // effective address of fault
-	l.jal   _do_unaligned_access
-	l.nop
-	l.j     _ret_from_exception
-	l.nop
-	
-	
+	/* r4: EA of fault (set by EXCEPTION_HANDLE) */
+	l.jal   do_unaligned_access
+	 l.addi  r3,r1,0 /* pt_regs */
 
-#if 0
-UNHANDLED_EXCEPTION(_vector_0x600,0x600)
-#endif
+	l.j     _ret_from_exception
+	 l.nop
 		
 #if 0
 EXCEPTION_ENTRY(_aligment_handler)
