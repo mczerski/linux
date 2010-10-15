@@ -67,7 +67,9 @@ properties.
 		/* Specify empty ranges here to indicates 1:1 mapping of SOC
 		   addresses (device addresses) to CPU addresses */
 		/*ranges;*/
-		ranges = <0 0x90000000 0x30000000>;
+		/* This is also a 1:1 mapping but limits size of mappable
+		   region to 0x30000000 */
+		ranges = <0x90000000 0x90000000 0x30000000>;
 		/* This SOC has only a single, implicit PIC, so define it
 		  early and put the interrupt-parent property in the 'soc'
 		 node so that it's inherited by all the children using
@@ -79,17 +81,16 @@ properties.
 
 		pic: pic@0 {
 			compatible = "opencores,or1k-pic";
-/*			#address-cells = <0>;*/
 			#interrupt-cells = <1>;
 			interrupt-controller;
 		};		
 
 
-		serial0: serial@0000 {
+		serial0: serial@90000000 {
 /* FIXME: device_type is still needed here... should remove requirement from of_serial driver */
 			device_type = "serial";
 			compatible = "opencores,uart", "ns16550a";
-			reg = <0x0000 0x100>;
+			reg = <0x90000000 0x100>;
 			interrupts = <2>;
 			clock-frequency = <20000000>;
 		};			
@@ -97,7 +98,7 @@ properties.
 		serial1: serial@93000000 {
 			device_type = "serial";
 			compatible = "opencores,uart", "ns16550a";
-			reg = <0x3000000 0x7>;
+			reg = <0x93000000 0x7>;
 			interrupts = <3>;
 			clock-frequency = <20000000>;
 		};
@@ -105,21 +106,21 @@ properties.
 		serial2: serial@94000000 {
 			device_type = "serial";
 			compatible = "opencores,uart", "ns16550a";
-			reg = <0x4000000 0x7>;
+			reg = <0x94000000 0x7>;
 			interrupts = <5>;
 			clock-frequency = <20000000>;
 		};
 			
 
-		enet0: ethoc@2000000 {
+		enet0: ethoc@92000000 {
 			compatible = "opencores,ethoc", "ethoc";
-			reg = <0x2000000 0x53>;
+			reg = <0x92000000 0x53>;
 			interrupts = <4>;
 		};
 
 		i2c0: ocores@a0000000 {
 			compatible = "opencores,i2c-ocores";
-			reg = <0x10000000 0x8>;
+			reg = <0xa0000000 0x8>;
 			interrupts = <10>;
 
 			regstep = <1>;
@@ -141,7 +142,7 @@ properties.
 
 		i2c1: ocores@a1000000 {
 			compatible = "opencores,i2c-ocores";
-			reg = <0x11000000 0x8>;
+			reg = <0xa1000000 0x8>;
 			interrupts = <11>;
 
 			regstep = <1>;
@@ -168,7 +169,7 @@ properties.
 
 		i2c2: ocores@a2000000 {
 			compatible = "opencores,i2c-ocores";
-			reg = <0x12000000 0x8>;
+			reg = <0xa2000000 0x8>;
 			interrupts = <12>;
 
 			regstep = <1>;
@@ -185,7 +186,7 @@ properties.
 
 		i2c3: ocores@a3000000 {
 			compatible = "opencores,i2c-ocores";
-			reg = <0x13000000 0x8>;
+			reg = <0xa3000000 0x8>;
 			interrupts = <13>;
 
 			regstep = <1>;
@@ -200,10 +201,9 @@ properties.
 			#size-cells = <0>;
 		}; 
 
-
-		spi0: spi@b0000000 {
+		spi0: spi0@b0000000 {
 			compatible = "opencores,spi-simple";
-			reg = <0x20000000 0x5>;
+			reg = <0xb0000000 0x5>;
 
 			/* Devices connected on this I2C bus get 
 			 * defined here; address- and size-cells
@@ -214,22 +214,50 @@ properties.
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-/*			mmc-spi-slot@0 {
-				compatible = "mmc-spi-slot";
-				reg = <0>;
-				spi-max-frequency = <10000000>;
-			};
-*/
-			spiflash0: mtd@0 {
-				compatible = "m25p10";
+			flash0: mtd@0 {
+				compatible = "st,m25p10";
 				reg = <0>;
 				spi-max-frequency = <100000000>;
+
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				partition@0 {
+					label = "bootloader";
+					reg = <0x00000000 0x00018000>;
+					read-only;
+				};
+				partition@18000 {
+					label = "dtb";
+					reg = <0x00018000 0x00008000>;
+				};
 			};
 		};
 
-		gpio0: gpio@1000000 {
+		spi1: spi1@b1000000 {
+			compatible = "opencores,spi-simple";
+			reg = <0xb1000000 0x5>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices.  Address
+			 * for child is chip-select (slave select).
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/* Example SD card slot at chipselect 0 */
+			/* mmc-spi-slot@0 {
+				compatible = "mmc-spi-slot";
+				reg = <0>;
+				spi-max-frequency = <10000000>;
+			}; */
+		};
+
+		gpio0: gpio@91000000 {
                 	compatible = "opencores,jbtrivial";
-                        reg = <0x1000000 0x6>;
+                        reg = <0x91000000 0x6>;
                         #gpio-cells = <2>;
                         gpio-controller;
 			xlnx,data-offset = <3>;
