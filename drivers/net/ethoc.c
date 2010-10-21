@@ -183,7 +183,6 @@ MODULE_PARM_DESC(buffer_size, "DMA buffer allocation size");
  * @vma:        pointer to array of virtual memory addresses for buffers
  * @netdev:	pointer to network device structure
  * @napi:	NAPI structure
- * @stats:	network device statistics
  * @msg_enable:	device state flags
  * @rx_lock:	receive lock
  * @lock:	device lock
@@ -208,7 +207,6 @@ struct ethoc {
 
 	struct net_device *netdev;
 	struct napi_struct napi;
-	struct net_device_stats stats;
 	u32 msg_enable;
 
 	spinlock_t rx_lock;
@@ -288,7 +286,7 @@ static inline void ethoc_disable_rx_and_tx(struct ethoc *dev)
 	ethoc_write(dev, MODER, mode);
 }
 
-static int ethoc_init_ring(struct ethoc *dev, void* mem_start)
+static int ethoc_init_ring(struct ethoc *dev, unsigned long mem_start)
 {
 	struct ethoc_bd bd;
 	int i;
@@ -367,39 +365,39 @@ static unsigned int ethoc_update_rx_stats(struct ethoc *dev,
 
 	if (bd->stat & RX_BD_TL) {
 		dev_err(&netdev->dev, "RX: frame too long\n");
-		dev->stats.rx_length_errors++;
+		netdev->stats.rx_length_errors++;
 		ret++;
 	}
 
 	if (bd->stat & RX_BD_SF) {
 		dev_err(&netdev->dev, "RX: frame too short\n");
-		dev->stats.rx_length_errors++;
+		netdev->stats.rx_length_errors++;
 		ret++;
 	}
 
 	if (bd->stat & RX_BD_DN) {
 		dev_err(&netdev->dev, "RX: dribble nibble\n");
-		dev->stats.rx_frame_errors++;
+		netdev->stats.rx_frame_errors++;
 	}
 
 	if (bd->stat & RX_BD_CRC) {
 		dev_err(&netdev->dev, "RX: wrong CRC\n");
-		dev->stats.rx_crc_errors++;
+		netdev->stats.rx_crc_errors++;
 		ret++;
 	}
 
 	if (bd->stat & RX_BD_OR) {
 		dev_err(&netdev->dev, "RX: overrun\n");
-		dev->stats.rx_over_errors++;
+		netdev->stats.rx_over_errors++;
 		ret++;
 	}
 
 	if (bd->stat & RX_BD_MISS)
-		dev->stats.rx_missed_errors++;
+		netdev->stats.rx_missed_errors++;
 
 	if (bd->stat & RX_BD_LC) {
 		dev_err(&netdev->dev, "RX: late collision\n");
-		dev->stats.collisions++;
+		netdev->stats.collisions++;
 		ret++;
 	}
 
@@ -431,15 +429,15 @@ static int ethoc_rx(struct net_device *dev, int limit)
 				void *src = priv->vma[entry];
 				memcpy_fromio(skb_put(skb, size), src, size);
 				skb->protocol = eth_type_trans(skb, dev);
-				priv->stats.rx_packets++;
-				priv->stats.rx_bytes += size;
+				dev->stats.rx_packets++;
+				dev->stats.rx_bytes += size;
 				netif_receive_skb(skb);
 			} else {
 				if (net_ratelimit())
 					dev_warn(&dev->dev, "low on memory - "
 							"packet dropped\n");
 
-				priv->stats.rx_dropped++;
+				dev->stats.rx_dropped++;
 				break;
 			}
 		}
@@ -460,30 +458,30 @@ static void ethoc_update_tx_stats(struct ethoc *dev, struct ethoc_bd *bd)
 
 	if (bd->stat & TX_BD_LC) {
 		dev_err(&netdev->dev, "TX: late collision\n");
-		dev->stats.tx_window_errors++;
+		netdev->stats.tx_window_errors++;
 	}
 
 	if (bd->stat & TX_BD_RL) {
 		dev_err(&netdev->dev, "TX: retransmit limit\n");
-		dev->stats.tx_aborted_errors++;
+		netdev->stats.tx_aborted_errors++;
 	}
 
 	if (bd->stat & TX_BD_UR) {
 		dev_err(&netdev->dev, "TX: underrun\n");
-		dev->stats.tx_fifo_errors++;
+		netdev->stats.tx_fifo_errors++;
 	}
 
 	if (bd->stat & TX_BD_CS) {
 		dev_err(&netdev->dev, "TX: carrier sense lost\n");
-		dev->stats.tx_carrier_errors++;
+		netdev->stats.tx_carrier_errors++;
 	}
 
 	if (bd->stat & TX_BD_STATS)
-		dev->stats.tx_errors++;
+		netdev->stats.tx_errors++;
 
-	dev->stats.collisions += (bd->stat >> 4) & 0xf;
-	dev->stats.tx_bytes += bd->stat >> 16;
-	dev->stats.tx_packets++;
+	netdev->stats.collisions += (bd->stat >> 4) & 0xf;
+	netdev->stats.tx_bytes += bd->stat >> 16;
+	netdev->stats.tx_packets++;
 }
 
 static void ethoc_tx(struct net_device *dev)
@@ -514,7 +512,7 @@ static void ethoc_tx(struct net_device *dev)
 
 static irqreturn_t ethoc_interrupt(int irq, void *dev_id)
 {
-	struct net_device *dev = (struct net_device *)dev_id;
+	struct net_device *dev = dev_id;
 	struct ethoc *priv = netdev_priv(dev);
 	u32 pending;
 
@@ -529,7 +527,7 @@ static irqreturn_t ethoc_interrupt(int irq, void *dev_id)
 
 	if (pending & INT_MASK_BUSY) {
 		dev_err(&dev->dev, "packet dropped\n");
-		priv->stats.rx_dropped++;
+		dev->stats.rx_dropped++;
 	}
 
 	if (pending & INT_MASK_RX) {
@@ -634,7 +632,7 @@ static void ethoc_mdio_poll(struct net_device *dev)
 {
 }
 
-static int ethoc_mdio_probe(struct net_device *dev)
+static int __devinit ethoc_mdio_probe(struct net_device *dev)
 {
 	struct ethoc *priv = netdev_priv(dev);
 	struct phy_device *phy;
@@ -672,7 +670,7 @@ static int ethoc_open(struct net_device *dev)
 	if (ret)
 		return ret;
 
-	ethoc_init_ring(priv, (void*)dev->mem_start);
+	ethoc_init_ring(priv, dev->mem_start);
 	ethoc_reset(priv);
 
 	if (netif_queue_stopped(dev)) {
@@ -732,7 +730,7 @@ static int ethoc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		phy = priv->phy;
 	}
 
-	return phy_mii_ioctl(phy, mdio, cmd);
+	return phy_mii_ioctl(phy, ifr, cmd);
 }
 
 static int ethoc_config(struct net_device *dev, struct ifmap *map)
@@ -810,8 +808,7 @@ static void ethoc_tx_timeout(struct net_device *dev)
 
 static struct net_device_stats *ethoc_stats(struct net_device *dev)
 {
-	struct ethoc *priv = netdev_priv(dev);
-	return &priv->stats;
+	return &dev->stats;
 }
 
 static netdev_tx_t ethoc_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -822,7 +819,7 @@ static netdev_tx_t ethoc_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	void *dest;
 
 	if (unlikely(skb->len > ETHOC_BUFSIZ)) {
-		priv->stats.tx_errors++;
+		dev->stats.tx_errors++;
 		goto out;
 	}
 
@@ -874,7 +871,7 @@ static const struct net_device_ops ethoc_netdev_ops = {
  * ethoc_probe() - initialize OpenCores ethernet MAC
  * pdev:	platform device
  */
-static int ethoc_probe(struct platform_device *pdev)
+static int __devinit ethoc_probe(struct platform_device *pdev)
 {
 	struct net_device *netdev = NULL;
 	struct resource *res = NULL;
@@ -1083,7 +1080,7 @@ out:
  * ethoc_remove() - shutdown OpenCores ethernet MAC
  * @pdev:	platform device
  */
-static int ethoc_remove(struct platform_device *pdev)
+static int __devexit ethoc_remove(struct platform_device *pdev)
 {
 	struct net_device *netdev = platform_get_drvdata(pdev);
 	struct ethoc *priv = netdev_priv(netdev);
@@ -1124,7 +1121,7 @@ static int ethoc_resume(struct platform_device *pdev)
 
 static struct platform_driver ethoc_driver = {
 	.probe   = ethoc_probe,
-	.remove  = ethoc_remove,
+	.remove  = __devexit_p(ethoc_remove),
 	.suspend = ethoc_suspend,
 	.resume  = ethoc_resume,
 	.driver  = {
