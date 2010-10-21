@@ -28,6 +28,10 @@
 	 */
 	
 	.text
+
+
+#if 0
+
 /*
  * Enable interrupts
  *      sti()
@@ -119,6 +123,9 @@ __restore_flags:
 	l.mtspr r0,r3,SPR_SR
 	l.jr	r9
 	l.nop
+
+
+#endif
 
 /*
  * Create a kernel thread

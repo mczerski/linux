@@ -42,6 +42,7 @@ struct pt_regs;
 
 extern void show_regs(struct pt_regs * regs);
 
+#if 0
 extern void __save_flags(unsigned long *flags);
 extern void __restore_flags(unsigned long flags);
 extern void __save_and_cli(unsigned long *flags);
@@ -54,6 +55,7 @@ extern void __cli(void);
 #define local_irq_save(flags)		__save_and_cli(&(flags))
 #define local_irq_restore(flags)	__restore_flags(flags)
 #define local_save_flags(flags)         __save_flags(&(flags))
+#endif
 
 #define prepare_to_switch()	do { } while(0)
 #define switch_to(prev,next,last) _switch_to((prev),(next),&(last))
@@ -114,7 +116,7 @@ static inline unsigned long mfspr(unsigned long add)
 	return ret;
 }
 
-#define irqs_disabled() ((mfspr(SPR_SR) & (SPR_SR_IEE | SPR_SR_TEE)) == 0)
+//#define irqs_disabled() ((mfspr(SPR_SR) & (SPR_SR_IEE | SPR_SR_TEE)) == 0)
 
 #define arch_align_stack(x) (x)
 

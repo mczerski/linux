@@ -3,6 +3,7 @@
  *
  *  or32 version
  *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ *               Jonas Bonn (jonas@southpole.se)
  *
  *  For more information about OpenRISC processors, licensing and
  *  design services you may contact Beyond Semiconductor at
@@ -18,65 +19,132 @@
 
 #include <linux/ptrace.h>
 #include <linux/errno.h>
-#include <linux/kernel_stat.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/ioport.h>
 #include <linux/interrupt.h>
-#include <linux/timex.h>
-#include <linux/slab.h>
-#include <linux/random.h>
 #include <linux/init.h>
 #include <linux/of.h>
+#include <linux/ftrace.h>
+#include <linux/irq.h>
 
-#include <asm/system.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/irq_regs.h>
-#include <asm/bitops.h>
-#include <asm/page.h>
-#include <asm/machdep.h>
-#include <asm/or32-hf.h>
+#include <asm/irqflags.h>
 
-/* table for system interrupt handlers */
-static struct irq_handler irq_list[NR_IRQS];
+/* read interrupt enabled status */
+unsigned long __raw_local_save_flags(void) {
+//	printk("JONAS; raw_local_save_flags\n");
+	return (mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE));
+}
+EXPORT_SYMBOL(__raw_local_save_flags);
 
-static const char *default_names[NR_IRQS] = {
-	"int0", "int1", "int2", "int3",	"int4", "int5", "int6", "int7"
-	"int8", "int9", "int10", "int11", "int12", "int13", "int14", "int15"
-	"int16", "int17", "int18", "int19", "int20", "int21", "int22", "int23"
-	"int24", "int25", "int26", "int27", "int28", "int29", "int30", "int31"
+/* set interrupt enabled status */
+void raw_local_irq_restore(unsigned long flags) {
+//	printk("JONAS; raw_local_irq_restore\n");
+	mtspr(SPR_SR, ((mfspr(SPR_SR) & ~(SPR_SR_IEE|SPR_SR_TEE)) | flags));
+}
+EXPORT_SYMBOL(raw_local_irq_restore);
+
+
+
+
+
+/* OR1K PIC implementation */
+
+static const char const * irq_name[NR_IRQS] = {
+	"int0", "int1", "int2", "int3",	"int4", "int5", "int6", "int7",
+	"int8", "int9", "int10", "int11", "int12", "int13", "int14", "int15",
+	"int16", "int17", "int18", "int19", "int20", "int21", "int22", "int23",
+	"int24", "int25", "int26", "int27", "int28", "int29", "int30", "int31",
 };
 
-int pic_enable_irq(unsigned int irq)
+void pic_mask(unsigned int irq)
 {
-	/* Enable in the IMR */
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (0x00000001L << irq));
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
+}
+
+void pic_unmask(unsigned int irq)
+{
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << irq));
+}
+
+void pic_ack(unsigned int irq)
+{
+	/* EDGE-triggered interrupts need to be ack'ed in order to clear
+	 * the latch.  
+	 * LEVER-triggered interrupts do not need to be ack'ed; however, 
+	 * ack'ing the interrupt has no ill-effect and is quicked than
+	 * trying to figure out what type it is...
+	 */
+
+	/* FIXME: This is contrary to spec which says write 1 to ack
+	 * interrupt... */
+//	mtspr(SPR_PICSR, (1UL << irq)); 
+	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << irq));
+}
+
+void pic_mask_ack(unsigned int irq)
+{
+	/* Comment for pic_ack applies here, too */
+
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
+	/* FIXME: This is contrary to spec which says write 1 to ack
+	 * interrupt... */
+//	mtspr(SPR_PICSR, (1UL << irq)); 
+	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << irq));
+}
+
+int pic_set_type(unsigned int irq, unsigned int flow_type) {
+	/* There's nothing to do in the PIC configuration when changing
+	 * flow type.  Level and edge-triggered interrupts are both
+	 * supported, but it's PIC-implementation specific which type
+	 * is handled. */
 
 	return 0;
 }
 
-int pic_disable_irq(unsigned int irq)
+int pic_get_irq()
 {
-	/* Disable in the IMR */
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(0x00000001L << irq));
+	int irq;
+	int i;
+	unsigned long mask;
+	unsigned long pend = mfspr(SPR_PICSR);
 
-	return 0;
-}
+	/* Bail if no IRQ pending */
+	if (pend == 0)
+		return -1;
 
-int pic_init(void)
-{
-	/* turn off all interrupts */
-	mtspr(SPR_PICMR, 0);
-	return 0;
-}
+//	printk("Jonas IRQ\n");
+//	printk("pend = 0x%lx\n", pend);
 
-int pic_do_irq(struct pt_regs *fp)
-{
+	i = 16;
+	irq = 0;
+	mask = (1UL << i) -1;
+	while (i > 0) {
+//		printk("JOnas IRQ trest\n");
+		if (!(pend & mask)) {
+			pend >>= i;
+			irq += i;
+//			printk("New pend = 0x%lx\n", pend);
+		}
+		i >>= 1;
+//		printk("New i = %d\n", i);
+		mask >>= i;
+	}
+
+//	printk("Got IRQ %d\n", irq);
+
+	return irq;
+#if 0
+	irq = 0;
+	while (!(pend & 1UL)) {
+		irq++;
+		pend >>= 1;
+	}
+
+
 	int irq;
 	int mask;
 
 	unsigned long pend = mfspr(SPR_PICSR) & 0xfffffffc;
+
+
 
 	if (pend & 0x0000ffff) {
 		if (pend & 0x000000ff) {
@@ -125,27 +193,69 @@ int pic_do_irq(struct pt_regs *fp)
 
 //	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~mask);
 	return irq;
+
+#endif
 }
 
-void init_IRQ(void)
+/**
+ * struct irq_chip - hardware interrupt chip descriptor
+ *
+ * @name:               name for /proc/interrupts
+ * @startup:            start up the interrupt (defaults to ->enable if NULL)
+ * @shutdown:           shut down the interrupt (defaults to ->disable if NULL)
+ * @enable:             enable the interrupt (defaults to chip->unmask if NULL)
+ * @disable:            disable the interrupt
+ * @ack:                start of a new interrupt
+ * @mask:               mask an interrupt source
+ * @mask_ack:           ack and mask an interrupt source
+ * @unmask:             unmask an interrupt source
+ * @eoi:                end of interrupt - chip level
+ * @end:                end of interrupt - flow level
+ * @set_affinity:       set the CPU affinity on SMP machines
+ * @retrigger:          resend an IRQ to the CPU
+ * @set_type:           set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
+ * @set_wake:           enable/disable power-management wake-on of an IRQ
+ *
+ * @bus_lock:           function to lock access to slow bus (i2c) chips
+ * @bus_sync_unlock:    function to sync and unlock slow bus (i2c) chips
+ *
+ * @release:            release function solely used by UML
+ * @typename:           obsoleted by name, kept as migration helper
+ */
+
+/* This is the optional PIC for the OR*/
+
+static struct irq_chip or1k_pic = {
+	.name = "OR1K PIC",
+	.unmask = pic_unmask,
+	.mask = pic_mask,
+	.ack = pic_ack,
+	.mask_ack = pic_mask_ack,
+	.set_type = pic_set_type
+};
+
+void __init init_IRQ(void)
 {
 	int i;
 
+	/* Setup IRQ descriptors... these all default to LEVEL triggered
+	 * so if EDGE triggered is needed then this needs to be fixed
+	 * up.
+	 */
+
 	for (i = 0; i < NR_IRQS; i++) {
-		irq_list[i].handler = NULL;
-		irq_list[i].flags   = IRQ_FLG_STD;
-		irq_list[i].dev_id  = NULL;
-		irq_list[i].devname = default_names[i];
+		set_irq_chip_and_handler_name(i, &or1k_pic,
+			handle_level_irq, irq_name[i]);
+		irq_desc[i].status |= IRQ_LEVEL;
 	}
 
-	pic_init();
-	mtspr(SPR_SR, mfspr(SPR_SR) | SPR_SR_IEE);
+	/* Disable all interrupts until explicitly requested */
+	mtspr(SPR_PICMR, (0UL));
 }
-
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	phx_warn("NOT implemented yet");
+	/* FIXME */
 #if 0
 	int i = *(loff_t *) v;
 	struct irqaction * action;
@@ -173,39 +283,22 @@ int show_interrupts(struct seq_file *p, void *v)
         return 0;
 }
 
-asmlinkage void do_IRQ(struct pt_regs *regs)
+void __irq_entry do_IRQ(struct pt_regs *regs)
 {
-        struct pt_regs *old_regs = set_irq_regs(regs);
 	int irq;
-	int cpu;
-	unsigned long flags;
+	struct pt_regs *old_regs = set_irq_regs(regs);
 
-//	printk("x");
 	irq_enter();
-	local_irq_save(flags);
-#if 0
-	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
-#endif
-	cpu = smp_processor_id();
 
-	while((irq = pic_do_irq(regs)) >= 0) {
-//		printk("*");
-//		mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
-
-		if (irq_list[irq].handler)
-			irq_list[irq].handler(irq, irq_list[irq].dev_id);
-		else
-			panic("No interrupt handler for autovector %d\n", irq);
-//		mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << irq));
-		mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << irq));
-
+	while ((irq = pic_get_irq()) >= 0) {
+		generic_handle_irq(irq);
 	}
-	local_irq_restore(flags);
-	
-	irq_exit();
-	set_irq_regs(old_regs);
+
+        irq_exit();
+        set_irq_regs(old_regs);
 }
 
+#if 0
 int request_irq(unsigned int irq,
 		irqreturn_t (*handler)(int, void *), /*RGD removed pt_reg*/
 		unsigned long flags, const char *devname, void *dev_id)
@@ -284,7 +377,8 @@ void disable_irq_nosync(unsigned int irq)
 {
         disable_irq(irq);
 }
-
+#endif
+#if 0
 int get_irq_list(char *buf)
 {
 	int i, len = 0;
@@ -306,7 +400,7 @@ int get_irq_list(char *buf)
 
 	return len;
 }
-
+#endif
 #if 0
 void dump(struct pt_regs *fp)
 {
@@ -377,12 +471,12 @@ void dump(struct pt_regs *fp)
 	printk("\n\n");
 }
 #endif /* 0 */
-
+/*
 void init_irq_proc(void)
 {
 	phx_warn("TODO");
 }
-
+*/
 /*
 unsigned int irq_create_mapping(struct irq_host *host, irq_hw_number_t hwirq)
 {

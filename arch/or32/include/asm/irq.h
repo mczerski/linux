@@ -2,6 +2,7 @@
 #ifndef __OR32_IRQ_H__
 #define __OR32_IRQ_H__
 
+#if 0
 #include <linux/interrupt.h>
 #include <asm/machdep.h>
 #include <asm/atomic.h>
@@ -10,10 +11,14 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 
-#define NO_IRQ		(0)
+#endif
 
 #define	NR_IRQS		32
+#include <asm-generic/irq.h>
 
+#define NO_IRQ		(0)
+
+#if 0
 static inline int irq_canonicalize(int irq)
 {
 	return(irq);
@@ -54,6 +59,6 @@ static inline void irq_dispose_mapping(unsigned int virq)
 { 
         return; 
 }
-
+#endif
 #endif /* __OR32_IRQ_H__ */
 #endif /* __KERNEL__ */
