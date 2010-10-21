@@ -194,10 +194,10 @@ void __init setup_cpuinfo(void)
 	unsigned long iccfgr,dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
-        cpu = (struct device_node *) of_find_node_by_type(NULL, "cpu");
+//        cpu = (struct device_node *) of_find_node_by_type(NULL, "cpu");
+        cpu = (struct device_node *) of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
         if (!cpu) {
-                printk(KERN_ERR "Device tree missing CPU node\n");
-		return;
+		panic("No compatible CPU found in device tree...\n");
 	}
 
 	iccfgr = mfspr(SPR_ICCFGR);
@@ -215,11 +215,7 @@ void __init setup_cpuinfo(void)
 
 
 	cpuinfo.clock_frequency =  fcpu(cpu, "clock-frequency");
-/*	cpuinfo.icache_size = fcpu(cpu, "i-cache-size");
-	cpuinfo.icache_block_size = fcpu(cpu, "i-cache-block-size");
-	cpuinfo.dcache_size = fcpu(cpu, "d-cache-size");
-	cpuinfo.dcache_block_size = fcpu(cpu, "d-cache-block-size");
-*/
+
 	of_node_put(cpu);
 
 	print_cpuinfo();
@@ -331,9 +327,7 @@ void __init setup_arch(char **cmdline_p)
 //	printk("Starting 8051...\n");
 //	oc8051_init();
 
-#ifndef CONFIG_OR32_ANONYMOUS
 	printk("Linux/or32 port 2003-2005 OpenCores <phoenix@bsemi.com>\n");
-#endif /* CONFIG_OR32_ANONYMOUS */
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)

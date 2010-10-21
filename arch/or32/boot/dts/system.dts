@@ -16,12 +16,12 @@ properties.
 
 /dts-v1/;
 / {
-	model = "OrsocProto";
-	compatible = "orsoc,proto";
+	compatible = "orsoc,development-board";
 	#size-cells = <1>;
 	#address-cells = <1>;
 
 	chosen {
+		bootargs = "console=uart,mmio,0x90000000,115200";
 	};
 
 	/*
@@ -31,7 +31,6 @@ properties.
 
 	memory {
 		device_type = "memory";
-/*		reg = <0x00000000 0x1800000>;*/
 		reg = <0x00000000 0x2000000>;
 	};
 
@@ -47,19 +46,12 @@ properties.
 	 * here so we can bring up both of ours.  See smp_setup_cpu_maps().
 	 */
 
-	cpus {
-		#size-cells = <0>;
-		#address-cells = <1>;
+	/* device_type node seems to be mandatory for cpus */
 
+	cpus {
 		cpu@0 {
-			device_type = "cpu";
-			reg = <0x00000000>;
+			compatible = "opencores,openrisc-1200";
 			clock-frequency = <20000000>;
-/*			timebase-frequency = <20000000>;*/
-			i-cache-size = <8192>;
-			d-cache-size = <8192>;
-			i-cache-block-size = <16>;
-			d-cache-block-size = <16>;
 		};
 	};
 
@@ -107,7 +99,7 @@ properties.
 			reg = <0x2000000 0x53>;
 			interrupts = <4>;
 		};
-
+/*
 		gpio0: gpio@a0000000 {
                 	compatible = "opencores,jbtrivial";
                         reg = <0xa000000 0x6>;
@@ -161,6 +153,6 @@ properties.
                                 gpios = <&gpio0 7 0x0>;
                         };
                 };
-
+*/
 	};
 };
