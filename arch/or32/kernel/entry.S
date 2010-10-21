@@ -903,27 +903,27 @@ ENTRY(_switch)
 
 ENTRY(sys_clone)
 	l.j	_sys_clone
-	l.addi	r7,r1,0
+	 l.addi	r7,r1,0
 	
 ENTRY(sys_fork)
 	l.j	_sys_fork
-	l.addi	r3,r1,0
+	 l.addi	r3,r1,0
 
 ENTRY(sys_vfork)
 	l.j	_sys_vfork
-	l.addi	r3,r1,0
+	 l.addi	r3,r1,0
 	
 ENTRY(sys_execve)
 	l.j	_sys_execve
-	l.addi	r6,r1,0
+	 l.addi	r6,r1,0
 
 ENTRY(sys_sigaltstack)
 	l.j	_sys_sigaltstack
-	l.addi	r5,r1,0
+	 l.addi	r5,r1,0
 
 ENTRY(sys_rt_sigreturn)
 	l.j	_sys_rt_sigreturn
-	l.addi	r3,r1,0
+	 l.addi	r3,r1,0
 
 /* ============================================================[ EOF ]=== */
 
