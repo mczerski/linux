@@ -37,6 +37,7 @@
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
+#include <linux/tick.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -55,7 +56,7 @@ void cpu_idle(void)
 	for (;;) {
 		
 // __PHX__ TODO: make an config option or something
-#if 1
+#if 0
 		if (!(SPR_SR_TEE & (spr_sr = mfspr(SPR_SR)))) {
 			printk("idled: tick timer disabled, enabling...\n");
 			printk("idled: SR 0x%lx, ESR 0x%lx, EPCR 0x%lx, EEAR 0x%lx\n",
@@ -67,11 +68,14 @@ void cpu_idle(void)
 		}
 #endif
 
+                tick_nohz_stop_sched_tick(1);
 		if (!need_resched()) {
 			if (powersave != NULL) {
 				powersave();
 			}
 		}
+                tick_nohz_restart_sched_tick();
+ 
 #if 0
 		if (need_resched())
 			schedule();

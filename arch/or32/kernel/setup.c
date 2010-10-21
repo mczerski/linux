@@ -78,18 +78,6 @@ extern u32 _fdt_start;
  
 #include <asm/machdep.h>
 
-extern void config_BSP(char *command, int len);
-
-void (*mach_tick)(void) = NULL;
-int (*mach_set_clock_mmss) (unsigned long) = NULL;
-void (*mach_sched_init) (void) = NULL;
-unsigned long (*mach_gettimeoffset)(void) = NULL;
-void (*mach_gettod)(int *year, int *mon, int *day, int *hour, int *min, int *sec) = NULL;
-int (*mach_hwclk)(int, struct hwclk_time*) = NULL;
-void (*mach_mksound)( unsigned int count, unsigned int ticks) = NULL;
-void (*mach_reset)( void ) = NULL;
-void (*mach_debug_init)(void) = NULL;
-
 unsigned long or32_mem_size;
 
 unsigned long fb_mem_start;
@@ -316,8 +304,6 @@ void __init setup_arch(char **cmdline_p)
 
 	setup_cpuinfo();
 
-	config_BSP(&command_line[0], COMMAND_LINE_SIZE);
-
 	/* detect System on Chip parameters */
 	detect_soc();
 
@@ -439,7 +425,7 @@ struct seq_operations cpuinfo_op = {
 	show:   show_cpuinfo,
 };
 
-void arch_gettod(int *year, int *mon, int *day, int *hour,
+/*void arch_gettod(int *year, int *mon, int *day, int *hour,
 		                  int *min, int *sec)
 {
    
@@ -448,7 +434,7 @@ void arch_gettod(int *year, int *mon, int *day, int *hour,
 	else
 		*year = *mon = *day = *hour = *min = *sec = 0;
 }
-
+*/
 /*RGD this awful hack is because our compiler does
  *support the "weak" attribute correctly at this time
  *once we do (support weak) this should be removed!!

@@ -1,21 +1,11 @@
 /*
  *  linux/arch/or32/kernel/time.c
  *
- *  or32 version
+ *  Copyright (C) 2010 Jonas Bonn 
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
- *
- *  Copied/hacked from:
- *
- *  linux/arch/m68knommu/kernel/time.c
- *
- *  Copyright (C) 1991, 1992, 1995  Linus Torvalds
- *
- * This file contains the m68k-specific time handling details.
- * Most of the stuff is located in the machine specific files.
  */
+
+//#define DEBUG 1
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -30,79 +20,264 @@
 #include <linux/timex.h>
 #include <linux/interrupt.h>
 
+#include <linux/clocksource.h>
+#include <linux/clockchips.h>
+
+#include <asm/irq_regs.h>
+
+#include <asm/cpuinfo.h>
 #include <asm/machdep.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/or32-hf.h>
 
-#define TICK_SIZE (tick_nsec / 1000)
-
-static inline int set_rtc_mmss(unsigned long nowtime)
-{
-  if (mach_set_clock_mmss)
-    return mach_set_clock_mmss (nowtime);
-  return -1;
-}
 
 /* last time the RTC clock got updated */
-static long last_rtc_update;
+// static long last_rtc_update;
 
+u32 arch_gettimeoffset(void)
+{
+        unsigned long count, result;
+        unsigned long factor;
+
+        factor = cpuinfo.clock_frequency / 1000000;
+
+        count = mfspr(SPR_TTCR);
+        result = count / factor;
+#if 0
+        printk("gettimeofday offset :: cnt %d, sys_tick_per %d, result %d\n",
+               count, factor, result);
+#endif
+        return(result);
+
+}
+EXPORT_SYMBOL(arch_gettimeoffset);
+
+static inline void or32_timer_stop(void)
+{
+	mtspr(SPR_TTMR, 0);
+}
+
+static int or32_timer_set_next_event(unsigned long delta,
+                                        struct clock_event_device *dev)
+{
+	static int i = 0;
+	static u32 x[32];
+	u32 c;
+
+//        printk("%s: next event, delta %ld\n", __func__, (u32)delta);
+
+/*	x[i++] = delta;
+	if (i == 32) {
+		for (i = 0; i < 32; i++) {
+			printk("jd: %ld\n", x[i]);
+		}
+		i = 0;
+	}
+*/
+	/* Read the 32 bit counter value,  mask off the low 28 bits, add delta */
+	c = mfspr(SPR_TTCR);
+	c &= SPR_TTMR_PERIOD;
+	c += delta;
+	c &= SPR_TTMR_PERIOD;
+
+	/* Set counter and enable interrupt; keep timer in continuous mode always */
+	mtspr(SPR_TTMR, SPR_TTMR_CR | SPR_TTMR_IE | c);
+
+	c = mfspr(SPR_TTMR);
+	pr_debug("SPR_TTMR = %lx\n", c);
+
+        return 0;
+}
+
+static void or32_timer_set_mode(enum clock_event_mode mode,
+                                struct clock_event_device *evt)
+{
+        switch (mode) {
+        case CLOCK_EVT_MODE_PERIODIC:
+                printk(KERN_INFO "%s: periodic\n", __func__);
+		BUG();
+//                or32_timer_start_periodic(cpuinfo.freq_div_hz);
+                break;
+        case CLOCK_EVT_MODE_ONESHOT:
+                printk(KERN_INFO "%s: oneshot\n", __func__);
+                break;
+        case CLOCK_EVT_MODE_UNUSED:
+                printk(KERN_INFO "%s: unused\n", __func__);
+                break;
+        case CLOCK_EVT_MODE_SHUTDOWN:
+                printk(KERN_INFO "%s: shutdown\n", __func__);
+//                or32_timer_stop();
+                break;
+        case CLOCK_EVT_MODE_RESUME:
+                printk(KERN_INFO "%s: resume\n", __func__);
+                break;
+        }
+}
+
+/* This is the clock event device based on the OR32 timer.
+ * As the timer is being used as a continuous clock-source (required for HR timers) 
+ * we cannot enable the PERIODIC feature.  The tick timer can run using one-shot
+ * events, so no problem.
+ */
+
+static struct clock_event_device clockevent_or32_timer = {
+        .name           = "or32_timer_clockevent",
+        .features       = CLOCK_EVT_FEAT_ONESHOT,
+//        .shift          = 36,
+        .rating         = 300,
+        .set_next_event = or32_timer_set_next_event,
+        .set_mode       = or32_timer_set_mode,
+};
+
+static inline void timer_ack(void)
+{
+	/* Clear the IP bit and disable further interrupts */
+//	mtspr(SPR_TTMR, mfspr(SPR_TTMR) | ~(SPR_TTMR_IE | SPR_TTMR_IP));
+
+	/* Clear the IP bit and disable further interrupts */
+	/* This can be done very simply... just just need to keep the timer
+	   running, so just maintain the CR bits while clearing the rest 
+	   of the register
+	*/
+	mtspr(SPR_TTMR, SPR_TTMR_CR);
+	pr_debug("TIMER ACKED TTMR=%lx\n", mfspr(SPR_TTMR));
+}
 
 /*
- * This get called at every clock tick...
+ * The timer interrupt is mostly handled in generic code nowadays... this
+ * function just acknowledges the interrupt and fires the event handler that 
+ * has been set on the clockevent device by the generic time management code.
  *
+ * This function needs to be called by the timer exception handler and that's
+ * all the exception handler needs to do.
+ *
+ * FIXME: Check how to get this into a threaded interrupt handler or something...
  */
+
+/* FIXME: what's with the pt_regs parameter here... really needed? */
+/* FIXME; should this really be marked __irq_entry */
+
 irqreturn_t timer_interrupt(struct pt_regs * regs)
 {
-#if 0
-  	check_stack(regs, __FILE__, __FUNCTION__, __LINE__);
+        struct pt_regs *old_regs = set_irq_regs(regs);
+        struct clock_event_device *evt = &clockevent_or32_timer;
+/*#ifdef CONFIG_HEART_BEAT
+        heartbeat();
 #endif
-        /*
-         * Here we are in the timer irq handler. We just have irqs locally
-         * disabled but we don't know if the timer_bh is running on the other
-         * CPU. We need to avoid to SMP race with it. NOTE: we don' t need
-         * the irq version of write_lock because as just said we have irq
-         * locally disabled. -arca
-         */
-	/*profile_tick(CPU_PROFILING); broken on or32 why? RGD*/
-	
-	do_timer(1); /*RGD*/
-	
-#ifndef CONFIG_SMP
-	update_process_times(user_mode(regs));
-#endif
+*/
+	pr_debug("JB\n");
+
+        timer_ack();
+
+	/*
+	 * update_process_times() expects us to have called irq_enter().
+	 */
+
+	irq_enter();
+        evt->event_handler(evt);
+	irq_exit();
+
+        set_irq_regs(old_regs);
+
         return IRQ_HANDLED;
 }
 
-
-
-
 /*
- * Scheduler clock - returns current time in nanosec units.
- */
-unsigned long long sched_clock(void)
+static struct irqaction timer_irqaction = {
+        .handler = timer_interrupt,
+        .flags = IRQF_DISABLED | IRQF_TIMER,
+        .name = "timer",
+        .dev_id = &clockevent_or32_timer,
+};
+*/
+static __init void or32_clockevent_init(void)
 {
-	return (unsigned long long)jiffies * (1000000000 / HZ);
+	clockevents_calc_mult_shift(&clockevent_or32_timer, cpuinfo.clock_frequency, 4);
+     	printk("TIMER INIT event **************** ******* mult = %ld\n", clockevent_or32_timer.mult);
+	printk("TIMER INIT  event ***********************shift = %ld\n", clockevent_or32_timer.shift);
+//   clockevent_or32_timer.mult =
+//                div_sc(cpuinfo.clock_frequency, NSEC_PER_SEC,
+//                                clockevent_or32_timer.shift);
+	/* We only have 28 bits */
+        clockevent_or32_timer.max_delta_ns =
+                clockevent_delta2ns((u32)0x0fffffff, &clockevent_or32_timer);
+	printk("MAX DELTA = %lld\n", clockevent_or32_timer.max_delta_ns);
+        clockevent_or32_timer.min_delta_ns =
+                clockevent_delta2ns(1, &clockevent_or32_timer);
+	printk("MIN DELTA = %lld\n", clockevent_or32_timer.min_delta_ns);
+        clockevent_or32_timer.cpumask = cpumask_of(0);
+        clockevents_register_device(&clockevent_or32_timer);
+
+	printk("clock event registered\n");
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+/** 
+ * Incrementer
+ */
+
+
+static cycle_t or32_timer_read(struct clocksource* cs) {
+//	printk("timer read %lx\n", mfspr(SPR_TTCR));
+
+	return (cycle_t) mfspr(SPR_TTCR);
+} 
+
+static struct clocksource or32_timer = {
+	.name		= "or32_timer",
+        .rating         = 200,
+	.read		= or32_timer_read,
+        .mask           = CLOCKSOURCE_MASK(32),
+//	.shift		= 16,
+        .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
+static int __init or32_timer_init(void)
+{
+
+	clocksource_calc_mult_shift(&or32_timer, cpuinfo.clock_frequency, 4);
+
+//        or32_timer.mult = 
+//		clocksource_hz2mult(cpuinfo.clock_frequency, or32_timer.shift);
+	printk("clock frequency = %ld\n", cpuinfo.clock_frequency);
+	printk("TIMER INIT *********************** mult = %ld\n", or32_timer.mult);
+	printk("TIMER INIT *********************** mult = %ld\n", or32_timer.shift);
+        if (clocksource_register(&or32_timer))
+                panic("failed to register clocksource");
+
+        /* Set counter period, enable timer and interrupt */
+
+	/* Enable the incrementer in 'continuous' mode with interrupt disabled */
+        mtspr(SPR_TTMR, SPR_TTMR_CR);
+
+	/* FIXME: We probably want a timercounter, too */
+        /* register timecounter - for ftrace support */
+//        init_microblaze_timecounter();
+        return 0;
+}
+
+//arch_initcall(or32_incrementer_init);
 
 void __init time_init(void)
 {
-	unsigned int year, mon, day, hour, min, sec;
+	u32 upr;
 
-	extern void arch_gettod(int *year, int *mon, int *day, int *hour,
-				int *min, int *sec);
+	upr = mfspr(SPR_UPR);
+	if (!(upr & SPR_UPR_TTP))
+		panic("Linux not supported on devices without tick timer");
 
-	year = 1980;
-	mon = day = 1;
-	hour = min = sec = 0;
-	arch_gettod (&year, &mon, &day, &hour, &min, &sec);
-
-	if ((year += 1900) < 1970)
-		year += 100;
-
-	
-	if (mach_sched_init)
-		mach_sched_init();
+	or32_timer_init();
+	or32_clockevent_init();
 }
-

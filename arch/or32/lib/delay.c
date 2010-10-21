@@ -22,7 +22,10 @@
 
 int __devinit read_current_timer(unsigned long *timer_value)
 {
-	*timer_value = mfspr(SPR_TTCR);
+	u32 v = mfspr(SPR_TTCR);
+//	printk("timer value = %d\n", v);
+	*timer_value = v;
+//	*timer_value = mfspr(SPR_TTCR);
 	return 0;
 }
 
