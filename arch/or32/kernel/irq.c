@@ -32,6 +32,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/irq_regs.h>
 #include <asm/bitops.h>
 #include <asm/page.h>
 #include <asm/machdep.h>
@@ -174,6 +175,7 @@ int show_interrupts(struct seq_file *p, void *v)
 
 asmlinkage void do_IRQ(struct pt_regs *regs)
 {
+        struct pt_regs *old_regs = set_irq_regs(regs);
 	int irq;
 	int cpu;
 	unsigned long flags;
@@ -201,6 +203,7 @@ asmlinkage void do_IRQ(struct pt_regs *regs)
 	local_irq_restore(flags);
 	
 	irq_exit();
+	set_irq_regs(old_regs);
 }
 
 int request_irq(unsigned int irq,
