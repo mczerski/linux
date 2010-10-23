@@ -51,17 +51,17 @@ static const char const * irq_name[NR_IRQS] = {
 	"int24", "int25", "int26", "int27", "int28", "int29", "int30", "int31",
 };
 
-void pic_mask(unsigned int irq)
+static void pic_mask(struct irq_data *data)
 {
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->irq));
 }
 
-void pic_unmask(unsigned int irq)
+static void pic_unmask(struct irq_data *data)
 {
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << irq));
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << data->irq));
 }
 
-void pic_ack(unsigned int irq)
+static void pic_ack(struct irq_data *data)
 {
 	/* EDGE-triggered interrupts need to be ack'ed in order to clear
 	 * the latch.  
@@ -73,21 +73,21 @@ void pic_ack(unsigned int irq)
 	/* FIXME: This is contrary to spec which says write 1 to ack
 	 * interrupt... */
 //	mtspr(SPR_PICSR, (1UL << irq)); 
-	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << irq));
+	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));
 }
 
-void pic_mask_ack(unsigned int irq)
+static void pic_mask_ack(struct irq_data *data)
 {
 	/* Comment for pic_ack applies here, too */
 
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << irq));
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->irq));
 	/* FIXME: This is contrary to spec which says write 1 to ack
 	 * interrupt... */
 //	mtspr(SPR_PICSR, (1UL << irq)); 
-	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << irq));
+	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));
 }
 
-int pic_set_type(unsigned int irq, unsigned int flow_type) {
+static int pic_set_type(struct irq_data *data, unsigned int flow_type) {
 	/* There's nothing to do in the PIC configuration when changing
 	 * flow type.  Level and edge-triggered interrupts are both
 	 * supported, but it's PIC-implementation specific which type
@@ -134,12 +134,12 @@ static inline int pic_get_irq(void)
 /* This is the optional PIC for the OR*/
 
 static struct irq_chip or1k_pic = {
-	.name = "OR1K PIC",
-	.unmask = pic_unmask,
-	.mask = pic_mask,
-	.ack = pic_ack,
-	.mask_ack = pic_mask_ack,
-	.set_type = pic_set_type
+	.name = "or1k-PIC",
+	.irq_unmask = pic_unmask,
+	.irq_mask = pic_mask,
+	.irq_ack = pic_ack,
+	.irq_mask_ack = pic_mask_ack,
+	.irq_set_type = pic_set_type
 };
 
 void __init init_IRQ(void)
@@ -188,7 +188,7 @@ int show_interrupts(struct seq_file *p, void *v)
 #endif
                 seq_printf(p, " %8s", irq_desc[i].status &
                                         IRQ_LEVEL ? "level" : "edge");
-                seq_printf(p, " %8s", irq_desc[i].chip->name);
+                seq_printf(p, " %8s", irq_desc[i].irq_data.chip->name);
                 seq_printf(p, "  %s", action->name);
 
                 for (action = action->next; action; action = action->next)

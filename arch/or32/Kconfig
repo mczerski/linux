@@ -3,6 +3,16 @@
 # see Documentation/kbuild/config-language.txt.
 #
 
+config OR32
+	def_bool y
+	select OF
+	select OF_FLATTREE
+	select HAVE_MEMBLOCK
+	select ARCH_WANT_OPTIONAL_GPIOLIB
+	select HAVE_GENERIC_HARDIRQS
+	select GENERIC_HARDIRQS_NO_DEPRECATED
+	select GENERIC_IRQ_PROBE
+
 config MMU
 	bool
 	default y
@@ -26,15 +36,6 @@ config RWSEM_GENERIC_SPINLOCK
 config GENERIC_CALIBRATE_DELAY
 	bool
 	default y
-
-config GENERIC_HARDIRQS
-        def_bool y
-
-config GENERIC_IRQ_PROBE
-        def_bool y
-
-config GENERIC_HARDIRQS_NO__DO_IRQ
-        def_bool y
 
 config RWSEM_XCHGADD_ALGORITHM
 	bool
@@ -67,12 +68,6 @@ config GENERIC_FIND_NEXT_BIT
 
 source "init/Kconfig"
 
-config OR32
-	def_bool y
-	select OF
-	select OF_FLATTREE
-	select HAVE_MEMBLOCK
-	select ARCH_WANT_OPTIONAL_GPIOLIB
 
 menu "Processor type and features"
 
