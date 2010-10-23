@@ -85,6 +85,7 @@ void show_mem(void)
 	printk("%d pages swap cached\n",cached);
 }
 
+#if 0
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
@@ -130,6 +131,7 @@ static void __init fixrange_init (unsigned long start, unsigned long end, pgd_t 
 		j = 0;
 	}
 }
+#endif
 
 static void __init zone_sizes_init(void)
 {
@@ -146,6 +148,7 @@ static void __init zone_sizes_init(void)
 	free_area_init(zones_size);
 }
 
+#if 0
 static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 {
         pgd_t *pge;
@@ -170,7 +173,7 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 
         return err;
 }
-
+#endif
 /*
  * Map all physical memory into kernel's address space.
  *
@@ -268,6 +271,7 @@ void __init paging_init(void)
 
 	zone_sizes_init();
 
+#if 0
 	/*
 	 * Fixed mappings, only the page table structure has to be
 	 * created - mappings will be set by set_fixmap():
@@ -275,7 +279,7 @@ void __init paging_init(void)
 	vaddr = __fix_to_virt(__end_of_fixed_addresses - 1) & PMD_MASK;
 	pgd_base = swapper_pg_dir;
 	fixrange_init(vaddr, 0, pgd_base);
-
+#endif
 	/*
 	 * enable EA translations via PT mechanism
 	 */
@@ -301,7 +305,7 @@ void __init paging_init(void)
 	mtspr(SPR_ICBIR, 0x900);
 	mtspr(SPR_ICBIR, 0xa00);
 
-	kmap_init();
+//	kmap_init();
 }
 
 
@@ -402,6 +406,7 @@ void free_initmem(void)
 		((unsigned long)&__init_end - (unsigned long)&__init_begin) >> 10);
 }
 
+#if 1
 /*
  * Associate a virtual page frame with a given physical page frame 
  * and protection flags for that frame.
@@ -444,4 +449,4 @@ void __set_fixmap (enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
 	set_pte_pfn(address, phys >> PAGE_SHIFT, flags);
 	flush_tlb_all();
 }
-
+#endif

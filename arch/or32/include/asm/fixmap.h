@@ -7,12 +7,10 @@
  *
  * Copyright (C) 1998 Ingo Molnar
  *
- * Support of BIGMEM added by Gerhard Wichert, Siemens AG, July 1999
  */
 
-#ifndef _ASM_FIXMAP_H
-#define _ASM_FIXMAP_H
-
+#ifndef __ASM_OPENRISC_FIXMAP_H
+#define __ASM_OPENRISC_FIXMAP_H
 
 /* used by vmalloc.c, vsyscall.lds.S.
  *
@@ -21,11 +19,10 @@
  */
 #define __FIXADDR_TOP	0xffffe000
 
-#ifndef __ASSEMBLY__
 #include <linux/kernel.h>
+#include <linux/threads.h>
 #include <asm/page.h>
 #ifdef CONFIG_HIGHMEM
-#include <linux/threads.h>
 #include <asm/kmap_types.h>
 #endif
 
@@ -34,13 +31,15 @@
  * addresses. The point is to have a constant address at
  * compile time, but to set the physical address only
  * in the boot process. We allocate these special addresses
- * from the end of virtual memory (0xfffff000) backwards.
- * Also this lets us do fail-safe vmalloc(), we
+ * from the end of virtual memory (0xffffe000) backwards.
+ * 
+ * Also this would let us do fail-safe vmalloc(), we
  * can guarantee that these special addresses and
- * vmalloc()-ed addresses never overlap.
+ * vmalloc()-ed addresses never overlap.  We don't actually
+ * do this on OpenRISC though (nor do most other arch's).
  *
  * these 'compile-time allocated' memory buffers are
- * fixed-size 4k pages. (or larger if used with an increment
+ * fixed-size (PAGE_SIZE) pages. (or larger if used with an increment
  * highger than 1) use fixmap_set(idx,phys) to associate
  * physical memory with fixmap indices.
  *
@@ -48,20 +47,23 @@
  * task switches.
  */
 enum fixed_addresses {
-	FIX_HOLE,
+#ifdef CONFIG_HIGHMEM
 	FIX_KMAP_BEGIN,	/* reserved pte's for temporary kernel mappings */
 	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
-	__end_of_permanent_fixed_addresses,
-	/* temporary boot-time mappings, used before ioremap() is functional */
-#define NR_FIX_BTMAPS	16
-	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
-	FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
-	FIX_WP_TEST,
+#endif
+	/*
+	 * FIX_IOREMAP entries are useful for mapping physical address
+	 * space before ioremap() is useable, e.g. really early in boot
+	 * before kmalloc() is working.
+	 */
+#define FIX_N_IOREMAPS  32
+	FIX_IOREMAP_BEGIN,
+	FIX_IOREMAP_END = FIX_IOREMAP_BEGIN + FIX_N_IOREMAPS,
 	__end_of_fixed_addresses
 };
 
-extern void __set_fixmap (enum fixed_addresses idx,
-					unsigned long phys, pgprot_t flags);
+extern void __set_fixmap(enum fixed_addresses idx,
+			 unsigned long phys, pgprot_t flags);
 
 #define set_fixmap(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL)
@@ -74,23 +76,13 @@ extern void __set_fixmap (enum fixed_addresses idx,
 #define clear_fixmap(idx) \
 		__set_fixmap(idx, 0, __pgprot(0))
 
-#define FIXADDR_TOP	((unsigned long)__FIXADDR_TOP)
+#define FIXADDR_TOP	((unsigned long)__FIXADDR_TOP-PAGE_SIZE)
 
-#define __FIXADDR_SIZE	(__end_of_permanent_fixed_addresses << PAGE_SHIFT)
-#define __FIXADDR_BOOT_SIZE	(__end_of_fixed_addresses << PAGE_SHIFT)
-#define FIXADDR_START		(FIXADDR_TOP - __FIXADDR_SIZE)
-#define FIXADDR_BOOT_START	(FIXADDR_TOP - __FIXADDR_BOOT_SIZE)
+#define FIXADDR_SIZE		(__end_of_fixed_addresses << PAGE_SHIFT)
+#define FIXADDR_START		(FIXADDR_TOP - FIXADDR_SIZE)
 
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))
 #define __virt_to_fix(x)	((FIXADDR_TOP - ((x)&PAGE_MASK)) >> PAGE_SHIFT)
-
-/*
- * This is the range that is readable by user mode, and things
- * acting like user mode such as get_user_pages.
- */
-#define FIXADDR_USER_START	(__fix_to_virt(FIX_VSYSCALL))
-#define FIXADDR_USER_END	(FIXADDR_USER_START + PAGE_SIZE)
-
 
 /*
  * 'index to address' translation. If anyone tries to use the idx
@@ -116,9 +108,8 @@ static __always_inline unsigned long fix_to_virt(const unsigned int idx)
 
 static inline unsigned long virt_to_fix(const unsigned long vaddr)
 {
-	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_BOOT_START);
+	BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
 	return __virt_to_fix(vaddr);
 }
 
-#endif /* !__ASSEMBLY__ */
 #endif

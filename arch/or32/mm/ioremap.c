@@ -29,11 +29,13 @@
 extern int mem_init_done;
 
 static unsigned long ioremap_bot = 0xffff0000L;
+static unsigned int fixmaps_used __initdata = 0;
 
+#if 0
 /* bt ioremaped lenghts */
 static unsigned int bt_ioremapped_len[NR_FIX_BTMAPS] __initdata = 
  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-
+#endif
 /*
  * IO remapping core to use when system is running
  */
@@ -50,18 +52,25 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 			return NULL;
 		addr = (unsigned long) area->addr;
 	} else {
-		ioremap_bot -= size;
+		printk("JONAS IOREMAP %lx\n", size);
+		if ((fixmaps_used + (size >> PAGE_SHIFT)) > FIX_N_IOREMAPS)
+			return NULL;
+		addr = fix_to_virt(FIX_IOREMAP_BEGIN+fixmaps_used);
+		fixmaps_used += (size >> PAGE_SHIFT);
+/*		ioremap_bot -= size;
 		addr = ioremap_bot;
+*/
 	}
 
 	prot = __pgprot(_PAGE_PRESENT | __READABLE | __WRITEABLE | _PAGE_GLOBAL |
 		        _PAGE_KERNEL | flags);
 
 	if (ioremap_page_range((unsigned long) addr, addr + size, phys_addr, prot)) {
-		if (mem_init_done)
+		if (likely(mem_init_done))
 			vfree(area->addr);
 		else
-			ioremap_bot += size;
+			fixmaps_used -= (size >> PAGE_SHIFT);
+//			ioremap_bot += size;
 		return NULL;
 	}
 /* Is this flush necessary??  Can we get flush_cache_vmap to cover it??? */
@@ -69,6 +78,7 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 	return addr;
 }
 
+#if 0
 /*
  * Boot-time IO remapping core to use
  */
@@ -136,6 +146,8 @@ static void __init bt_iounmap(void *addr)
 		--nr_pages;
 	}
 }
+#endif
+
 
 /*
  * Generic mapping function (not visible outside):
@@ -206,16 +218,27 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	return (void *) (offset + (char *)addr);
 }
 
+#if 0
 static inline int is_bt_ioremapped(void *addr)
 {
 	unsigned long a = (unsigned long)addr;
 	return (a < FIXADDR_TOP) && (a >= FIXADDR_BOOT_START);
 }
+#endif
 
 void iounmap(void *addr)
 {
-	if(is_bt_ioremapped(addr))
-		return bt_iounmap(addr);
+
+//	if(is_bt_ioremapped(addr))
+//		return bt_iounmap(addr);
+	/* FIXME: How does this account for ioremap_bot */
+
+	/* If the page is from the fixmap pool then we just leave it. */ 
+	if (unlikely(addr > FIXADDR_START)) {
+		clear_fixmap(virt_to_fix((unsigned long) addr));
+		return;
+	}
+		
 	if (addr > high_memory)
 		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
