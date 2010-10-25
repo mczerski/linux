@@ -159,8 +159,6 @@ void __init init_IRQ(void)
 
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
-
-	printk("JONAS: IRQ ENABLED, picmr=%lx\n", mfspr(SPR_PICMR));
 }
 
 int show_interrupts(struct seq_file *p, void *v)
