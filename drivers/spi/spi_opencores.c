@@ -579,8 +579,6 @@ static int __devinit ocspi_probe(struct platform_device *pdev)
 
 	master->bus_num = -1;
 
-	printk("JONAS ...... assigned bus_num %d\n", master->bus_num);
-
 	/* we support only mode 0 for now, and no options... 
 	 * but we can support CPHA setting -- to be implemented 
 	 */

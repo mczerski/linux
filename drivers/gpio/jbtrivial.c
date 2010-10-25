@@ -171,14 +171,10 @@ static void jbgpio_save_regs(struct of_mm_gpio_chip *mm_gc)
 	struct jbgpio_instance *chip =
 	    container_of(mm_gc, struct jbgpio_instance, mmchip);
 	int i;
-	printk("Jonas 4a\n");
 
 	for (i = 0; i < 3; i++) {
-	printk("Jonas 4b\n");
 		iowrite8(chip->gpio_state[i], mm_gc->regs + chip->data_offset + i);
-	printk("Jonas 4c\n");
 		iowrite8(chip->gpio_dir[i], mm_gc->regs + chip->tri_offset + i);
-	printk("Jonas 4d\n");
 	}
 }
 

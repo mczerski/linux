@@ -103,10 +103,7 @@ const struct of_device_id or32_bus_ids[] = {
 
 static int __init or32_device_probe(void)
 {
-	printk("JONASSSSSSSSSSSSSSSSSSSSSSS!!!!!");
-
         of_platform_bus_probe(NULL, or32_bus_ids, NULL);
-/*        of_platform_reset_gpio_probe();*/
         return 0;
 }
 device_initcall(or32_device_probe);
