@@ -505,7 +505,7 @@ static void ethoc_tx(struct net_device *dev)
 	if ((priv->cur_tx - priv->dty_tx) <= (priv->num_tx / 2))
 		netif_wake_queue(dev);
 
-//	ethoc_ack_irq(priv, INT_MASK_TX);
+	ethoc_ack_irq(priv, INT_MASK_TX);
 	spin_unlock(&priv->lock);
 }
 
