@@ -589,7 +589,9 @@ static int __devinit ocspi_probe(struct platform_device *pdev)
 	master->setup = ocspi_setup;
 	master->transfer = ocspi_transfer;
 	master->num_chipselect = OCSPI_NUM_CHIPSELECTS;
-	master->dev.of_node = dev->of_node;
+#ifdef CONFIG_OF
+	master->dev.of_node = pdev->dev.of_node;
+#endif
 
 	dev_set_drvdata(&pdev->dev, master);
 
