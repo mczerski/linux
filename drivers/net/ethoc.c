@@ -408,6 +408,10 @@ static int ethoc_rx(struct net_device *dev, int limit)
 	struct ethoc *priv = netdev_priv(dev);
 	int count;
 
+	/* Prevent overflow of priv->cur_rx by rewinding it */	
+	if (priv->cur_rx > priv->num_rx)
+		priv->cur_rx = priv->cur_rx % priv->num_rx;
+
 	for (count = 0; count < limit; ++count) {
 		unsigned int entry;
 		struct ethoc_bd bd;
