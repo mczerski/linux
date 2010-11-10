@@ -135,7 +135,7 @@ struct ohs900 {
 	spinlock_t		lock;
 	void __iomem		*addr_reg;
    
-	struct ohs900_platform_data	*board;
+	struct ocores_ohs900_platform_data	*board;
 	struct proc_dir_entry	*pde;
 
 	unsigned long		stat_insrmv;
@@ -276,9 +276,9 @@ ohs900_read_buf(struct ohs900 *s_ohs900, int addr, void *buf, size_t count, unsi
 /*-------------------------------------------------------------------------*/
 
 #ifdef DEBUGING
-#define DBGA(stuff...)		printk(KERN_DEBUG "ohs900: " stuff)
+#define DBG(stuff...)		printk(KERN_DEBUG "ohs900: " stuff)
 #else
-#define DBGA(stuff...)		do{}while(0)
+#define DBG(stuff...)		do{}while(0)
 #endif
 
 #ifdef DEVELOP

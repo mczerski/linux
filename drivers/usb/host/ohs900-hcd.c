@@ -24,10 +24,22 @@
  * Status:  Passed basic testing, works with usb-storage.
  *
  * TODO:
- * - Replace direct memory accesses.
+ * 
  * - various issues noted in the code
  * - use urb->iso_frame_desc[] with ISO transfers
- */
+ 
+Changelog:
+//2010-09-26
+//Updated to work with version 2.6.34 kernel running below 20MHz
+ Tested with USB-storage, USB HID and USB-Hub. 
+ Note:Issues when low speed device is connected to a HUB with high-speed connection, seems like a hardware issue. 
+ Fixed: direct memory accesses replaced with ioremap_nocache.
+
+2010-10-21
+ Problem description: Unplugging the hub from the board has no effect, the de-registration seems not to work. The device is still listed in "lsusb".
+ Fix: The timer functions i now queued to run from the interrupt routine after an insertion/removal event occurs. Thereby the port status is updated and the kernel
+ detect the device as disconnected when checking port status.
+*/
 
 //#undef	VERBOSE
 //#undef	PACKET_TRACE
@@ -35,6 +47,9 @@
 /*#define DEBUG*/
 #undef DEBUG
 
+
+
+#include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -49,7 +64,7 @@
 #include <linux/interrupt.h>
 #include <linux/usb.h>
 
-
+#include <linux/of.h>
 #include <linux/platform_device.h>
 
 #include <asm/io.h>
@@ -118,7 +133,7 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
 		s_ohs900->irq_enable = 0;
 		hcd->state = HC_STATE_HALT;
 	}
-    		tmp;
+    		
 
    
 
@@ -252,7 +267,7 @@ static void in_packet(
 {
 	u8			len;   
 	len = ep->maxpacket;   
-    ep->length = min((int)len, urb->transfer_buffer_length - urb->actual_length); 
+    ep->length = min((int)len, (int)(urb->transfer_buffer_length - urb->actual_length)); 
       
 	ohs900_write(ohs900, OHS900_RXFIFOCONTROLREG, OHS900_FIFO_FORCE_EMPTY);    
 	ohs900_write(ohs900, OHS900_TXTRANSTYPEREG, OHS900_IN);
@@ -641,31 +656,34 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 	struct ohs900	*ohs900 = hcd_to_ohs900(hcd);
 	u8		irqstat;
 	irqreturn_t	ret = IRQ_NONE;
-	
+	unsigned	retries = 5;
+    
 	spin_lock(&ohs900->lock);
-    irqstat = ohs900_read(ohs900, OHS900_IRQ_STATUS);
+   
 
-    wmb();
-    ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
-    wmb();
-    ohs900_write(ohs900, OHS900_IRQ_ENABLE, 0x00);
 
-    irqstat &= ohs900->irq_enable;	
+retry:
+	irqstat = ohs900_read(ohs900, OHS900_IRQ_STATUS);
+
+	if (irqstat) {
+		ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
+		irqstat &= ohs900->irq_enable;
+	}
 
 #ifdef	QUIRK2
-	// this may no longer be necessary ... 
+	/* this may no longer be necessary ... */
 	if (irqstat == 0) {
-		DBG("IRQ == 0? BUG \n");
+		irqstat = checkdone(ohs900);
+		if (irqstat)
+			ohs900->stat_lost++;
 	}
-#endif  
+#endif
 
 	/* USB packets, not necessarily handled in the order they're
 	 * issued ... that's fine if they're different endpoints.
-	 */     
-            
-	if (irqstat & OHS900_INTMASK_TRANS_DONE) 
-    {        
-        done(ohs900, ohs900->active_a);
+	 */
+	if (irqstat & OHS900_INTMASK_TRANS_DONE) {
+		done(ohs900, ohs900->active_a);
 		ohs900->active_a = NULL;
 		ohs900->stat_a++;
 	}
@@ -673,9 +691,10 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 
 	if (irqstat & OHS900_INTMASK_SOFINTR) {
 		unsigned index;
-        DBG("SOFINT\n");
+
 		index = ohs900->frame++ % (PERIODIC_SIZE - 1);
 		ohs900->stat_sof++;
+
 		/* be graceful about almost-inevitable periodic schedule
 		 * overruns:  continue the previous frame's transfers iff
 		 * this one has nothing scheduled.
@@ -691,7 +710,7 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 	/* khubd manages debouncing and wakeup */
 	if (irqstat & OHS900_INTMASK_INSRMV) {
 		ohs900->stat_insrmv++;
-        DBG("INSRMV \n");
+		
 		/* most stats are reset for each VBUS session */
 		ohs900->stat_wake = 0;
 		ohs900->stat_sof = 0;
@@ -704,6 +723,7 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 
 		ohs900->irq_enable = OHS900_INTMASK_INSRMV;
 		ohs900_write(ohs900, OHS900_IRQ_ENABLE, ohs900->irq_enable);
+		
 
 		/* usbcore nukes other pending transactions on disconnect */
 		if (ohs900->active_a) {
@@ -720,14 +740,20 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 		/* port status seems wierd until after reset, so
 		 * force the reset and make khubd clean up later.
 		 */
-		ohs900->port1 |= (1 << USB_PORT_FEAT_C_CONNECTION)
+           ohs900->port1 |= (1 << USB_PORT_FEAT_C_CONNECTION)
 				| (1 << USB_PORT_FEAT_CONNECTION);
 
+		
+		   mod_timer(&ohs900->timer, jiffies
+						+ msecs_to_jiffies(1800));
+
+		
+    
 	} else if (irqstat & OHS900_INTMASK_RESUME_DET) {
 		if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND)) {
 			DBG("wakeup\n");
 			ohs900->port1 |= 1 << USB_PORT_FEAT_C_SUSPEND;
-			ohs900->stat_wake;
+			ohs900->stat_wake++;
 		} else
 			irqstat &= ~OHS900_INTMASK_RESUME_DET;
 	}
@@ -735,19 +761,17 @@ static irqreturn_t ohs900h_irq(struct usb_hcd *hcd)
 	if (irqstat) {
 		if (ohs900->port1 & (1 << USB_PORT_FEAT_ENABLE))
 			start_transfer(ohs900);
-   
 		ret = IRQ_HANDLED;
-		
+		if (retries--)
+			goto retry;
 	}
 
 	if (ohs900->periodic_count == 0 && list_empty(&ohs900->async)) 
 		sofirq_off(ohs900);
-
-   
 	ohs900_write(ohs900, OHS900_IRQ_ENABLE, ohs900->irq_enable);
-	spin_unlock(&ohs900->lock);
 
-   
+	spin_unlock(&ohs900->lock);
+  
 	return ret;
 }
 
@@ -1626,6 +1650,8 @@ ohs900h_probe(struct platform_device *dev)
   struct usb_hcd		*hcd;
 	struct ohs900		*s_ohs900;
 	struct resource		*addr, *ires;
+    struct  ocores_ohs900_platform_data *pdata;
+
 	int			irq;
 	void __iomem		*addr_reg;
 	int			retval;
@@ -1640,7 +1666,7 @@ ohs900h_probe(struct platform_device *dev)
 	 */
 
 
-	INFO("driver %s, starting ohs900h_probe\n", hcd_name);
+	printk("driver %s, starting ohs900h_probe\n", hcd_name);
 	ires = platform_get_resource(dev, IORESOURCE_IRQ, 0);
 	if (dev->num_resources < 3 || !ires)
 		return -ENODEV;
@@ -1677,15 +1703,12 @@ ohs900h_probe(struct platform_device *dev)
 		}
 	}
 
-  
- 
-   
+     
 	/* allocate and initialize hcd */
 
     hcd = usb_create_hcd(&ohs900h_hc_driver, &dev->dev, dev->name );
     
-    
-    
+        
 	if (!hcd) {
 		retval = -ENOMEM;
 		goto err5;
@@ -1696,7 +1719,39 @@ ohs900h_probe(struct platform_device *dev)
 	INFO("driver %s, spin_lock_init\n", hcd_name);
 	spin_lock_init(&s_ohs900->lock);
 	INIT_LIST_HEAD(&s_ohs900->async);
-	s_ohs900->board = dev->dev.platform_data;
+
+	pdata = (struct ocores_ohs900_platform_data*) dev->dev.platform_data;
+	if (pdata) {
+		s_ohs900->board = pdata;
+	} else {
+        s_ohs900->board=  kzalloc(sizeof(struct ocores_ohs900_platform_data), GFP_KERNEL);
+		if (!s_ohs900->board)
+			return -ENOMEM;
+		int* val;
+		printk("hejsan\n");
+		val = (int*) of_get_property(dev->dev.of_node, "can_wakeup", NULL);
+		if (!val) {
+			dev_err(&dev->dev, "Missing required paramter 'can_wakeup'");
+			return -ENODEV;
+		}		
+		s_ohs900->board->can_wakeup = *val;
+		val = (int*) of_get_property(dev->dev.of_node, "potpg", NULL);
+		if (!val) {
+			dev_err(&dev->dev, "Missing required paramter 'potpg'");
+			return -ENODEV;
+		}
+		
+		s_ohs900->board->potpg = *val;
+		printk("hejsan2\n");
+		val = (int*) of_get_property(dev->dev.of_node, "power", NULL);
+		if (!val) {
+			dev_err(&dev->dev, "Missing required paramter 'power'");
+			return -ENODEV;
+		}
+		s_ohs900->board->power = *val;
+	}
+printk("hejsan2\n");
+	
 	init_timer(&s_ohs900->timer);
 	s_ohs900->timer.function = ohs900h_timer;
 	s_ohs900->timer.data = (unsigned long) s_ohs900;
@@ -1821,7 +1876,16 @@ ohs900h_resume(struct platform_device *dev)
 
 #endif
 
+static struct of_device_id ocores_ohs900_match[] = {
+        {
+                .compatible = "opencores,ohs900-ocores",
+        },
+        {},
+};
+MODULE_DEVICE_TABLE(of, ocores_ohs900_match);
 
+/* work with hotplug and coldplug */
+MODULE_ALIAS("platform:ohs900");
 struct platform_driver ohs900h_driver = {
 	.probe =	ohs900h_probe,
 	.remove =	__devexit_p(ohs900h_remove),
@@ -1831,6 +1895,7 @@ struct platform_driver ohs900h_driver = {
 	.driver = {
 		.name =	(char *) hcd_name,
 		.owner = THIS_MODULE,
+		.of_match_table = ocores_ohs900_match,
 	},
 };
 
