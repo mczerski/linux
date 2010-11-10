@@ -1129,5 +1129,11 @@ config RAMOOPS
 	  This enables panic and oops messages to be logged to a circular
 	  buffer in RAM where it can be read back at some later point.
 
+config ARC_SCET
+default n
+	bool "Enable SCET timer"
+	---help---
+	  This enables SCET timer as a char device.
+
 endmenu
 
