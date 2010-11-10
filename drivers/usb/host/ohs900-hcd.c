@@ -48,7 +48,7 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/usb.h>
-//#include <linux/usb_ohs900.h>
+
 
 #include <linux/platform_device.h>
 
@@ -58,7 +58,7 @@
 #include <asm/byteorder.h>
 
 #include "linux/usb/hcd.h"
-#include "ohs900.h"
+#include "ohs900-hcd.h"
 
 
 MODULE_DESCRIPTION("OHS900 USB Host Controller Driver");
@@ -1830,59 +1830,6 @@ struct platform_driver ohs900h_driver = {
 	},
 };
 
-static struct resource ohs900_resources[] = { 
- [0] = {
-   .start          = (OHS900_BASE),
-   .end            = ((OHS900_BASE) + OHS900_IO_EXTENT - 1),
-   .flags          = IORESOURCE_MEM,
- },
- [1] = {
-    .start          = (OHS900_SLAVE_ADDRESS),
-   .end            = ((OHS900_SLAVE_ADDRESS) + OHS900_IO_EXTENT - 1),
-   .flags          = IORESOURCE_MEM,
- },
- [2] = {
-   .start          = (OHS900_IRQ),
-   .end            = (OHS900_IRQ),
-   .flags          = IORESOURCE_IRQ,
- },
- [3] = {
-   .start          = (OHS900SLAVE_IRQ),
-   .end            = (OHS900SLAVE_IRQ),
-   .flags          = IORESOURCE_IRQ,
- },
-};
-
-
-static void sm3k_port_power(struct device *dev, int is_on) {
-	INFO("driver %s, inside stubbed sm3k_port_power\n", hcd_name);
- // see linux/usb_ohs900.h
-}
-static void sm3k_hc_reset(struct device *dev) {
- // see linux/usb_ohs900.h
-	struct ohs900	*ohs900 = dev_get_drvdata(dev);
-
-	INFO("Resetting core\n");
-	ohs900_write(ohs900, OHS900_HOSTSLAVECTLREG, OHS900_HSCTLREG_RESET_CORE);
-}
-struct ohs900_platform_data sm3k_ohs900 = {
- .can_wakeup = 1,
- .potpg = 10,
- .power = 250,
- .port_power = sm3k_port_power,
- .reset = sm3k_hc_reset,
-};
-static struct platform_device ohs900_device = {
- .name           = "ohs900-hcd",
- .id             = -1,
- .dev = {
-   .platform_data = &sm3k_ohs900,
-   .release = ohs900_release,
- },
- .num_resources  = ARRAY_SIZE(ohs900_resources),
- .resource       = ohs900_resources,
-};
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -1899,7 +1846,7 @@ static int __init ohs900h_init(void)
 	if (usb_disabled())
 		return -ENODEV;
 	
-	platform_device_register(&ohs900_device); 
+
 	
 	INFO("driver %s, %s\n", hcd_name, DRIVER_VERSION);
 	return platform_driver_register(&ohs900h_driver);
@@ -1909,6 +1856,6 @@ module_init(ohs900h_init);
 static void __exit ohs900h_cleanup(void) 
 {	
 	platform_driver_unregister(&ohs900h_driver);
-	platform_device_unregister(&ohs900_device);
+
 }
 module_exit(ohs900h_cleanup);

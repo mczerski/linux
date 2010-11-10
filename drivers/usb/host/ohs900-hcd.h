@@ -5,7 +5,7 @@
  * Copyright (C) 2004 Psion Teklogix
  * Copyright (C) 2004 David Brownell
  */
-
+#include <linux/ohs900.h>
 //#include <asm/arch/sam255.h>
 
 #define DEVELOP
@@ -123,18 +123,8 @@
 
 #define	LOG2_PERIODIC_SIZE	5	/* arbitrary; this matches OHCI */
 #define	PERIODIC_SIZE		(1 << LOG2_PERIODIC_SIZE)
-struct ohs900_platform_data {
-    unsigned can_wakeup:1;
-    u8 potpg;
-    u8 power;
-    void (*port_power)(struct device *dev, int is_on);
-    void (*reset) (struct device *dev);    
-};
 
-struct my_work_t {
-   struct work_struct my_work;
-   struct ohs900 *ohs900_s;    
-};
+
 
 
 
