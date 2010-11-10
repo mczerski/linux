@@ -122,6 +122,15 @@ properties.
 			interrupts = <4>;
 		};
 
+		ohs900: ocores@9c000000 {
+			compatible = "opencores,ohs900-ocores";
+			reg = <0x9c000000 0x100>;
+			interrupts = <20 21>;
+			can_wakeup = <1>;			
+			potpg = <10>;			
+			power = <250>;
+		};
+
 		i2c0: ocores@a0000000 {
 			compatible = "opencores,i2c-ocores";
 			reg = <0xa0000000 0x8>;
