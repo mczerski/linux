@@ -20,7 +20,6 @@
 #define BUF_LEN TIMER_WIDTH	//We never read/write more then 6 bytes of data
 
  //#define SOFTWARE_TESTING
-void scet_release(struct device *dev);
 /* 
  * Is the device open right now? Used to prevent
  * concurent access into the same device 
@@ -253,73 +252,54 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 static int __devinit scet_probe(struct platform_device *pdev)
 {
 
-	int retval;
-	struct resource *addr;
-	void __iomem *addr_reg;
-	u8 ioaddr = 0;
+	int retval = 0;
+	struct resource *r;
 
-	scd = kzalloc(sizeof(struct scet_cd), GFP_KERNEL);
-	DBG("driver %s, starting scet_probe %s \n", DEVICE_NAME, pdev->name);
+	scd = devm_kzalloc(sizeof(struct scet_cd), GFP_KERNEL);
 
-	addr = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!addr)
-		DBG("-ENODEV \n");
-	DBG("driver %s, ioremap addr->start = 0x%lX\n", DEVICE_NAME,
-	    (unsigned long)(addr->start));
-
-	addr =
-	    request_mem_region(addr->start, addr->end - addr->start,
-			       DEVICE_NAME);
-
-	DBG("hejda\n");
-
-	retval = -EBUSY;
-	if (!addr) {
-		addr = platform_get_resource(pdev, IORESOURCE_IO, 0);
-		if (!addr)
-			return -ENODEV;
-		ioaddr = 1;
-		DBG("adriver %s, setting addr_reg to addr->start == 0x%hX\n",
-		    DEVICE_NAME, addr->start);
-		addr_reg = (void __iomem *)(unsigned long)addr->start;
-	} else {
-		addr_reg =
-		    ioremap_nocache(addr->start, addr->end - addr->start + 1);
-		DBG("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", DEVICE_NAME, (unsigned long)(addr->start), (unsigned long)(addr->end), (unsigned long)addr_reg);
-		if (addr_reg == NULL) {
-			retval = -ENOMEM;
-			goto err2;
-		}
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (r == NULL) {
+		retval = -ENODEV;
+		goto out;
 	}
-	scd->addr_reg = addr_reg;
+
+	if (!devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
+				     dev_name(&pdev->dev))) {
+		retval = -EBUSY;
+		goto out;
+	}
+
+	scd->addr_reg = devm_ioremap_nocache(&pdev->dev, r->start,
+					     resource_size(r));
+	if (!scd->addr_reg) {
+		retval = -ENOMEM;
+		goto out;
+	}
+
 	scd->timer_freeze = 0;
 	scd->timer_run = 0;
 
 	stop_timer(scd);
 	reset_timer(scd);
-	//start_timer(scd);        
-	// read_timer(scd);
 
-	return 0;
-
-err2:
-	kfree(scd);
-	DBG("init error, %d\n", retval);
+out:
 	return retval;
-
 }
 
-static int __devexit scet_probe_remove(struct platform_device *dev)
+static int __devexit scet_remove(struct platform_device *dev)
 {
-	DBG("SCET removed");
-	kfree(scd);
+	/* Nothing to do...
+	 * 'devres' device management takes cares of freeing
+	 * resources for us
+	 */
+
 	return 0;
 }
 
 static struct of_device_id scet_match[] = {
 	{
 	 .compatible = "opencores,scet",
-	 },
+	},
 	{},
 };
 
@@ -328,8 +308,7 @@ MODULE_ALIAS("platform:" DEVICE_NAME);
 
 static struct platform_driver scet_driver = {
 	.probe = scet_probe,
-	.remove = __devexit_p(scet_probe_remove),
-
+	.remove = __devexit_p(scet_remove),
 	.driver = {
 		   .name = DEVICE_NAME,
 		   .owner = THIS_MODULE,
@@ -337,33 +316,39 @@ static struct platform_driver scet_driver = {
 		   },
 };
 
-void scet_release(struct device *dev)
-{
-	/*
-	   This function is needed because otherwise the
-	   platform_device_unregister() call fails. Should we be actually
-	   doing something here?
-	 */
-}
+static const struct file_operations scet_fops = {
+	.read = device_read,
+	.write = device_write,
+	.unlocked_ioctl = device_ioctl,
+	.open = device_open,
+	.release = device_release,	/* a.k.a. close */
+};
 
 static int __init scet_init(void)
 {
-	init_module();
+	int status = 0;
 
-	//platform_device_register(&scet_driver); 
+	if (register_chrdev(MAJOR_NUM, DEVICE_NAME, &scet_fops)) {
+		return -EIO;
+	}
+	
+	status = platform_driver_register(&scet_driver);
+	if (status)
+		goto err_out;
 
-	DBG("driver init SCET \n");
-	return platform_driver_register(&scet_driver);
+	return status;
+
+err_out:
+	unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
+	return status;
 }
-
 module_init(scet_init);
 
 static void __exit scet_cleanup(void)
 {
 	platform_driver_unregister(&scet_driver);
-	//platform_device_unregister(&scet_device);
+	unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
 }
-
 module_exit(scet_cleanup);
 
 static const struct file_operations Fops = {
@@ -373,49 +358,3 @@ static const struct file_operations Fops = {
 	.open = device_open,
 	.release = device_release,	/* a.k.a. close */
 };
-
-/* 
- * Initialize the module - Register the unsigned character device 
- */
-int init_module()
-{
-	int ret_val;
-	/* 
-	 * Register the unsigned character device (atleast try) 
-	 */
-	ret_val = register_chrdev(MAJOR_NUM, DEVICE_NAME, &Fops);
-	/* 
-	 * Negative values signify an error 
-	 */
-	if (ret_val < 0) {
-		DBG(KERN_ALERT "%s failed with %d\n",
-		    "Sorry, registering the unsigned character device ",
-		    ret_val);
-		return ret_val;
-	}
-
-	DBG(KERN_INFO "%s The major device number is %d.\n",
-	    "Registeration is a success", MAJOR_NUM);
-	DBG(KERN_INFO "mknod %s c %d 0\n", DEVICE_NAME, MAJOR_NUM);
-
-	return 0;
-}
-
-/* 
- * Cleanup - unregister the appropriate file from /proc 
- */
-void cleanup_module()
-{
-	int reta = 0;
-
-	/* 
-	 * Unregister the device 
-	 */
-	unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
-
-	/* 
-	 * If there's an error, report it 
-	 */
-	if (reta < 0)
-		DBG(KERN_ALERT "Error: unregister_chrdev: %d\n", reta);
-}
