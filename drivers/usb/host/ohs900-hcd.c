@@ -147,7 +147,7 @@ static void port_power(struct ohs900 *s_ohs900, int is_on)
 
 	if (s_ohs900->board && s_ohs900->board->port_power) {
 		/* switch VBUS, at 500mA unless hub power budget gets set */
-		DBG("power %s\n", is_on ? "on" : "off");
+		pr_debug("power %s\n", is_on ? "on" : "off");
 		s_ohs900->board->port_power(hcd->self.controller, is_on);
 	}
 
@@ -284,7 +284,7 @@ static inline void sofirq_on(struct ohs900 *ohs900)
 {
 	if (ohs900->irq_enable & OHS900_INTMASK_SOFINTR)
 		return;
-	DBG("sof irq on\n");
+	pr_debug("sof irq on\n");
 	ohs900->irq_enable |= OHS900_INTMASK_SOFINTR;
 }
 
@@ -292,7 +292,7 @@ static inline void sofirq_off(struct ohs900 *ohs900)
 {
 	if (!(ohs900->irq_enable & OHS900_INTMASK_SOFINTR))
 		return;
-	DBG("sof irq off\n");
+	pr_debug("sof irq off\n");
 	ohs900->irq_enable &= ~OHS900_INTMASK_SOFINTR;
 }
 
@@ -336,7 +336,7 @@ static struct ohs900h_ep *start(struct ohs900 *ohs900)
 	}
 
 	if (unlikely(list_empty(&ep->hep->urb_list))) {
-		DBG("empty %p queue?\n", ep);
+		pr_debug("empty %p queue?\n", ep);
 		return NULL;
 	}
 
@@ -389,7 +389,7 @@ static struct ohs900h_ep *start(struct ohs900 *ohs900)
 		status_packet(ohs900, ep, urb, control);
 		break;
 	default:
-		DBG("bad ep%p pid %02x\n", ep, ep->nextpid);
+		pr_debug("bad ep%p pid %02x\n", ep, ep->nextpid);
 		ep = NULL;
 	}
 	return ep;
@@ -514,7 +514,7 @@ static void done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 			}
 			break;
 		case USB_PID_IN:
-			//INFO("ACK/in qh%p\n", ep);
+			//pr_debug("ACK/in qh%p\n", ep);
 			buf = urb->transfer_buffer + urb->actual_length;
 			//prefetchw(buf);
 			len = ohs900_read(ohs900, OHS900_RXFIFOCNTLSBREG)
@@ -524,14 +524,14 @@ static void done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 			if (len > ep->length) {
 				len = ep->length;
 				urbstat = -EOVERFLOW;
-				DBG("EOVERFLOW\n");
+				pr_debug("EOVERFLOW\n");
 			}
 			urb->actual_length += len;
 			ohs900_read_buf(ohs900, OHS900_HOST_RXFIFO_DATA,
 					buf, len, urb->actual_length);
 
 			if (urb->actual_length > urb->transfer_buffer_length)
-				DBG("Actual len %d > buff len %d, ERROR\n",
+				pr_debug("Actual len %d > buff len %d, ERROR\n",
 				    urb->actual_length,
 				    urb->transfer_buffer_length);
 			usb_dotoggle(udev, ep->epnum, 0);
@@ -580,7 +580,7 @@ static void done(struct ohs900 *ohs900, struct ohs900h_ep *ep)
 		else
 			urbstat = -EPROTO;
 		ep->error_count = 0;
-		DBG("...5STRIKES %02x qh%p stat %d\n", status, ep, urbstat);
+		pr_debug("...5STRIKES %02x qh%p stat %d\n", status, ep, urbstat);
 	}
 
 	if (urbstat != -EINPROGRESS || urb->unlinked) {
@@ -597,7 +597,7 @@ static inline u8 checkdone(struct ohs900 *ohs900)
 		ctl = ohs900_read(ohs900, OHS900_HOST_TX_CTLREG);
 		if (ctl & OHS900_HCTLMASK_TRANS_REQ)
 			ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, 0);
-		DBG("%s DONE_A: ctrl %02x sts %02x\n",
+		pr_debug("%s DONE_A: ctrl %02x sts %02x\n",
 		    (ctl & OHS900_HCTLMASK_TRANS_REQ) ? "timeout" : "lost",
 		    ctl, ohs900_read(ohs900, OHS900_HRXSTATREG));
 		irqstat |= OHS900_INTMASK_TRANS_DONE;
@@ -694,7 +694,7 @@ retry:
 
 	} else if (irqstat & OHS900_INTMASK_RESUME_DET) {
 		if (ohs900->port1 & (1 << USB_PORT_FEAT_SUSPEND)) {
-			DBG("wakeup\n");
+			pr_debug("wakeup\n");
 			ohs900->port1 |= 1 << USB_PORT_FEAT_C_SUSPEND;
 			ohs900->stat_wake++;
 		} else
@@ -813,7 +813,7 @@ static int ohs900h_urb_enqueue(struct usb_hcd *hcd,
 
 		if (ep->maxpacket > H_MAXPACKET) {
 			/* iso packets up to 64 bytes could work... */
-			INFO("dev %d ep%d maxpacket %d\n",
+			pr_debug("dev %d ep%d maxpacket %d\n",
 			     udev->devnum, epnum, ep->maxpacket);
 			retval = -EINVAL;
 			goto fail;
@@ -870,7 +870,7 @@ static int ohs900h_urb_enqueue(struct usb_hcd *hcd,
 		 * to share the faster parts of the tree without needing
 		 * dummy/placeholder nodes
 		 */
-		DBG("schedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
+		pr_debug("schedule qh%d/%p branch %d\n", ep->period, ep, ep->branch);
 		for (i = ep->branch; i < PERIODIC_SIZE; i += ep->period) {
 			struct ohs900h_ep **prev = &ohs900a->periodic[i];
 			struct ohs900h_ep *here = *prev;
@@ -902,10 +902,10 @@ static int ohs900h_urb_enqueue(struct usb_hcd *hcd,
 	spin_unlock_irqrestore(&ohs900a->lock, flags);
 	return retval;
 
-fail:	DBG("FAIL URB ENQUE");
+fail:	pr_debug("FAIL URB ENQUE");
 	if (retval)
 		usb_hcd_unlink_urb_from_ep(hcd, urb);
-fail_not_linked:DBG("FAIL URB ENQUE - not_linked");
+fail_not_linked:pr_debug("FAIL URB ENQUE - not_linked");
 	spin_unlock_irqrestore(&ohs900a->lock, flags);
 	return retval;
 }
@@ -939,7 +939,7 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		} else if (ohs900->active_a == ep) {
 			if (time_before_eq(ohs900->jiffies_a, jiffies)) {
 				/* happens a lot with lowspeed?? */
-				DBG("giveup on DONE_A: ctrl %02x sts %02x\n",
+				pr_debug("giveup on DONE_A: ctrl %02x sts %02x\n",
 				    ohs900_read(ohs900, OHS900_HOST_TX_CTLREG),
 				    ohs900_read(ohs900, OHS900_HRXSTATREG));
 				ohs900_write(ohs900, OHS900_HOST_TX_CTLREG, 0);
@@ -954,7 +954,7 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		if (urb)
 			finish_request(ohs900, ep, urb, 0);
 		else
-			INFO("dequeue, urb %p active %s; wait4irq\n", urb,
+			pr_debug("dequeue, urb %p active %s; wait4irq\n", urb,
 			     (ohs900->active_a == ep) ? "A" : "B");
 	} else
 
@@ -1000,7 +1000,7 @@ static int ohs900h_hub_status_data(struct usb_hcd *hcd, char *buf)
 	struct ohs900 *ohs900 = hcd_to_ohs900(hcd);
 #ifdef	QUIRK3
 	unsigned long flags;
-	//INFO("Enters ohs900h_hub_status_data  xxx");
+	//pr_debug("Enters ohs900h_hub_status_data  xxx");
 	/* non-SMP HACK: use root hub timer as i/o watchdog
 	 * this seems essential when SOF IRQs aren't in use...
 	 */
@@ -1073,7 +1073,7 @@ static void ohs900h_timer(unsigned long _ohs900)
 
 	switch (signaling) {
 	case OHS900_TXLCTL_MASK_SE0:
-		DBG("end reset\n");
+		pr_debug("end reset\n");
 		ohs900->port1 = (1 << USB_PORT_FEAT_C_RESET)
 		    | (1 << USB_PORT_FEAT_POWER);
 		ohs900->ctrl1 = 0;
@@ -1082,11 +1082,11 @@ static void ohs900h_timer(unsigned long _ohs900)
 			irqstat &= ~OHS900_INTMASK_RESUME_DET;
 		break;
 	case OHS900_TXLCTL_MASK_FS_K:
-		DBG("end resume\n");
+		pr_debug("end resume\n");
 		ohs900->port1 &= ~(1 << USB_PORT_FEAT_SUSPEND);
 		break;
 	default:
-		DBG("odd timer signaling: %02x\n", signaling);
+		pr_debug("odd timer signaling: %02x\n", signaling);
 		break;
 	}
 	ohs900_write(ohs900, OHS900_IRQ_STATUS, irqstat);
@@ -1180,7 +1180,7 @@ ohs900h_hub_control(struct usb_hcd *hcd,
 				break;
 
 			/* 20 msec of resume/K signaling, other irqs blocked */
-			DBG("start resume...\n");
+			pr_debug("start resume...\n");
 			ohs900->irq_enable = 0;
 			ohs900_write(ohs900, OHS900_IRQ_ENABLE,
 				     ohs900->irq_enable);
@@ -1222,11 +1222,11 @@ ohs900h_hub_control(struct usb_hcd *hcd,
 #endif
 
 #ifdef CONFIG_USB_SUSPEND
-			INFO("\n USB_SUSPEND ENABLED!!!");
+			pr_debug("\n USB_SUSPEND ENABLED!!!");
 
 #endif
 
-		DBG("GetPortStatus %08x\n", ohs900->port1);
+		pr_debug("GetPortStatus %08x\n", ohs900->port1);
 		break;
 	case SetPortFeature:
 		if (wIndex != 1 || wLength != 0)
@@ -1238,7 +1238,7 @@ ohs900h_hub_control(struct usb_hcd *hcd,
 			if (!(ohs900->port1 & (1 << USB_PORT_FEAT_ENABLE)))
 				goto error;
 
-			DBG("suspend...\n");
+			pr_debug("suspend...\n");
 			ohs900_write(ohs900, OHS900_SOFENREG, 0);
 			break;
 		case USB_PORT_FEAT_POWER:
@@ -1283,14 +1283,14 @@ error:
 static int ohs900h_bus_suspend(struct usb_hcd *hcd)
 {
 	// SOFs off
-	INFO("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
 static int ohs900h_bus_resume(struct usb_hcd *hcd)
 {
 	// SOFs on
-	INFO("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
@@ -1333,7 +1333,7 @@ static int proc_ohs900h_show(struct seq_file *s, void *unused)
 	struct ohs900h_ep *ep;
 	unsigned i;
 	u8 t;
-	INFO("Enter static int proc_ohs900h_show(struct seq_file *s, void *unused)");
+	pr_debug("Enter static int proc_ohs900h_show(struct seq_file *s, void *unused)");
 	seq_printf(s, "%s\n%s version %s\nportstatus[1] = %08x\n",
 		   ohs900_to_hcd(ohs900)->product_desc,
 		   hcd_name, DRIVER_VERSION, ohs900->port1);
@@ -1476,7 +1476,7 @@ static void ohs900h_stop(struct usb_hcd *hcd)
 {
 	struct ohs900 *ohs900 = hcd_to_ohs900(hcd);
 	unsigned long flags;
-	INFO("Enter ohs900h_stop(struct usb_hcd *hcd)");
+	pr_debug("Enter ohs900h_stop(struct usb_hcd *hcd)");
 	del_timer_sync(&hcd->rh_timer);
 
 	spin_lock_irqsave(&ohs900->lock, flags);
@@ -1489,8 +1489,8 @@ static int ohs900h_start(struct usb_hcd *hcd)
 	struct ohs900 *s_ohs900 = hcd_to_ohs900(hcd);
 
 	/* chip has been reset, VBUS power is off */
-	//  INFO("START to urb_enqueue %p", hcd->driver->urb_enqueue);    
-	// INFO("START to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);
+	//  pr_debug("START to urb_enqueue %p", hcd->driver->urb_enqueue);    
+	// pr_debug("START to ohs900h_endpoint_disable %p", hcd->driver->endpoint_disable);
 
 	hcd->state = HC_STATE_RUNNING;
 
@@ -1560,7 +1560,7 @@ static int __devexit ohs900h_remove(struct platform_device *dev)
 	struct usb_hcd *hcd = platform_get_drvdata(dev);
 	struct ohs900 *ohs900 = hcd_to_ohs900(hcd);
 	struct resource *res;
-	INFO("Enter ohs900h_remove(struct platform_device *dev)");
+	pr_debug("Enter ohs900h_remove(struct platform_device *dev)");
 	remove_debug_file(ohs900);
 	usb_remove_hcd(hcd);
 
@@ -1603,12 +1603,12 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 
 	/* refuse to confuse usbcore */
 	if (dev->dev.dma_mask) {
-		DBG("no we won't dma\n");
+		pr_debug("no we won't dma\n");
 		return -EINVAL;
 	}
 
 	addr = platform_get_resource(dev, IORESOURCE_MEM, 0);
-	INFO("driver %s, ioremap addr->start = 0x%lX, resource_len(addr) = 0x%lx\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(resource_len(addr)));
+	pr_debug("driver %s, ioremap addr->start = 0x%lX, resource_len(addr) = 0x%lx\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(resource_len(addr)));
 
 	addr =
 	    request_mem_region(addr->start, addr->end - addr->start, hcd_name);
@@ -1619,13 +1619,13 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 		if (!addr)
 			return -ENODEV;
 		ioaddr = 1;
-		INFO("driver %s, setting addr_reg to addr->start == 0x%hX\n",
+		pr_debug("driver %s, setting addr_reg to addr->start == 0x%hX\n",
 		     hcd_name, addr->start);
 		addr_reg = (void __iomem *)(unsigned long)addr->start;
 	} else {
 		addr_reg =
 		    ioremap_nocache(addr->start, addr->end - addr->start + 1);
-		INFO("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(addr->end), (unsigned long)addr_reg);
+		pr_debug("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(addr->end), (unsigned long)addr_reg);
 		if (addr_reg == NULL) {
 			retval = -ENOMEM;
 			goto err2;
@@ -1643,7 +1643,7 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 	hcd->rsrc_start = addr->start;
 	s_ohs900 = hcd_to_ohs900(hcd);
 
-	INFO("driver %s, spin_lock_init\n", hcd_name);
+	pr_debug("driver %s, spin_lock_init\n", hcd_name);
 	spin_lock_init(&s_ohs900->lock);
 	INIT_LIST_HEAD(&s_ohs900->async);
 
@@ -1699,7 +1699,7 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 
 	tmp = ohs900_read(s_ohs900, 0xe0);
 
-	INFO("driver %s, getting hw version\n", hcd_name);
+	pr_debug("driver %s, getting hw version\n", hcd_name);
 	tmp = ohs900_read(s_ohs900, OHS900_HWREVREG);
 
 	switch (tmp) {
@@ -1726,26 +1726,26 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 
 		goto err6;
 	}
-	INFO("driver %s, hw version = %d\n", hcd_name, tmp);
+	pr_debug("driver %s, hw version = %d\n", hcd_name, tmp);
 
 	//irqflags |= IRQF_SHARED;
 	retval = usb_add_hcd(hcd, irq, IRQF_DISABLED);	// | irqflags);
 	if (retval != 0)
 		goto err6;
 
-	INFO("%s, irq %d\n", hcd->product_desc, irq);
+	pr_debug("%s, irq %d\n", hcd->product_desc, irq);
 
 	create_debug_file(s_ohs900);
 	return retval;
 err6:
-	INFO("init error, %d\n", retval);
+	pr_debug("init error, %d\n", retval);
 	usb_put_hcd(hcd);
 err5:
-	INFO("init error, %d\n", retval);
+	pr_debug("init error, %d\n", retval);
 	if (!ioaddr)
 		iounmap(addr_reg);
 err2:
-	INFO("init error, %d\n", retval);
+	pr_debug("init error, %d\n", retval);
 	return retval;
 }
 
@@ -1760,7 +1760,7 @@ static int ohs900h_suspend(struct platform_device *dev)
 {
 	struct ohs900 *ohs900 = dev_get_drvdata(dev);
 	int retval = 0;
-	INFO("Enter ohs900h_suspend(struct platform_device *dev)");
+	pr_debug("Enter ohs900h_suspend(struct platform_device *dev)");
 	if (phase != SUSPEND_POWER_DOWN)
 		return retval;
 
@@ -1776,7 +1776,7 @@ static int ohs900h_suspend(struct platform_device *dev)
 static int ohs900h_resume(struct platform_device *dev)
 {
 	struct ohs900 *ohs900 = dev_get_drvdata(dev);
-	INFO("Enter ohs900h_resume(struct platform_device *dev)");
+	pr_debug("Enter ohs900h_resume(struct platform_device *dev)");
 	if (phase != RESUME_POWER_ON)
 		return 0;
 
@@ -1830,7 +1830,7 @@ static int __init ohs900h_init(void)
 	if (usb_disabled())
 		return -ENODEV;
 
-	INFO("driver %s, %s\n", hcd_name, DRIVER_VERSION);
+	pr_debug("driver %s, %s\n", hcd_name, DRIVER_VERSION);
 	return platform_driver_register(&ohs900h_driver);
 }
 
