@@ -100,8 +100,6 @@ MODULE_ALIAS("platform:ohs900-hcd");
 
 static const char hcd_name[] = "ohs900-hcd";
 
-void ohs900_release(struct device *dev);
-
 /*-------------------------------------------------------------------------*/
 
 static irqreturn_t ohs900h_irq(struct usb_hcd *hcd);
@@ -1826,15 +1824,6 @@ struct platform_driver ohs900h_driver = {
 };
 
 /*-------------------------------------------------------------------------*/
-
-void ohs900_release(struct device *dev)
-{
-	/*
-	   This function is needed because otherwise the
-	   platform_device_unregister() call fails. Should we be actually
-	   doing something here?
-	 */
-}
 
 static int __init ohs900h_init(void)
 {
