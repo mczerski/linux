@@ -2,24 +2,21 @@
  *  scet.c - Create an input/output  device driver for scet timer
  */
 
+#define DEBUG
+
 #include <linux/kernel.h>	/* We're doing kernel work */
 #include <linux/module.h>	/* Specifically, a module */
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <asm/uaccess.h>	/* for get_user and put_user */
 #include <linux/platform_device.h>
-#include <linux/slab.h>
-#include <linux/uaccess.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/system.h>
-#include <asm/byteorder.h>
+#include <linux/io.h>
+
 #include "scet.h"
-#define SUCCESS 0
+
 #define DEVICE_NAME "scet_dev"
 #define BUF_LEN TIMER_WIDTH	//We never read/write more then 6 bytes of data
 
- //#define SOFTWARE_TESTING
 /* 
  * Is the device open right now? Used to prevent
  * concurent access into the same device 
@@ -35,9 +32,10 @@ static struct scet_cd *scd;
 static void stop_timer(struct scet_cd *s_scet_cd)
 {
 	s_scet_cd->timer_run = 0;
-	INFO("sct STOP run:%d, freeze: %d ctrl: %d \n", s_scet_cd->timer_run,
-	     s_scet_cd->timer_freeze,
-	     s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
+	pr_debug("sct STOP run:%d, freeze: %d ctrl: %d \n",
+		 s_scet_cd->timer_run,
+		 s_scet_cd->timer_freeze,
+		 s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 	scet_write(s_scet_cd, SCET_TCTRL,
 		   (s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1)));
 
@@ -46,9 +44,10 @@ static void stop_timer(struct scet_cd *s_scet_cd)
 static void start_timer(struct scet_cd *s_scet_cd)
 {
 	s_scet_cd->timer_run = 1;
-	INFO("sct START run:%d, freeze: %d ctrl: %d \n", s_scet_cd->timer_run,
-	     s_scet_cd->timer_freeze,
-	     s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
+	pr_debug("sct START run:%d, freeze: %d ctrl: %d \n",
+		 s_scet_cd->timer_run,
+		 s_scet_cd->timer_freeze,
+		 s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 	scet_write(s_scet_cd, SCET_TCTRL,
 		   s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 
@@ -57,9 +56,10 @@ static void start_timer(struct scet_cd *s_scet_cd)
 static void freeze_timer(struct scet_cd *s_scet_cd)
 {
 	s_scet_cd->timer_freeze = 1;
-	INFO("sct FREEZE run:%d, freeze:%d, ctrl: %d \n", s_scet_cd->timer_run,
-	     s_scet_cd->timer_freeze,
-	     s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
+	pr_debug("sct FREEZE run:%d, freeze:%d, ctrl: %d \n",
+		 s_scet_cd->timer_run,
+		 s_scet_cd->timer_freeze,
+		 s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 	scet_write(s_scet_cd, SCET_TCTRL,
 		   s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 
@@ -68,9 +68,9 @@ static void freeze_timer(struct scet_cd *s_scet_cd)
 static void ufreeze_timer(struct scet_cd *s_scet_cd)
 {
 	s_scet_cd->timer_freeze = 0;
-	INFO("sct UFREEZE run:%d, freeze: %d, ctrl: %d \n",
-	     s_scet_cd->timer_run, s_scet_cd->timer_freeze,
-	     s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
+	pr_debug("sct UFREEZE run:%d, freeze: %d, ctrl: %d \n",
+		 s_scet_cd->timer_run, s_scet_cd->timer_freeze,
+		 s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 	scet_write(s_scet_cd, SCET_TCTRL,
 		   s_scet_cd->timer_run | (s_scet_cd->timer_freeze << 1));
 
@@ -86,6 +86,7 @@ static void reset_timer(struct scet_cd *s_scet_cd)
 	scet_write(s_scet_cd, SCET_TB5, 0);
 }
 
+#if 0
 static void read_timer(struct scet_cd *s_scet_cd)
 {
 	int i = 0;
@@ -99,13 +100,14 @@ static void read_timer(struct scet_cd *s_scet_cd)
 	ufreeze_timer(s_scet_cd);
 
 }
+#endif
 
 /* 
  * This is called whenever a process attempts to open the device file 
  */
 static int device_open(struct inode *inode, struct file *file)
 {
-	DBG(KERN_INFO "\n SCET device_open(%p)\n", file);
+	pr_debug("\n SCET device_open(%p)\n", file);
 	/* 
 	 * We don't want to talk to two processes at the same time 
 	 */
@@ -115,13 +117,14 @@ static int device_open(struct inode *inode, struct file *file)
 	Device_Open++;
 
 	try_module_get(THIS_MODULE);
-	return SUCCESS;
+
+	return 0;
 }
 
 static int device_release(struct inode *inode, struct file *file)
 {
 
-	DBG(KERN_INFO "device_release(%p,%p)\n", inode, file);
+	pr_debug("device_release(%p,%p)\n", inode, file);
 
 	/* 
 	 * We're now ready for our next caller 
@@ -129,7 +132,8 @@ static int device_release(struct inode *inode, struct file *file)
 	Device_Open--;
 
 	module_put(THIS_MODULE);
-	return SUCCESS;
+
+	return 0;
 }
 
 static ssize_t device_read(struct file *file,	/* see include/linux/fs.h   */
@@ -141,20 +145,19 @@ static ssize_t device_read(struct file *file,	/* see include/linux/fs.h   */
 
 	int bytes_read = 0;
 	u8 next_out;
-	INFO(KERN_INFO "device_read(%p,%p,%d)\n", file, buffer, length);
+	pr_debug("device_read(%p,%p,%d)\n", file, buffer, length);
 
 	freeze_timer(scd);
 	while (bytes_read < TIMER_WIDTH || length < 0) {
-		//DBG("read: %d\n", bytes_read);       
 		next_out = scet_read(scd, bytes_read);
-		DBG("next out: %d\n", next_out);
+		pr_debug("next out: %d\n", next_out);
 		put_user(next_out, buffer++);
 		length--;
 		bytes_read++;
 	}
 	ufreeze_timer(scd);
 
-	INFO("Read %d bytes\n", bytes_read);
+	pr_debug("Read %d bytes\n", bytes_read);
 	return bytes_read;
 }
 
@@ -165,14 +168,14 @@ device_write(struct file *file,
 	int i;
 	u8 next_out;
 
-	INFO(KERN_INFO "SCET_write(%p,%p,%d)", file, buffer, length);
+	pr_debug("SCET_write(%p,%p,%d)", file, buffer, length);
 
 	for (i = 0; i < TIMER_WIDTH && i < BUF_LEN; i++) {
 		get_user(next_out, buffer + i);
-		INFO("Write %d to, i %d \n", next_out, i);
+		pr_debug("Write %d to, i %d \n", next_out, i);
 		scet_write(scd, i, next_out);
 	}
-	INFO("SCET byte writen to timer %d", i);
+	pr_debug("SCET byte writen to timer %d", i);
 	return i;
 }
 
@@ -204,7 +207,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	 */
 	switch (cmd) {
 
-		INFO("cmd %u \n", cmd);
+		pr_debug("cmd %u \n", cmd);
 
 	case IOCTL_SET_SCET_TIME:
 		temp = (unsigned char *)arg;
@@ -226,7 +229,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 
 	case IOCTL_SET_SCET_OPERATION:
 
-		INFO("Set SCET timer mode to %u \n", (unsigned int)arg);
+		pr_debug("Set SCET timer mode to %u \n", (unsigned int)arg);
 		if (arg == 0)
 			stop_timer(scd);
 		else
@@ -246,7 +249,7 @@ long device_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	}
 
-	return SUCCESS;
+	return 0;
 }
 
 static int __devinit scet_probe(struct platform_device *pdev)
@@ -255,16 +258,20 @@ static int __devinit scet_probe(struct platform_device *pdev)
 	int retval = 0;
 	struct resource *r;
 
-	scd = devm_kzalloc(sizeof(struct scet_cd), GFP_KERNEL);
+	pr_debug("Probing SCET device\n");
+
+	scd = devm_kzalloc(&pdev->dev, sizeof(struct scet_cd), GFP_KERNEL);
 
 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (r == NULL) {
+		dev_dbg(&pdev->dev, "No resource\n");
 		retval = -ENODEV;
 		goto out;
 	}
 
 	if (!devm_request_mem_region(&pdev->dev, r->start, resource_size(r),
 				     dev_name(&pdev->dev))) {
+		dev_dbg(&pdev->dev, "Resource not available\n");
 		retval = -EBUSY;
 		goto out;
 	}
@@ -278,6 +285,8 @@ static int __devinit scet_probe(struct platform_device *pdev)
 
 	scd->timer_freeze = 0;
 	scd->timer_run = 0;
+
+	pr_debug("Probed and resources allocated\n");
 
 	stop_timer(scd);
 	reset_timer(scd);
@@ -335,6 +344,8 @@ static int __init scet_init(void)
 	status = platform_driver_register(&scet_driver);
 	if (status)
 		goto err_out;
+
+	pr_debug("ARC-SCET driver\n");
 
 	return status;
 
