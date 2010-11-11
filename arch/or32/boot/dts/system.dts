@@ -68,8 +68,8 @@ properties.
 		   addresses (device addresses) to CPU addresses */
 		/*ranges;*/
 		/* This is also a 1:1 mapping but limits size of mappable
-		   region to 0x30000000 */
-		ranges = <0x90000000 0x90000000 0x30000000>;
+		   region to 0x40000000 */
+		ranges = <0x80000000 0x80000000 0x40000000>;
 		/* This SOC has only a single, implicit PIC, so define it
 		  early and put the interrupt-parent property in the 'soc'
 		 node so that it's inherited by all the children using
@@ -84,7 +84,11 @@ properties.
 			#interrupt-cells = <1>;
 			interrupt-controller;
 		};		
-
+	
+		scet0: scet@8c000000 {
+			compatible = "opencores,scet";
+			reg = <0x8c000000 0x100>;			
+		};
 
 		serial0: serial@90000000 {
 /* FIXME: device_type is still needed here... should remove requirement from of_serial driver */
