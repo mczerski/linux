@@ -1553,7 +1553,6 @@ static struct hc_driver ohs900h_hc_driver = {
 };
 
 /*-------------------------------------------------------------------------*/
-#define resource_len(r) (((r)->end - (r)->start) + 1)
 
 static int __devexit ohs900h_remove(struct platform_device *dev)
 {
@@ -1572,12 +1571,12 @@ static int __devexit ohs900h_remove(struct platform_device *dev)
 	return 0;
 }
 
-static int __devinit ohs900h_probe(struct platform_device *dev)
+static int __devinit ohs900h_probe(struct platform_device *pdev)
 {
 
 	struct usb_hcd *hcd;
 	struct ohs900 *s_ohs900;
-	struct resource *addr, *ires;
+	struct resource *res, *ires;
 	struct ocores_ohs900_platform_data *pdata;
 
 	int irq;
@@ -1595,104 +1594,87 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 
 	printk("driver %s, starting ohs900h_probe\n", hcd_name);
 	ires = platform_get_resource(dev, IORESOURCE_IRQ, 0);
-	if (dev->num_resources < 3 || !ires)
+	if (pdev->num_resources < 3 || !ires)
 		return -ENODEV;
 
 	irq = ires->start;
 	irqflags = ires->flags & IRQF_TRIGGER_MASK;
 
 	/* refuse to confuse usbcore */
-	if (dev->dev.dma_mask) {
+	if (pdev->dev.dma_mask) {
 		pr_debug("no we won't dma\n");
 		return -EINVAL;
 	}
 
-	addr = platform_get_resource(dev, IORESOURCE_MEM, 0);
-	pr_debug("driver %s, ioremap addr->start = 0x%lX, resource_len(addr) = 0x%lx\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(resource_len(addr)));
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!devm_request_mem_region(&pdev->dev, res->start,
+				     resource_size(res),
+				     dev_name(&pdev->dev))) {
+		dev_dbg(&pdev->dev, "Resource not available\n");
+		return -EBUSY;
+ 	}
 
-	addr =
-	    request_mem_region(addr->start, addr->end - addr->start, hcd_name);
-
-	retval = -EBUSY;
-	if (!addr) {
-		addr = platform_get_resource(dev, IORESOURCE_IO, 0);
-		if (!addr)
-			return -ENODEV;
-		ioaddr = 1;
-		pr_debug("driver %s, setting addr_reg to addr->start == 0x%hX\n",
-		     hcd_name, addr->start);
-		addr_reg = (void __iomem *)(unsigned long)addr->start;
-	} else {
-		addr_reg =
-		    ioremap_nocache(addr->start, addr->end - addr->start + 1);
-		pr_debug("driver %s, setting addr_reg to ioremap \n (addr->start = 0x%lX), end  == : 0x%lX , addr_reg : 0x%lX\n", hcd_name, (unsigned long)(addr->start), (unsigned long)(addr->end), (unsigned long)addr_reg);
-		if (addr_reg == NULL) {
-			retval = -ENOMEM;
-			goto err2;
-		}
+	addr_reg = devm_ioremap_nocache(&pdev->dev, res->start, resource_size(res));
+	if (addr_reg == NULL) {
+		return -ENOMEM;
 	}
-
-	/* allocate and initialize hcd */
-
-	hcd = usb_create_hcd(&ohs900h_hc_driver, &dev->dev, dev->name);
-
-	if (!hcd) {
-		retval = -ENOMEM;
-		goto err5;
-	}
-	hcd->rsrc_start = addr->start;
-	s_ohs900 = hcd_to_ohs900(hcd);
-
-	pr_debug("driver %s, spin_lock_init\n", hcd_name);
-	spin_lock_init(&s_ohs900->lock);
-	INIT_LIST_HEAD(&s_ohs900->async);
 
 	pdata = (struct ocores_ohs900_platform_data *)dev->dev.platform_data;
-	if (pdata) {
-		s_ohs900->board = pdata;
-	} else {
-		s_ohs900->board =
-		    kzalloc(sizeof(struct ocores_ohs900_platform_data),
-			    GFP_KERNEL);
+	if (!pdata) {
+		int* val;
+
+		pdata = devm_kzalloc(&pdev->dev,
+				sizeof(struct ocores_ohs900_platform_data),
+			    	GFP_KERNEL);
 		if (!s_ohs900->board)
 			return -ENOMEM;
-		int *val;
-		printk("hejsan\n");
-		val =
-		    (int *)of_get_property(dev->dev.of_node, "can_wakeup",
+
+		val = (int*)of_get_property(pdev->dev.of_node, "can_wakeup",
 					   NULL);
 		if (!val) {
 			dev_err(&dev->dev,
 				"Missing required paramter 'can_wakeup'");
 			return -ENODEV;
 		}
-		s_ohs900->board->can_wakeup = *val;
-		val = (int *)of_get_property(dev->dev.of_node, "potpg", NULL);
+		pdata->can_wakeup = *val;
+
+		val = (int*)of_get_property(pdev->dev.of_node, "potpg", NULL);
 		if (!val) {
 			dev_err(&dev->dev, "Missing required paramter 'potpg'");
 			return -ENODEV;
 		}
+		pdata->potpg = *val;
 
-		s_ohs900->board->potpg = *val;
-		printk("hejsan2\n");
-		val = (int *)of_get_property(dev->dev.of_node, "power", NULL);
+		val = (int*)of_get_property(dev->dev.of_node, "power", NULL);
 		if (!val) {
 			dev_err(&dev->dev, "Missing required paramter 'power'");
 			return -ENODEV;
 		}
-		s_ohs900->board->power = *val;
+		pdata->power = *val;
 	}
-	printk("hejsan2\n");
+
+	/* allocate and initialize hcd */
+	hcd = usb_create_hcd(&ohs900h_hc_driver, &pdev->dev, pdev->name);
+
+	if (!hcd) {
+		return -ENOMEM;
+	}
+	hcd->rsrc_start = res->start;
+	
+	s_ohs900 = hcd_to_ohs900(hcd);
+
+	pr_debug("driver %s, spin_lock_init\n", hcd_name);
+	spin_lock_init(&s_ohs900->lock);
+	INIT_LIST_HEAD(&s_ohs900->async);
 
 	init_timer(&s_ohs900->timer);
 	s_ohs900->timer.function = ohs900h_timer;
 	s_ohs900->timer.data = (unsigned long)s_ohs900;
 	s_ohs900->addr_reg = addr_reg;
+	s_ohs900->board = pdata;
 
 	spin_lock_irq(&s_ohs900->lock);
-
 	port_power(s_ohs900, 0);
-
 	spin_unlock_irq(&s_ohs900->lock);
 
 	msleep(200);
@@ -1723,29 +1705,24 @@ static int __devinit ohs900h_probe(struct platform_device *dev)
 		break;
 	default:
 		/* reject other chip revisions */
-
-		goto err6;
+		retval = -ENODEV;
+		goto err_out;
 	}
 	pr_debug("driver %s, hw version = %d\n", hcd_name, tmp);
 
 	//irqflags |= IRQF_SHARED;
 	retval = usb_add_hcd(hcd, irq, IRQF_DISABLED);	// | irqflags);
 	if (retval != 0)
-		goto err6;
+		goto err_out;
 
-	pr_debug("%s, irq %d\n", hcd->product_desc, irq);
+	dev_dbg(pdev->dev, "%s, irq %d\n", hcd->product_desc, irq);
 
 	create_debug_file(s_ohs900);
-	return retval;
-err6:
+	return 0;
+
+err_out:
 	pr_debug("init error, %d\n", retval);
 	usb_put_hcd(hcd);
-err5:
-	pr_debug("init error, %d\n", retval);
-	if (!ioaddr)
-		iounmap(addr_reg);
-err2:
-	pr_debug("init error, %d\n", retval);
 	return retval;
 }
 
