@@ -28,6 +28,8 @@
 
 extern int mem_init_done;
 
+static unsigned long ioremap_bot = 0xffff0000L;
+
 /* bt ioremaped lenghts */
 static unsigned int bt_ioremapped_len[NR_FIX_BTMAPS] __initdata = 
  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
@@ -42,21 +44,29 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 	unsigned long addr;
 	pgprot_t prot;
 
-	area = get_vm_area(size, VM_IOREMAP);
-	if (!area)
-		return NULL;
-	addr = (unsigned long) area->addr;
+	if (likely(mem_init_done)) {
+		area = get_vm_area(size, VM_IOREMAP);
+		if (!area)
+			return NULL;
+		addr = (unsigned long) area->addr;
+	} else {
+		ioremap_bot -= size;
+		addr = ioremap_bot;
+	}
 
 	prot = __pgprot(_PAGE_PRESENT | __READABLE | __WRITEABLE | _PAGE_GLOBAL |
 		        _PAGE_KERNEL | flags);
 
 	if (ioremap_page_range((unsigned long) addr, addr + size, phys_addr, prot)) {
-		vfree(area->addr);
+		if (mem_init_done)
+			vfree(area->addr);
+		else
+			ioremap_bot += size;
 		return NULL;
 	}
 /* Is this flush necessary??  Can we get flush_cache_vmap to cover it??? */
 //	flush_tlb_all();
-	return area->addr;
+	return addr;
 }
 
 /*
@@ -185,10 +195,13 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	/*
 	 * Ok, go for it..
 	 */
-	if(mem_init_done)
+	if(mem_init_done) {
 		addr = ioremap_core(phys_addr, size, flags);
-	else
-		addr = bt_ioremap_core(phys_addr, size, flags);
+	} else {
+		printk("JONAS JONAS: bt_iorempa_core\n");
+		addr = ioremap_core(phys_addr, size, flags);
+		//addr = bt_ioremap_core(phys_addr, size, flags);
+	}
 
 	return (void *) (offset + (char *)addr);
 }

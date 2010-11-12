@@ -4,6 +4,10 @@
 #include <asm/page.h>
 #include <linux/threads.h>
 #include <linux/mm.h>
+#include <linux/memblock.h>
+#include <linux/bootmem.h>
+
+extern int mem_init_done;
 
 #if 1
 #define pmd_populate_kernel(mm, pmd, pte) \
@@ -67,12 +71,29 @@ static inline void pgd_free (struct mm_struct *mm, pgd_t *pgd)
 	free_page((unsigned long)pgd);
 }
 
+/**
+ * OK, this one's a bit tricky... ioremap can get called before memory is
+ * initialized (early serial console does this) and will want to alloc a page
+ * for its mapping.  No userspace pages will ever get allocated before memory
+ * is initialized so this applies only to kernel pages.  In the event that
+ * this is called before memory is initialized we allocate the page using
+ * the memblock infrastructure.
+ */
+
 static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
-  	pte_t *pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	pte_t* pte;
+
+	if (likely(mem_init_done)) {
+	  	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	} else {
+		pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+//		pte = (pte_t *) __va(memblock_alloc(PAGE_SIZE, PAGE_SIZE));
+	}
+
 	if (pte)
 		clear_page(pte);
- 	return pte;
+	return pte;
 }
 
 static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
