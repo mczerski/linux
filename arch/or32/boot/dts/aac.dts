@@ -1,0 +1,290 @@
+/dts-v1/;
+/ {
+	compatible = "orsoc,development-board";
+	#size-cells = <1>;
+	#address-cells = <1>;
+
+	chosen {
+		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 debug";
+/*		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::"; */
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x2000000>;
+	};
+
+	cpus {
+		cpu@0 {
+			compatible = "opencores,openrisc-1200";
+			clock-frequency = <20000000>;
+		};
+	};
+
+	soc {
+		/* Every node with children must specify address-cells and
+		   size-cells; they are not inherited */
+		#address-cells = <1>;
+		#size-cells = <1>;
+		device_type = "soc";
+
+		/* This is also a 1:1 mapping but limits size of mappable
+		   region to 0x40000000 */
+		ranges = <0x80000000 0x80000000 0x40000000>;
+                /* An alternative is to specify an empty ranges here to
+                   indicates 1:1 mapping of SOC addresses (device addresses)
+                   to CPU addresses */
+                /*ranges;*/
+
+		/* This SOC has only a single, implicit PIC, so define it
+		   early and put the interrupt-parent property in the 'soc'
+		   node so that it's inherited by all the children using
+		   interrupts.
+		*/
+		interrupt-parent = <&pic>;
+
+		/* Devices with interrupts need a 'parent', so we need to
+		   define a controller */
+		pic: pic@0 {
+			compatible = "opencores,or1k-pic";
+			#interrupt-cells = <1>;
+			interrupt-controller;
+		};		
+	
+		scet0: scet@8c000000 {
+			compatible = "opencores,scet";
+			reg = <0x8c000000 0x100>;			
+		};
+
+		serial0: serial@90000000 {
+			/* FIXME: device_type is still needed here... 
+			   should remove requirement from of_serial driver */
+			device_type = "serial";
+			compatible = "opencores,uart", "ns16550a";
+			reg = <0x90000000 0x100>;
+			interrupts = <2>;
+			clock-frequency = <20000000>;
+		};			
+
+		serial1: serial@93000000 {
+			device_type = "serial";
+			compatible = "opencores,uart", "ns16550a";
+			reg = <0x93000000 0x7>;
+			interrupts = <3>;
+			clock-frequency = <20000000>;
+		};
+
+		serial2: serial@94000000 {
+			device_type = "serial";
+			compatible = "opencores,uart", "ns16550a";
+			reg = <0x94000000 0x7>;
+			interrupts = <5>;
+			clock-frequency = <20000000>;
+		};
+			
+		enet0: ethoc@92000000 {
+			compatible = "opencores,ethoc", "ethoc";
+			reg = <0x92000000 0x53>;
+			interrupts = <4>;
+		};
+
+		ohs900: ocores@9c000000 {
+			compatible = "opencores,ohs900-ocores";
+			reg = <0x9c000000 0x100>;
+			interrupts = <20 21>;
+			can_wakeup = <1>;			
+			potpg = <10>;			
+			power = <250>;
+		};
+
+		i2c0: ocores@a0000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0xa0000000 0x8>;
+			interrupts = <10>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dummy@60 {
+				compatible = "dummy";
+				reg = <60>;
+			};
+		}; 
+
+		i2c1: ocores@a1000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0xa1000000 0x8>;
+			interrupts = <11>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			test@60 {
+				compatible = "dummy";
+				reg = <60>;
+			};
+
+			test2@64 {
+				compatible = "dummy";
+				reg = <64>;
+			};
+		}; 
+
+		i2c2: ocores@a2000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0xa2000000 0x8>;
+			interrupts = <12>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+		}; 
+
+		i2c3: ocores@a3000000 {
+			compatible = "opencores,i2c-ocores";
+			reg = <0xa3000000 0x8>;
+			interrupts = <13>;
+
+			regstep = <1>;
+			clock_khz = <20000>;
+
+			/* Devices connected on this I2C bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+		}; 
+
+		spi0: spi0@b0000000 {
+			compatible = "opencores,spi-simple";
+			reg = <0xb0000000 0x5>;
+
+			/* Devices connected on this SPI bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices.
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			flash0: mtd@0 {
+				compatible = "st,m25p10";
+				reg = <0>;
+				spi-max-frequency = <100000000>;
+
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				partition@0 {
+					label = "bootloader";
+					reg = <0x00000000 0x00018000>;
+					read-only;
+				};
+				partition@18000 {
+					label = "dtb";
+					reg = <0x00018000 0x00008000>;
+				};
+			};
+		};
+
+		spi1: spi1@b1000000 {
+			compatible = "opencores,spi-simple";
+			reg = <0xb1000000 0x5>;
+
+			/* Devices connected on this SPI bus get 
+			 * defined here; address- and size-cells
+			 * apply to these child devices.
+			 */	
+
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			/* Example SD card slot at chipselect 0 */
+			/* mmc-spi-slot@0 {
+				compatible = "mmc-spi-slot";
+				reg = <0>;
+				spi-max-frequency = <10000000>;
+			}; */
+		};
+
+		gpio0: gpio@91000000 {
+                	compatible = "opencores,jbtrivial";
+                        reg = <0x91000000 0x6>;
+                        #gpio-cells = <2>;
+                        gpio-controller;
+			xlnx,data-offset = <3>;
+			xlnx,tri-offset = <3>;
+                };
+
+                gpio-leds {
+                        compatible = "gpio-leds";
+
+                        heartbeat {
+                                label = "Heartbeat";
+                                gpios = <&gpio0 0 0x0>;
+                                linux,default-trigger = "heartbeat";
+                        };
+
+                        led1 {
+                                label = "led1";
+                                gpios = <&gpio0 1 0x0>;
+                        };
+
+                        led2 {
+                                label = "led2";
+                                gpios = <&gpio0 2 0x0>;
+                        };
+
+                        led3 {
+                                label = "led3";
+                                gpios = <&gpio0 3 0x0>;
+                        };
+
+                        led4 {
+                                label = "led4";
+                                gpios = <&gpio0 4 0x0>;
+                        };
+
+                        led5 {
+                                label = "led5";
+                                gpios = <&gpio0 5 0x0>;
+                        };
+
+                        led6 {
+                                label = "led6";
+                                gpios = <&gpio0 6 0x0>;
+                        };
+
+                        led7 {
+                                label = "led7";
+                                gpios = <&gpio0 7 0x0>;
+                        };
+                };
+
+	};
+};
