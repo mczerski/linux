@@ -117,7 +117,7 @@ struct ohs900 {
 	spinlock_t lock;
 	void __iomem *addr_reg;
 
-	struct ocores_ohs900_platform_data *board;
+	struct ohs900_platform_data *board;
 	struct proc_dir_entry *pde;
 
 	unsigned long stat_insrmv;

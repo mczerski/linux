@@ -65,12 +65,15 @@ Changelog:
 #include <linux/of.h>
 #include <linux/platform_device.h>
 
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/system.h>
+#include <linux/io.h>
+#include <linux/irq.h>
+/*#include <asm/system.h>
 #include <asm/byteorder.h>
+*/
 
-#include "linux/usb/hcd.h"
+#include <linux/ohs900.h>
+
+#include <linux/usb/hcd.h>
 #include "ohs900-hcd.h"
 
 MODULE_DESCRIPTION("OHS900 USB Host Controller Driver");
@@ -1577,13 +1580,12 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 	struct usb_hcd *hcd;
 	struct ohs900 *s_ohs900;
 	struct resource *res, *ires;
-	struct ocores_ohs900_platform_data *pdata;
+	struct ohs900_platform_data *pdata;
 
 	int irq;
 	void __iomem *addr_reg;
 	int retval;
 	u8 tmp;
-	u8 ioaddr = 0;
 	unsigned long irqflags;
 
 	/* basic sanity checks first.  board-specific init logic should
@@ -1592,8 +1594,8 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 	 * minimal sanity checking.
 	 */
 
-	printk("driver %s, starting ohs900h_probe\n", hcd_name);
-	ires = platform_get_resource(dev, IORESOURCE_IRQ, 0);
+	dev_dbg(&pdev->dev, "driver %s, starting ohs900h_probe\n", hcd_name);
+	ires = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (pdev->num_resources < 3 || !ires)
 		return -ENODEV;
 
@@ -1602,7 +1604,7 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 
 	/* refuse to confuse usbcore */
 	if (pdev->dev.dma_mask) {
-		pr_debug("no we won't dma\n");
+		dev_dbg(&pdev->dev, "no we won't dma\n");
 		return -EINVAL;
 	}
 
@@ -1610,7 +1612,7 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 	if (!devm_request_mem_region(&pdev->dev, res->start,
 				     resource_size(res),
 				     dev_name(&pdev->dev))) {
-		dev_dbg(&pdev->dev, "Resource not available\n");
+		dev_err(&pdev->dev, "Resource not available\n");
 		return -EBUSY;
  	}
 
@@ -1619,20 +1621,20 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	pdata = (struct ocores_ohs900_platform_data *)dev->dev.platform_data;
+	pdata = (struct ohs900_platform_data *)pdev->dev.platform_data;
 	if (!pdata) {
 		int* val;
 
 		pdata = devm_kzalloc(&pdev->dev,
-				sizeof(struct ocores_ohs900_platform_data),
+				sizeof(struct ohs900_platform_data),
 			    	GFP_KERNEL);
-		if (!s_ohs900->board)
+		if (!pdata)
 			return -ENOMEM;
 
 		val = (int*)of_get_property(pdev->dev.of_node, "can_wakeup",
 					   NULL);
 		if (!val) {
-			dev_err(&dev->dev,
+			dev_err(&pdev->dev,
 				"Missing required paramter 'can_wakeup'");
 			return -ENODEV;
 		}
@@ -1640,14 +1642,14 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 
 		val = (int*)of_get_property(pdev->dev.of_node, "potpg", NULL);
 		if (!val) {
-			dev_err(&dev->dev, "Missing required paramter 'potpg'");
+			dev_err(&pdev->dev, "Missing required paramter 'potpg'");
 			return -ENODEV;
 		}
 		pdata->potpg = *val;
 
-		val = (int*)of_get_property(dev->dev.of_node, "power", NULL);
+		val = (int*)of_get_property(pdev->dev.of_node, "power", NULL);
 		if (!val) {
-			dev_err(&dev->dev, "Missing required paramter 'power'");
+			dev_err(&pdev->dev, "Missing required paramter 'power'");
 			return -ENODEV;
 		}
 		pdata->power = *val;
@@ -1715,7 +1717,7 @@ static int __devinit ohs900h_probe(struct platform_device *pdev)
 	if (retval != 0)
 		goto err_out;
 
-	dev_dbg(pdev->dev, "%s, irq %d\n", hcd->product_desc, irq);
+	dev_dbg(&pdev->dev, "%s, irq %d\n", hcd->product_desc, irq);
 
 	create_debug_file(s_ohs900);
 	return 0;
