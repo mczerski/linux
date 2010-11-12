@@ -91,7 +91,9 @@ extern const unsigned long text_start, edata; /* set by the linker script */
 static unsigned long __init setup_memory(void)
 {
 	unsigned long bootmap_size, start_pfn, max_low_pfn;
-
+	phys_addr_t memory_start, memory_end;
+	int i;
+	struct memblock_region* region;
 
 #ifndef CONFIG_FB_OC_SHMEM_SIZE
 #define CONFIG_FB_OC_SHMEM_SIZE 0
@@ -114,14 +116,12 @@ static unsigned long __init setup_memory(void)
 	memory_end = 0;
 
         /* Find main memory where is the kernel */
-        for (i = 0; i < memblock.memory.cnt; i++) {
-                memory_start = (u32) memblock.memory.regions[i].base;
-                memory_end = (u32) memblock.memory.regions[i].base
-                                + (u32) memblock.memory.regions[i].size;
+	for_each_memblock(memory, region) {
+                memory_start = region->base;
+                memory_end = region->base + region->size;
 		printk(KERN_INFO "%s: Memory: 0x%x-0x%x\n", __func__,
-			(u32) memblock.memory.regions[i].base,
-			(u32) memblock.memory.regions[i].base + (u32) memblock.memory.regions[i].size);
-        }
+			memory_start, memory_end);
+	}
 
 	if (! memory_end) {
 		panic("No memory!");

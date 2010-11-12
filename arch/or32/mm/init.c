@@ -190,12 +190,13 @@ static void __init map_ram(void)
 	 * ...from vmlinux.lds.S
  	 */
 	extern const unsigned long _s_kernel_ro, _e_kernel_ro;
+	struct memblock_region* region;
 
 	v = PAGE_OFFSET;
 
-	for (i = 0; i < memblock.memory.cnt; i++) {
-		p = (u32) memblock.memory.regions[i].base & PAGE_MASK;
-		e = p + (u32) memblock.memory.regions[i].size;
+	for_each_memblock(memory, region) {
+		p = (u32) region->base & PAGE_MASK;
+		e = p + (u32) region->size;
 
 		v = (u32) __va(p);
 		pge = pgd_offset_k(v);
@@ -229,8 +230,8 @@ static void __init map_ram(void)
 		}
 
 		printk(KERN_INFO "%s: Memory: 0x%x-0x%x\n", __func__,
-			(u32) memblock.memory.regions[i].base,
-			(u32) memblock.memory.regions[i].base + (u32) memblock.memory.regions[i].size);
+			region->base,
+			region->base + region->size);
 	}
 }
 
