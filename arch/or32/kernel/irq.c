@@ -30,16 +30,16 @@
 #include <linux/irqflags.h>
 
 /* read interrupt enabled status */
-unsigned long __raw_local_save_flags(void) {
+unsigned long arch_local_save_flags(void) {
 	return (mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE));
 }
-EXPORT_SYMBOL(__raw_local_save_flags);
+EXPORT_SYMBOL(arch_local_save_flags);
 
 /* set interrupt enabled status */
-void raw_local_irq_restore(unsigned long flags) {
+void arch_local_irq_restore(unsigned long flags) {
 	mtspr(SPR_SR, ((mfspr(SPR_SR) & ~(SPR_SR_IEE|SPR_SR_TEE)) | flags));
 }
-EXPORT_SYMBOL(raw_local_irq_restore);
+EXPORT_SYMBOL(arch_local_irq_restore);
 
 
 /* OR1K PIC implementation */

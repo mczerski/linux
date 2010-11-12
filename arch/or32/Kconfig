@@ -3,8 +3,6 @@
 # see Documentation/kbuild/config-language.txt.
 #
 
-mainmenu "Linux/or32 Kernel Configuration"
-
 config MMU
 	bool
 	default y

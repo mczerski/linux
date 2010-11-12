@@ -40,6 +40,7 @@
 #include <linux/initrd.h>
 #include <linux/of_fdt.h>
 #include <linux/of.h>
+#include <linux/memblock.h>
  
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -109,6 +110,25 @@ static unsigned long __init setup_memory(void)
 //	min_low_pfn = PAGE_OFFSET >> PAGE_SHIFT;
 
 #undef CONFIG_FB_OC_SHMEM_SIZE
+
+	memory_end = 0;
+
+        /* Find main memory where is the kernel */
+        for (i = 0; i < memblock.memory.cnt; i++) {
+                memory_start = (u32) memblock.memory.regions[i].base;
+                memory_end = (u32) memblock.memory.regions[i].base
+                                + (u32) memblock.memory.regions[i].size;
+		printk(KERN_INFO "%s: Memory: 0x%x-0x%x\n", __func__,
+			(u32) memblock.memory.regions[i].base,
+			(u32) memblock.memory.regions[i].base + (u32) memblock.memory.regions[i].size);
+        }
+
+	if (! memory_end) {
+		panic("No memory!");
+	}
+
+	start_pfn   = PFN_UP(__pa(&_end));
+	max_low_pfn = PFN_DOWN(memory_end);
 
 	/* 
 	 * initialize the boot-time allocator (with low memory only)
