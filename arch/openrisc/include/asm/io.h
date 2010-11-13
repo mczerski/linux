@@ -46,7 +46,7 @@ extern void iounmap(void *addr);
 /*
  * readX/writeX() are used to access memory mapped devices. On some
  * architectures the memory mapped IO stuff needs to be accessed
- * differently. On the or32 architecture, we just read/write the
+ * differently. On the openrisc architecture, we just read/write the
  * memory location directly.
  */
 #define readb(addr) (*(volatile unsigned char *) (addr))
@@ -68,7 +68,7 @@ extern void iounmap(void *addr);
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
 
 /*
- * Again, or32 does not require mem IO specific function.
+ * Again, OpenRISC does not require mem IO specific function.
  */
 
 #define eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void *)(b),(c),(d))
