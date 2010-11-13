@@ -51,11 +51,6 @@
 
 extern unsigned long or32_mem_size;
 
-void __init early_init_dt_scan_chosen_arch(unsigned long node)
-{
-	/* No OR32 specific code here */
-}
-
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
 	memblock_add(base, size);
