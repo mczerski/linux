@@ -557,17 +557,6 @@ asmlinkage void __init start_kernel(void)
 	local_irq_disable();
 	early_boot_irqs_off();
 
-	/*
-	 * HACK ALERT! This is early. We're enabling the console before
-	 * we've done PCI setups etc, and console_init() must be aware of
-	 * this. But we do want output early, in case something goes wrong.
-	 */
-	console_init();
-	if (panic_later)
-		panic(panic_later, panic_param);
-
-
-
 /*
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
@@ -639,7 +628,14 @@ asmlinkage void __init start_kernel(void)
 
 	kmem_cache_init_late();
 
-	/* Console init used to be here */
+	/*
+	 * HACK ALERT! This is early. We're enabling the console before
+	 * we've done PCI setups etc, and console_init() must be aware of
+	 * this. But we do want output early, in case something goes wrong.
+	 */
+	console_init();
+	if (panic_later)
+		panic(panic_later, panic_param);
 
 	lockdep_info();
 
@@ -853,7 +849,6 @@ static noinline int init_post(void)
 		printk(KERN_WARNING "Failed to execute %s.  Attempting "
 					"defaults...\n", execute_command);
 	}
-	/*run_init_process("/bin/hello");*/
 	run_init_process("/sbin/init");
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");
