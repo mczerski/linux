@@ -18,8 +18,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-#define DEBUG 1
-
 #include <stdarg.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
@@ -52,52 +50,16 @@
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
 	memblock_add(base, size);
-	memblock_dump_all();
+//	memblock_dump_all();
 }
 
 u64 __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 {
 	u64 alloc;
 	alloc = memblock_alloc(size, align);
-	memblock_dump_all();
+//	memblock_dump_all();
 	return alloc;
 }
-
-#if 0
-#ifdef CONFIG_EARLY_PRINTK
-/* MS this is Microblaze specifig function */
-static int __init early_init_dt_scan_serial(unsigned long node,
-				const char *uname, int depth, void *data)
-{
-	unsigned long l;
-	char *p;
-	int *addr;
-
-	pr_debug("search \"chosen\", depth: %d, uname: %s\n", depth, uname);
-
-/* find all serial nodes */
-	if (strncmp(uname, "serial", 6) != 0)
-		return 0;
-
-	early_init_dt_check_for_initrd(node);
-
-/* find compatible node with uartlite */
-	p = of_get_flat_dt_prop(node, "compatible", &l);
-	if ((strncmp(p, "xlnx,xps-uartlite", 17) != 0) &&
-			(strncmp(p, "xlnx,opb-uartlite", 17) != 0))
-		return 0;
-
-	addr = of_get_flat_dt_prop(node, "reg", &l);
-	return *addr; /* return address */
-}
-
-/* this function is looking for early uartlite console - Microblaze specific */
-int __init early_uartlite_console(void)
-{
-	return of_scan_flat_dt(early_init_dt_scan_serial, NULL);
-}
-#endif
-#endif
 
 void __init early_init_devtree(void *params)
 {
