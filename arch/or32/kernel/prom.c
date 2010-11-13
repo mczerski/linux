@@ -101,8 +101,6 @@ int __init early_uartlite_console(void)
 
 void __init early_init_devtree(void *params)
 {
-	pr_debug(" -> early_init_devtree(%p)\n", params);
-
 	/* Setup flat device-tree pointer */
 	initial_boot_params = params;
 
@@ -122,8 +120,6 @@ void __init early_init_devtree(void *params)
 //	parse_early_param();
 
 	memblock_analyze();
-
-	pr_debug(" <- early_init_devtree()\n");
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
