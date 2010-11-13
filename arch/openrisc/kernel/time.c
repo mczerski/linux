@@ -1,6 +1,4 @@
 /*
- *  linux/arch/or32/kernel/time.c
- *
  *  Copyright (C) 2010 Jonas Bonn 
  *
  *      This program is free software; you can redistribute it and/or
@@ -24,15 +22,13 @@
 
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
-
-#include <asm/irq_regs.h>
+#include <linux/irq.h>
+#include <linux/io.h>
 
 #include <asm/cpuinfo.h>
-#include <asm/segment.h>
-#include <asm/io.h>
 #include <asm/or32-hf.h>
 
-static int or32_timer_set_next_event(unsigned long delta,
+static int openrisc_timer_set_next_event(unsigned long delta,
                                      struct clock_event_device *dev)
 {
 	u32 c;
@@ -53,7 +49,7 @@ static int or32_timer_set_next_event(unsigned long delta,
         return 0;
 }
 
-static void or32_timer_set_mode(enum clock_event_mode mode,
+static void openrisc_timer_set_mode(enum clock_event_mode mode,
                                 struct clock_event_device *evt)
 {
         switch (mode) {
@@ -82,12 +78,12 @@ static void or32_timer_set_mode(enum clock_event_mode mode,
  * one-shot events, so no problem.
  */
 
-static struct clock_event_device clockevent_or32_timer = {
-        .name           = "or32_timer_clockevent",
+static struct clock_event_device clockevent_openrisc_timer = {
+        .name           = "openrisc_timer_clockevent",
         .features       = CLOCK_EVT_FEAT_ONESHOT,
         .rating         = 300,
-        .set_next_event = or32_timer_set_next_event,
-        .set_mode       = or32_timer_set_mode,
+        .set_next_event = openrisc_timer_set_next_event,
+        .set_mode       = openrisc_timer_set_mode,
 };
 
 static inline void timer_ack(void)
@@ -116,7 +112,7 @@ static inline void timer_ack(void)
 irqreturn_t timer_interrupt(struct pt_regs * regs)
 {
         struct pt_regs *old_regs = set_irq_regs(regs);
-        struct clock_event_device *evt = &clockevent_or32_timer;
+        struct clock_event_device *evt = &clockevent_openrisc_timer;
 
         timer_ack();
 
@@ -132,42 +128,44 @@ irqreturn_t timer_interrupt(struct pt_regs * regs)
         return IRQ_HANDLED;
 }
 
-static __init void or32_clockevent_init(void)
+static __init void openrisc_clockevent_init(void)
 {
-	clockevents_calc_mult_shift(&clockevent_or32_timer, cpuinfo.clock_frequency, 4);
+	clockevents_calc_mult_shift(&clockevent_openrisc_timer,
+				    cpuinfo.clock_frequency, 4);
 
 	/* We only have 28 bits */
-        clockevent_or32_timer.max_delta_ns =
-                clockevent_delta2ns((u32)0x0fffffff, &clockevent_or32_timer);
-        clockevent_or32_timer.min_delta_ns =
-                clockevent_delta2ns(1, &clockevent_or32_timer);
-        clockevent_or32_timer.cpumask = cpumask_of(0);
-        clockevents_register_device(&clockevent_or32_timer);
+        clockevent_openrisc_timer.max_delta_ns =
+                clockevent_delta2ns((u32)0x0fffffff,
+				    &clockevent_openrisc_timer);
+        clockevent_openrisc_timer.min_delta_ns =
+                clockevent_delta2ns(1, &clockevent_openrisc_timer);
+        clockevent_openrisc_timer.cpumask = cpumask_of(0);
+        clockevents_register_device(&clockevent_openrisc_timer);
 }
 
 
 /** 
- * Clocksource: OR1K Incrementer
+ * Clocksource: Based on OpenRISC timer/counter
  *
- * This sets up the OR1K Tick Timer as a clock source.  The tick timer
+ * This sets up the OpenRISC Tick Timer as a clock source.  The tick timer
  * is 32 bits wide and runs at the CPU clock frequency.
  */
 
-static cycle_t or32_timer_read(struct clocksource* cs) {
+static cycle_t openrisc_timer_read(struct clocksource* cs) {
 	return (cycle_t) mfspr(SPR_TTCR);
 } 
 
-static struct clocksource or32_timer = {
-	.name		= "or32_timer",
+static struct clocksource openrisc_timer = {
+	.name		= "openrisc_timer",
         .rating         = 200,
-	.read		= or32_timer_read,
+	.read		= openrisc_timer_read,
         .mask           = CLOCKSOURCE_MASK(32),
         .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-static int __init or32_timer_init(void)
+static int __init openrisc_timer_init(void)
 {
-        if (clocksource_register_hz(&or32_timer, cpuinfo.clock_frequency))
+        if (clocksource_register_hz(&openrisc_timer, cpuinfo.clock_frequency))
                 panic("failed to register clocksource");
 
 	/* Enable the incrementer: 'continuous' mode with interrupt disabled */
@@ -184,6 +182,6 @@ void __init time_init(void)
 	if (!(upr & SPR_UPR_TTP))
 		panic("Linux not supported on devices without tick timer");
 
-	or32_timer_init();
-	or32_clockevent_init();
+	openrisc_timer_init();
+	openrisc_clockevent_init();
 }
