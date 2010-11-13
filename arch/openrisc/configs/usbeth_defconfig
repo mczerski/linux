@@ -55,7 +55,7 @@ CONFIG_LOG_BUF_SHIFT=14
 # CONFIG_RELAY is not set
 # CONFIG_NAMESPACES is not set
 CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="arch/or32/support/initramfs arch/or32/support/initramfs.devnodes"
+CONFIG_INITRAMFS_SOURCE="arch/openrisc/support/initramfs arch/openrisc/support/initramfs.devnodes"
 CONFIG_INITRAMFS_ROOT_UID=0
 CONFIG_INITRAMFS_ROOT_GID=0
 # CONFIG_RD_GZIP is not set

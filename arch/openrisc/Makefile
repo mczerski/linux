@@ -30,16 +30,16 @@ CFLAGS		+= -fsigned-char -pipe -ffixed-r10 \
 #		   -ffixed-r28 -ffixed-r29 -ffixed-r30 -ffixed-r31 \
                    -Wno-uninitialized
 
-head-y 		:= arch/or32/kernel/head.o arch/or32/kernel/init_task.o
+head-y 		:= arch/openrisc/kernel/head.o arch/openrisc/kernel/init_task.o
 
 
-core-y		+= arch/or32/lib/ \
-		   arch/or32/kernel/ \
-		   arch/or32/mm/ \
-		   arch/or32/board/ 
+core-y		+= arch/openrisc/lib/ \
+		   arch/openrisc/kernel/ \
+		   arch/openrisc/mm/ \
+		   arch/openrisc/board/ 
 libs-y		+= $(LIBGCC)
 
 
-core-y		+= arch/or32/boot/
+core-y		+= arch/openrisc/boot/
 
 all: vmlinux

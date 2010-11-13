@@ -7,7 +7,7 @@ CONFIG_BSD_PROCESS_ACCT=y
 CONFIG_TINY_RCU=y
 CONFIG_LOG_BUF_SHIFT=14
 CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="arch/or32/support/initramfs arch/or32/support/initramfs.devnodes"
+CONFIG_INITRAMFS_SOURCE="arch/openrisc/support/initramfs arch/openrisc/support/initramfs.devnodes"
 CONFIG_EMBEDDED=y
 # CONFIG_SYSCTL_SYSCALL is not set
 # CONFIG_KALLSYMS is not set

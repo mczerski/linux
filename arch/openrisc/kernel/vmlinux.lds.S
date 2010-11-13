@@ -24,7 +24,7 @@
 #include <asm-generic/vmlinux.lds.h>
 	
 OUTPUT_FORMAT("elf32-or32", "elf32-or32", "elf32-or32")
-OUTPUT_ARCH(or32)
+/*OUTPUT_ARCH(or32)*/
 jiffies = jiffies_64 + 4;
 /*PAGE_SIZE = 8192;*/
 
