@@ -90,30 +90,14 @@ extern const unsigned long text_start, edata; /* set by the linker script */
 
 static unsigned long __init setup_memory(void)
 {
-	unsigned long bootmap_size, start_pfn, max_low_pfn;
+	unsigned long bootmap_size;
+	unsigned long ram_start_pfn;
+	unsigned long free_ram_start_pfn;
+	unsigned long ram_end_pfn;
 	phys_addr_t memory_start, memory_end;
-	int i;
 	struct memblock_region* region;
 
-#ifndef CONFIG_FB_OC_SHMEM_SIZE
-#define CONFIG_FB_OC_SHMEM_SIZE 0
-#endif /* CONFIG_FB_OC_SHMEM_SIZE */
-
-
-	/* min_low_pfn points to the start of DRAM, start_pfn points
-	 * to the first DRAM pages after the kernel, and max_low_pfn
-	 * to the end of DRAM. Partial pages are not useful, so round it 
-	 * down.
-	 */ 
-	start_pfn   = PFN_UP(__pa(&_end));
-	max_low_pfn = PFN_DOWN(or32_mem_size);
-/*	max_low_pfn = PFN_DOWN(CONFIG_OR32_MEMORY_SIZE
-			       -CONFIG_FB_OC_SHMEM_SIZE);*/
-//	min_low_pfn = PAGE_OFFSET >> PAGE_SHIFT;
-
-#undef CONFIG_FB_OC_SHMEM_SIZE
-
-	memory_end = 0;
+	memory_end = memory_start = 0;
 
         /* Find main memory where is the kernel */
 	for_each_memblock(memory, region) {
@@ -127,17 +111,29 @@ static unsigned long __init setup_memory(void)
 		panic("No memory!");
 	}
 
-	start_pfn   = PFN_UP(__pa(&_end));
-	max_low_pfn = PFN_DOWN(memory_end);
+	ram_start_pfn = PFN_UP(memory_start);
+	/* free_ram_start_pfn is first page after kernel */
+	free_ram_start_pfn = PFN_UP(__pa(&_end));
+	ram_end_pfn = PFN_DOWN(memblock_end_of_DRAM());
+
+#ifndef CONFIG_HIGHMEM
+	max_pfn = ram_end_pfn;
+#endif
 
 	/* 
-	 * initialize the boot-time allocator (with low memory only)
+	 * initialize the boot-time allocator (with low memory only).
+	 *
+	 * This makes the memory from the end of the kernel to the end of
+	 * RAM usable.
+	 * init_bootmem sets the global values min_low_pfn, max_low_pfn.
 	 */ 
-	bootmap_size = init_bootmem(start_pfn, max_low_pfn);
-	free_bootmem(PFN_PHYS(start_pfn), PFN_PHYS(max_low_pfn - start_pfn));
-	reserve_bootmem(PFN_PHYS(start_pfn), bootmap_size, BOOTMEM_DEFAULT);//rgd
+	bootmap_size = init_bootmem(ram_start_pfn, ram_end_pfn-ram_start_pfn);
+	free_bootmem(PFN_PHYS(free_ram_start_pfn),
+		     (ram_end_pfn-free_ram_start_pfn)<< PAGE_SHIFT);
+	reserve_bootmem(PFN_PHYS(free_ram_start_pfn), bootmap_size,
+			BOOTMEM_DEFAULT);
 
-	return(max_low_pfn);
+	return(ram_end_pfn);
 }
 
 
