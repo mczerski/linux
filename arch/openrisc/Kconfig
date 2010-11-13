@@ -3,7 +3,7 @@
 # see Documentation/kbuild/config-language.txt.
 #
 
-config OR32
+config OPENRISC
 	def_bool y
 	select OF
 	select OF_FLATTREE
@@ -73,9 +73,9 @@ menu "Processor type and features"
 
 choice 
 	prompt "Subarchitecture/SoC type"
-	default OR32_GENERIC
+	default OPENRISC_GENERIC
 
-config OR32_GENERIC
+config OPENRISC_GENERIC
 	bool "or1200/Generic"
 	help
 	  Generic OpenRISC 1200 platform
@@ -96,7 +96,7 @@ config OPENRISC_HAVE_INST_FL1
 
 endmenu
 
-config OR32_FLASH_BOOT
+config OPENRISC_FLASH_BOOT
 	bool "Boot from FLASH"
 	default n
 	help
@@ -112,8 +112,8 @@ source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
 source "mm/Kconfig"
 
-config OR32_NO_SPR_SR_DSX
-	bool "use SPR_SR_DSX software emulation" if OR32_GENERIC
+config OPENRISC_NO_SPR_SR_DSX
+	bool "use SPR_SR_DSX software emulation" if OPENRISC_GENERIC
 	default y
 	help
 	  SPR_SR_DSX bit is status register bit indicating whether
@@ -126,7 +126,7 @@ config OR32_NO_SPR_SR_DSX
 	  SPR_SR_DSX bit implemented. Say Y if you are unsure.
 
 
-config OR32_ANONYMOUS
+config OPENRISC_ANONYMOUS
 	bool "Enable anonymity"
 	default n
 
@@ -163,7 +163,7 @@ config DEBUG_STACKOVERFLOW
 
 	  Say Y if you are unsure. 
 
-config OR32_GUARD_PROTECTED_CORE
+config OPENRISC_GUARD_PROTECTED_CORE
 	bool "Write protect read only part of kernel"
 	default y
 	help
@@ -184,7 +184,7 @@ config JUMP_UPON_UNHANDLED_EXCEPTION
 
 	  Say Y if you are unsure.
 
-config OR32_EXCEPTION_DEBUG
+config OPENRISC_EXCEPTION_DEBUG
 	bool "Print processor state at each exception"
 	default n
 	help
@@ -193,7 +193,7 @@ config OR32_EXCEPTION_DEBUG
 
 	  Say N if you are unsure.
 	
-config OR32_ESR_EXCEPTION_BUG_CHECK
+config OPENRISC_ESR_EXCEPTION_BUG_CHECK
 	bool "Check for possible ESR exception bug"
 	default n
 	help

@@ -285,7 +285,7 @@ EXCEPTION_ENTRY(_data_page_fault_handler)
 	 * all this can be written much simpler. look at
 	 * DTLB miss handler in the CONFIG_GUARD_PROTECTED_CORE part
 	 */
-#ifdef CONFIG_OR32_NO_SPR_SR_DSX
+#ifdef CONFIG_OPENRISC_NO_SPR_SR_DSX
 	l.lwz   r6,PC(r3)                  // address of an offending insn
         l.lwz   r6,0(r6)                   // instruction that caused pf
 
@@ -539,7 +539,7 @@ UNHANDLED_EXCEPTION(_vector_0x700,0x700)
 /* ---[ 0x800: External interrupt exception ]---------------------------- */
 
 EXCEPTION_ENTRY(_external_irq_handler)
-#ifdef CONFIG_OR32_ESR_EXCEPTION_BUG_CHECK
+#ifdef CONFIG_OPENRISC_ESR_EXCEPTION_BUG_CHECK
 	l.lwz	r4,SR(r1)		// were interrupts enabled ?
 	l.andi	r4,r4,SPR_SR_IEE
 	l.sfeqi	r4,0

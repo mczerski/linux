@@ -95,7 +95,7 @@ config GPIO_XILINX
 
 config GPIO_JBTRIVIAL
 	bool "OpenCores JB-Trivial MM GPIO support"
-	depends on OR32
+	depends on OPENRISC
 	help
 	  Say yes here to support the JB-Trivial FPGA GPIO device
 

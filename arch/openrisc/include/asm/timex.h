@@ -6,7 +6,7 @@
 #include <asm/param.h>
 #include <asm/cpuinfo.h>
 
-//#define CLOCK_TICK_RATE	(CONFIG_OR32_SYS_CLK*1000000 / HZ)
+//#define CLOCK_TICK_RATE	(CONFIG_OPENRISC_SYS_CLK*1000000 / HZ)
 //#define CLOCK_TICK_RATE	(cpuinfo.clock_frequency / HZ)
 
 /* This isn't really used any more */

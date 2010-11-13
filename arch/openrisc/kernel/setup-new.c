@@ -111,7 +111,7 @@ static unsigned long __init setup_memory(void)
 	 * down.
 	 */ 
 	start_pfn   = PFN_UP(__pa(&_end));
-	max_low_pfn = PFN_DOWN(CONFIG_OR32_MEMORY_SIZE);
+	max_low_pfn = PFN_DOWN(CONFIG_OPENRISC_MEMORY_SIZE);
 	min_low_pfn = PAGE_OFFSET >> PAGE_SHIFT;
 
 	/* 
@@ -190,19 +190,19 @@ void __init detect_soc_rev_0(unsigned long upr)
 	       "            populated with all avaliable units)\n");
 
 	printk("  dCACHE: assumed %4d Kb size, %2d bytes/line, %d way(s)", 
-	       CONFIG_OR32_DC_SIZE, CONFIG_OR32_DC_LINE, 1);
+	       CONFIG_OPENRISC_DC_SIZE, CONFIG_OPENRISC_DC_LINE, 1);
 	detect_unit_config(upr, SPR_UPR_DCP,  ", detected: ", NULL);
 
 	printk("  iCACHE: assumed %4d Kb size, %2d bytes/line, %d way(s)", 
-	       CONFIG_OR32_IC_SIZE, CONFIG_OR32_IC_LINE, 1);
+	       CONFIG_OPENRISC_IC_SIZE, CONFIG_OPENRISC_IC_LINE, 1);
 	detect_unit_config(upr, SPR_UPR_ICP,  ", detected: ", NULL);
 
 	printk("  dMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_DTLB_ENTRIES, 1);
+	       CONFIG_OPENRISC_DTLB_ENTRIES, 1);
 	detect_unit_config(upr, SPR_UPR_DMP,  ", detected: ", NULL);
 
 	printk("  iMMU\t: assumed %4d entries, %d way(s)", 
-	       CONFIG_OR32_ITLB_ENTRIES, 1);
+	       CONFIG_OPENRISC_ITLB_ENTRIES, 1);
 	detect_unit_config(upr, SPR_UPR_IMP,  ", detected: ", NULL);
 	detect_unit_config(upr, SPR_UPR_DUP,  "  debug : unknown (guess yes), detected: ", NULL);
 	detect_unit_config(upr, SPR_UPR_PCUP, "  PerfC : unknown (guess no ), detected: ", NULL);
@@ -231,7 +231,7 @@ void __init detect_soc(void)
 	printk("  CPU\t: or32/OpenRISC-%x, revision %x, @%d MHz, %s\n", 
 	       version=extract_value(cfg, SPR_VR_VER), 
 	       revision=extract_value(cfg, SPR_VR_REV),
-	       CONFIG_OR32_SYS_CLK,
+	       CONFIG_OPENRISC_SYS_CLK,
 	       (upr & (unsigned long)SPR_UPR_SRP) ? 
 	       "with shadow registers" : "with no shadow registers");
 

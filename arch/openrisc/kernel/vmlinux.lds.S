@@ -12,7 +12,7 @@
  *		- recheck if all aligments are really needed
  */
 
-#ifdef CONFIG_OR32_FLASH_BOOT
+#ifdef CONFIG_OPENRISC_FLASH_BOOT
 #  define LOAD_OFFSET -0x30000000
 #  define LOAD_BASE    0xc0000000
 #else

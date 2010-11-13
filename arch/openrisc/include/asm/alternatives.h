@@ -94,7 +94,7 @@ void __switch_alternate(struct code_alts *alt, int num, int inv_mmu);
 /* The default needs to get the target fixed up, but for everything
  * else, it is not needed and the linker will potentially complain
  * about overflows */
-#ifdef CONFIG_OR32_BA2
+#ifdef CONFIG_OPENRISC_BA2
 # define C_ALT_L_EXT_JUMP(insn, target) \
 	99997: ;\
 	.if __c_alt_we_are_def==1 ;\

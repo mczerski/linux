@@ -46,7 +46,7 @@
 #define NO_CONTEXT -1
 
 /* this is to work around for certian problems */
-#define CONFIG_OR32_FLUSH_ALL
+#define CONFIG_OPENRISC_FLUSH_ALL
 
 #define or32_disable_immu()                \
 {                                          \
@@ -114,7 +114,7 @@ void flush_tlb_all(void)
 
 void flush_tlb_mm(struct mm_struct *mm)
 {
-#ifdef CONFIG_OR32_FLUSH_ALL
+#ifdef CONFIG_OPENRISC_FLUSH_ALL
 	flush_tlb_all();
 #else
         D(printk("tlb: flush mm (%p)\n", mm));
@@ -132,7 +132,7 @@ void flush_tlb_mm(struct mm_struct *mm)
 void flush_tlb_page(struct vm_area_struct *vma, 
 		    unsigned long addr)
 {
-#ifdef CONFIG_OR32_FLUSH_ALL
+#ifdef CONFIG_OPENRISC_FLUSH_ALL
 	flush_tlb_all();
 #else
 	unsigned long tlb_offset, flags;
@@ -161,7 +161,7 @@ void flush_tlb_range(struct vm_area_struct *vma,
 		     unsigned long start,
 		     unsigned long end)
 {
-#ifdef CONFIG_OR32_FLUSH_ALL
+#ifdef CONFIG_OPENRISC_FLUSH_ALL
 	flush_tlb_all();
 #else
 	unsigned long vpn, flags;
@@ -214,7 +214,7 @@ void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		prev, next, next_tsk, next_tsk ? next_tsk->mm : 0, current);
 */
 
-#ifdef CONFIG_OR32_FLUSH_ALL
+#ifdef CONFIG_OPENRISC_FLUSH_ALL
 	flush_tlb_all();
 #else
 	if (prev != next)
@@ -242,7 +242,7 @@ void destroy_context(struct mm_struct *mm)
 {
 	D(printk("destroy_context %d (%p)\n", mm->context, mm));
 	
-#ifdef CONFIG_OR32_FLUSH_ALL
+#ifdef CONFIG_OPENRISC_FLUSH_ALL
 	flush_tlb_all();
 #else
 	flush_tlb_mm(mm);

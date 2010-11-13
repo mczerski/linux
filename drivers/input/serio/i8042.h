@@ -26,7 +26,7 @@
 #include "i8042-sparcio.h"
 #elif defined(CONFIG_X86) || defined(CONFIG_IA64)
 #include "i8042-x86ia64io.h"
-#elif defined(CONFIG_OR32)
+#elif defined(CONFIG_OPENRISC)
 #include "i8042-or32.h"
 #else
 #include "i8042-io.h"

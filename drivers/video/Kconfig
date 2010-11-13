@@ -961,7 +961,7 @@ config FB_EPSON1355
 
 config FB_OC
 	bool "OpenCores VGA/LCD core 2.0 framebuffer support"
-	depends on OR32
+	depends on OPENRISC
 	default n
 	---help---
 	  Frame buffer driver for the OpenCores VGA/LCD core.
@@ -971,7 +971,7 @@ config FB_OC
 config FB_OC_SHMEM
 	bool "Framebuffer is in main memory"
 	default y
-	depends on OR32
+	depends on OPENRISC
 	---help---
 	  If VGA/LCD core has dedicated framebuffer memory answer N
 
