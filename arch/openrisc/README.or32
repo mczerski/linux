@@ -1,4 +1,5 @@
-This is a port of Linux to the OpenRISC 1000 family of microprocessors. 
+This is a port of Linux to the OpenRISC family of microprocessors; the intial
+target, specifically, is the OpenRISC 1000, 32-bit architecture.
 
 For more information about OpenRISC processors, licensing and design
 services you may contact ORSoC AB. 
@@ -8,14 +9,88 @@ services you may contact ORSoC AB.
 	website:	http://opencores.org
 			http://orsoc.se
 
-For information about Linux on OpenRISC, please contact South Pole AB
+For information about Linux on OpenRISC, please contact South Pole AB.
 
 	email:		info@southpole.se
 
 	website:	http://southpole.se
 			http://southpoleconsulting.com
 
-Changes:
+>>> --------------------------------------------------------------------- <<<
+
+Build instructions for OpenRISC toolchain and Linux
+===================================================
+
+In order to build and run Linux for OpenRISC, you'll need at least a basic
+toolchain and, perhaps, the architectural simulator.  Steps to get these bits
+in place are outlined here.
+
+(Note that an account at opencores.org may be necessary in order to download
+the toolchain from SVN... registration is free and encouraged!)
+
+The following instructions assume that the variable OPENRISC_PREFIX is defined
+to the location to install the toolchain; e.g. /usr/local/or32-elf.
+
+1) binutils
+
+	svn co http://opencores.org/ocsvn/openrisc/openrisc/trunk/gnu-src/binutils-2.20.1
+
+	cd binutils-2.20.1
+	./configure --target=or32-elf --prefix=$OPENRISC_PREFIX
+	make
+	make install
+
+You'll need to export the toolchain path in order to build GCC in the next
+step:
+
+	export PATH=$OPENRISC_PREFIX/bin:$PATH
+
+
+2) GCC
+
+Note that GCC cannot be built in the source directory.
+
+	svn co http://opencores.org/ocsvn/openrisc/openrisc/trunk/gnu-src/gcc-4.5.1
+
+	mkdir gcc-build
+	cd gcc-build
+	../gcc-4.5.1/configure --target=or32-elf --prefix=$OPENRISC_PREFIX --without-headers --enable-languages=c --disable-libssp --srcdir=../gcc-4.5.1
+	make
+	make install
+
+
+3) or1ksim (optional)
+
+or1ksim is the architectural simulator which will allow you to actually run
+your OpenRISC Linux kernel if you don't have OpenRISC processor at hand.
+
+	svn co http://opencores.org/ocsvn/openrisc/openrisc/trunk/or1ksim
+
+	cd or1ksim
+	./configure --prefix=$OPENRISC_PREFIX
+	make
+	make install
+
+4)  Linux kernel
+
+Build the kernel as usual
+
+	make ARCH=openrisc defconfig
+	make ARCH=openrisc
+
+5)  Run in architectural simulator
+
+There's a configuration file for the architectural simulator (or1ksim) in the
+arch/openrisc directory, allow you to run your kernel with the following
+incantation:
+
+	sim -f arch/openrisc/or1ksim.cfg vmlinux
+
+>>> --------------------------------------------------------------------- <<<
+
+History
+=======
+
 18. 11. 2003	Matjaz Breskvar (phoenix@bsemi.com)
 	initial port of linux to OpenRISC/or32 architecture. 
         all the core stuff is implemented and seams usable.
@@ -40,3 +115,4 @@ Changes:
 
 09. 10. 2010    Jonas Bonn (jonas@southpole.se)
 	major rewrite to bring up to par with upstream Linux 2.6.36
+
