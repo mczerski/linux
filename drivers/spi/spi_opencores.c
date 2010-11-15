@@ -670,13 +670,21 @@ static struct platform_driver ocspi_driver = {
 
 static int __init ocspi_init(void)
 {
+	int status;
+
 	ocspi_wq = create_singlethread_workqueue(
 				ocspi_driver.driver.name);
 
 	if (ocspi_wq == NULL)
 		return -ENOMEM;
 
-	return platform_driver_register(&ocspi_driver);
+	status = platform_driver_register(&ocspi_driver);
+
+	if (status) {
+		destroy_workqueue(ocspi_wq);
+	};
+
+	return status;
 }
 module_init(ocspi_init);
 
