@@ -54,20 +54,20 @@ static void openrisc_timer_set_mode(enum clock_event_mode mode,
 {
         switch (mode) {
         case CLOCK_EVT_MODE_PERIODIC:
-                printk(KERN_INFO "%s: periodic\n", __func__);
+                pr_debug(KERN_INFO "%s: periodic\n", __func__);
 		BUG();
                 break;
         case CLOCK_EVT_MODE_ONESHOT:
-                printk(KERN_INFO "%s: oneshot\n", __func__);
+                pr_debug(KERN_INFO "%s: oneshot\n", __func__);
                 break;
         case CLOCK_EVT_MODE_UNUSED:
-                printk(KERN_INFO "%s: unused\n", __func__);
+                pr_debug(KERN_INFO "%s: unused\n", __func__);
                 break;
         case CLOCK_EVT_MODE_SHUTDOWN:
-                printk(KERN_INFO "%s: shutdown\n", __func__);
+                pr_debug(KERN_INFO "%s: shutdown\n", __func__);
                 break;
         case CLOCK_EVT_MODE_RESUME:
-                printk(KERN_INFO "%s: resume\n", __func__);
+                pr_debug(KERN_INFO "%s: resume\n", __func__);
                 break;
         }
 }
