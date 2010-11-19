@@ -19,6 +19,7 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/of.h>
 #include <net/ethoc.h>
 
 static int buffer_size = 0x20000; /* 128 KBytes */
@@ -1041,7 +1042,17 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 			(struct ethoc_platform_data *)pdev->dev.platform_data;
 		memcpy(netdev->dev_addr, pdata->hwaddr, IFHWADDRLEN);
 		priv->phy_id = pdata->phy_id;
-	}
+	} else {
+		uint8_t* mac;
+		priv->phy_id = -1;
+
+#ifdef CONFIG_OF
+		mac = (uint8_t*)of_get_property(pdev->dev.of_node, "local-mac-address",
+				      NULL);
+		if (mac)
+			memcpy(netdev->dev_addr, mac, IFHWADDRLEN);
+#endif
+	} 
 
 	/* Check that the given MAC address is valid. If it isn't, read the
 	 * current MAC from the controller. */
@@ -1183,7 +1194,9 @@ static struct platform_driver ethoc_driver = {
 	.driver  = {
 		.name = "ethoc",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_OF
 		.of_match_table = ethoc_match,
+#endif
 	},
 };
 
