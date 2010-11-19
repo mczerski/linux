@@ -76,6 +76,13 @@ properties.
 			reg = <0x90000000 0x100>;
 			interrupts = <2>;
 			clock-frequency = <20000000>;
-		};			
+		};
+
+		enet0: ethoc@92000000 {
+			compatible = "opencores,ethoc", "ethoc";
+			reg = <0x92000000 0x53>;
+			interrupts = <4>;
+			local-mac-address = [02 de ad be ef 02];
+		};
 	};
 };
