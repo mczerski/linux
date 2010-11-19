@@ -562,7 +562,6 @@ static irqreturn_t ethoc_interrupt(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct ethoc *priv = netdev_priv(dev);
 	u32 pending;
-	u32 p2;
 	u32 mask;
 
 	/* Figure out what triggered the interrupt...
@@ -620,7 +619,6 @@ static int ethoc_get_mac_address(struct net_device *dev, void *addr)
 static int ethoc_poll(struct napi_struct *napi, int budget)
 {
 	struct ethoc *priv = container_of(napi, struct ethoc, napi);
-	int done = 0;
 	int rx_work_done = 0;
 	int tx_work_done = 0;
 
