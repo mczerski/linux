@@ -1,17 +1,14 @@
-/* $Id: sigcontext.h,v 1.1 2000/07/10 16:32:31 bjornw Exp $ */
-
 #ifndef __ASM_OPENRISC_SIGCONTEXT_H
 #define __ASM_OPENRISC_SIGCONTEXT_H
 
 #include <asm/ptrace.h>
 
-/* This struct is saved by setup_frame in signal.c, to keep the current context while
-   a signal handler is executed. It's restored by sys_sigreturn.
+/* This struct is saved by setup_frame in signal.c, to keep the current
+   context while a signal handler is executed. It's restored by sys_sigreturn.
    
-   To keep things simple, we use pt_regs here even though normally you just specify
-   the list of regs to save. Then we can use copy_from_user on the entire regs instead
-   of a bunch of get_user's as well...
-
+   To keep things simple, we use pt_regs here even though normally you just
+   specify the list of regs to save. Then we can use copy_from_user on the
+   entire regs instead of a bunch of get_user's as well...
 */
 
 struct sigcontext {
