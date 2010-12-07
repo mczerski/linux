@@ -59,13 +59,14 @@ struct thread_struct {
  * we're in the kernel, won't affect this - only the first user->kernel transition
  * registers are reached by this.
  */
-#define user_regs(thread_info) (((struct pt_regs *)((unsigned long)(thread_info) + THREAD_SIZE)) - 1)
+#define user_regs(thread_info) (((struct pt_regs *)((unsigned long)(thread_info) + THREAD_SIZE - STACK_FRAME_OVERHEAD)) - 1)
 
 /*
  * Dito but for the currently running task
  */
 
-#define current_regs() user_regs(current->thread_info)
+#define task_pt_regs(task) user_regs(task_thread_info(task)) 
+#define current_regs() task_pt_regs(current) 
 
 extern inline void prepare_to_copy(struct task_struct *tsk)
 {
@@ -77,8 +78,8 @@ extern inline void prepare_to_copy(struct task_struct *tsk)
    0, INIT_SP, NULL, KERNEL_DS, 0 }
 
 
-#define KSTK_EIP(tsk)   ((tsk)->thread.regs? (tsk)->thread.regs->pc: 0)
-#define KSTK_ESP(tsk)   ((tsk)->thread.regs? (tsk)->thread.regs->sp: 0)
+#define KSTK_EIP(tsk)   (task_pt_regs(tsk)->pc);
+#define KSTK_ESP(tsk)   (task_pt_regs(tsk)->sp);
 
 
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
