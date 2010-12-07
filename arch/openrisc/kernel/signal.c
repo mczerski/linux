@@ -266,12 +266,11 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* TODO what is the current->exec_domain stuff and invmap ? */
 
 	/* Set up registers for signal handler */
-
-	regs->pc = (unsigned long) ka->sa.sa_handler;  /* what we enter NOW   */
-	regs->gprs[7] = return_ip;                          /* what we enter LATER */
-	regs->gprs[1] = sig;                                /* first argument is signo */
-        regs->gprs[3] = (unsigned long) &frame->info;       /* second argument is (siginfo_t *) */
-        regs->gprs[4] = 0;                                  /* third argument is unused */
+	regs->pc = (unsigned long) ka->sa.sa_handler; /* what we enter NOW   */
+	regs->gprs[7] = return_ip;                    /* what we enter LATER */
+	regs->gprs[1] = sig;                          /* arg 1: signo */
+        regs->gprs[2] = (unsigned long) &frame->info; /* arg 2: (siginfo_t*) */
+        regs->gprs[3] = (unsigned long) &frame->uc;   /* arg 3: ucontext */
 
 	/* actually move the usp to reflect the stacked frame */
 
