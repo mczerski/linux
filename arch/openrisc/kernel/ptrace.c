@@ -85,7 +85,7 @@ static inline int put_reg(struct task_struct *task, int regno,
 	 * their privaleges to kernel mode. */
 	if((regno < sizeof(struct pt_regs)) &&
 	   (regno != offsetof(struct pt_regs, sr))) {
-		*((unsigned long *)task->thread.regs + (regno >> 2)) = data;
+		*((unsigned long *)task_pt_regs(task) + (regno >> 2)) = data;
 		return 0;
 	}
 	return -EIO;

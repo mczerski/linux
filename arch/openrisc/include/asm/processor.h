@@ -45,11 +45,13 @@ typedef struct {
 } mm_segment_t;
 
 struct thread_struct {
+#if 0
 	unsigned long  usp;     /* user space pointer */
 	unsigned long  ksp;     /* kernel stack pointer */
 	struct pt_regs *regs;   /* pointer to saved register state */
         mm_segment_t   fs;      /* for get_fs() validation */
 	signed long    last_syscall;
+#endif
 };
 
 /*
