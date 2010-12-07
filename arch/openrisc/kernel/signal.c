@@ -111,9 +111,10 @@ badframe:
 	return 1;
 }
 
-asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
+asmlinkage long
+_sys_rt_sigreturn(struct pt_regs *regs)
 {
-	struct rt_sigframe *frame = (struct rt_sigframe *)regs->sp;
+	struct rt_sigframe *frame = (struct rt_sigframe __user *)regs->sp;
 	sigset_t set;
 	stack_t st;
 
