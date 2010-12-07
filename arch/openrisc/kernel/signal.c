@@ -380,13 +380,21 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 	if (!user_mode(regs))
 		return 1;
 
-	if (!oldset)
+	if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
+		oldset = &current->saved_sigmask; 
+	else
 		oldset = &current->blocked;
 
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(canrestart, signr, &info, &ka, oldset, regs);
+		/* a signal was successfully delivered; the saved
+		 * sigmask will have been stored in the signal frame,
+		 * and will be restored by sigreturn, so we can simply
+		 * clear the TIF_RESTORE_SIGMASK flag */
+		if (test_thread_flag(TIF_RESTORE_SIGMASK))
+			clear_thread_flag(TIF_RESTORE_SIGMASK);
 		return 1;
 	}
 
@@ -403,6 +411,13 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 		  printk("do_signal: (%s:%d): don't know how to handle ERESTART_RESTARTBLOCK\n",
 			 __FILE__, __LINE__);
                 }
+	}
+
+	/* if there's no signal to deliver, we just put the saved sigmask
+	* back */
+	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
+		clear_thread_flag(TIF_RESTORE_SIGMASK);
+		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
 	}
 
 	return 0;
