@@ -184,27 +184,43 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	return err;
 }
 
-/* figure out where we want to put the new signal frame - usually on the stack */
 
-static inline void * get_sigframe(struct k_sigaction *ka, 
-				  struct pt_regs * regs, size_t frame_size)
+static inline unsigned long
+align_sigframe(unsigned long sp)
+{
+	return (sp & ~3UL);
+}
+
+/*
+ * Work out where the signal frame should go.  It's either on the user stack
+ * or the alternate stack.
+ */
+
+static inline void __user *
+get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 {
 	unsigned long sp = regs->sp;
+	int onsigstack = on_sig_stack(sp);
 
-	phx_signal("ka %p, regs %p, frame_size 0x%x (sp 0x%lx)",
-		   ka, regs, frame_size, sp);
+	/* redzone */
+	sp -= STACK_FRAME_OVERHEAD;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
-	if (ka->sa.sa_flags & SA_ONSTACK) {
-		if (! on_sig_stack(sp))
+	if ((ka->sa.sa_flags & SA_ONSTACK) && !onsigstack) {
+		if (current->sas_ss_size)
 			sp = current->sas_ss_sp + current->sas_ss_size;
 	}
 
-	/* make sure the frame is dword-aligned */
+	sp = align_sigframe(sp - frame_size);
 
-	sp &= ~3;
+	/*
+	 * If we are on the alternate signal stack and would overflow it, don't.
+	 * Return an always-bogus address instead so we will die with SIGSEGV.
+	 */
+	if (onsigstack && !likely(on_sig_stack(sp)))
+		return (void __user *)-1L;
 
-	return (void *)(sp - frame_size);
+	return (void __user *)sp;
 }
 
 /* grab and setup a signal frame.
@@ -238,7 +254,15 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Clear all the bits of the ucontext we don't use.  */
         err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
-
+	/* Added by jonas */
+        err |= __put_user(0, &frame->uc.uc_flags);
+        err |= __put_user(0, &frame->uc.uc_link);
+        err |= __put_user((void *)current->sas_ss_sp,
+                        &frame->uc.uc_stack.ss_sp);
+        err |= __put_user(sas_ss_flags(regs->sp),
+                        &frame->uc.uc_stack.ss_flags);
+        err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
+	/* End added by jonas */
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0]);
 
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
