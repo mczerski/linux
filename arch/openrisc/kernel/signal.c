@@ -51,12 +51,9 @@
 
 int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs);
 
-asmlinkage long _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regss)
+asmlinkage long
+_sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 {
-	struct pt_regs *regs = (struct pt_regs *) &uss;
-	phx_signal("uss %p, uoss %p",
-		   uss, uoss);
-	
 	return do_sigaltstack(uss, uoss, regs->sp);
 }
 
