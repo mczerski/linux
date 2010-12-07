@@ -336,3 +336,16 @@ void __init trap_init(void)
 {
 	/* Nothing needs to be done */
 }
+
+void do_trap(struct pt_regs* regs)
+{
+	siginfo_t info;
+
+	memset(&info, 0, sizeof(info));
+	info.si_signo = SIGTRAP;
+	info.si_code = TRAP_TRACE;
+	info.si_addr = regs->pc;
+	force_sig_info(SIGTRAP, &info, current);
+
+	regs->pc += 4;
+}

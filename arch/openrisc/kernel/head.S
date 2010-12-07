@@ -564,7 +564,8 @@ _dispatch_do_ipage_fault:
 
 /* ---[ 0xe00: Trap exception ]------------------------------------------ */
     .org 0xe00
-	UNHANDLED_EXCEPTION(_vector_0xe00)
+//	UNHANDLED_EXCEPTION(_vector_0xe00)
+	EXCEPTION_HANDLE(_trap_handler)
 
 /* ---[ 0xf00: Reserved exception ]-------------------------------------- */
     .org 0xf00

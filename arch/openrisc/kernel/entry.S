@@ -691,7 +691,13 @@ UNHANDLED_EXCEPTION(_vector_0xd00,0xd00)
 
 /* ---[ 0xe00: Trap exception ]------------------------------------------ */
 
-UNHANDLED_EXCEPTION(_vector_0xe00,0xe00)
+EXCEPTION_ENTRY(_trap_handler)
+	/* r4: EA of fault (set by EXCEPTION_HANDLE) */
+	l.jal   do_trap
+	 l.addi  r3,r1,0 /* pt_regs */
+
+	l.j     _ret_from_exception
+	 l.nop
 
 /* ---[ 0xf00: Reserved exception ]-------------------------------------- */
 
