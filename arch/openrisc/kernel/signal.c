@@ -399,13 +399,15 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 	if (!user_mode(regs))
 		return 1;
 
-	if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
-		oldset = &current->saved_sigmask; 
-	else
-		oldset = &current->blocked;
-
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
+		sigset_t *oldset;
+
+		if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
+			oldset = &current->saved_sigmask; 
+		else
+			oldset = &current->blocked;
+
 		/* Whee!  Actually deliver the signal.  */
 		handle_signal(canrestart, signr, &info, &ka, oldset, regs);
 		/* a signal was successfully delivered; the saved
