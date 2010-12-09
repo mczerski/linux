@@ -247,7 +247,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	err |= __put_user(&frame->info, &frame->pinfo);
 	err |= __put_user(&frame->uc, &frame->puc);
-	if (info)
+
+	if (ka->sa.sa_flags & SA_SIGINFO)
 		err |= copy_siginfo_to_user(&frame->info, info);
 	if (err)
 		goto give_sigsegv;
@@ -291,8 +292,8 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Set up registers for signal handler */
 	regs->pc = (unsigned long) ka->sa.sa_handler; /* what we enter NOW   */
-	regs->gprs[7] = return_ip;                    /* what we enter LATER */
-	regs->gprs[1] = sig;                          /* arg 1: signo */
+	regs->gprs[7] = (unsigned long) return_ip;    /* what we enter LATER */
+	regs->gprs[1] = (unsigned long) sig;          /* arg 1: signo */
         regs->gprs[2] = (unsigned long) &frame->info; /* arg 2: (siginfo_t*) */
         regs->gprs[3] = (unsigned long) &frame->uc;   /* arg 3: ucontext */
 
@@ -352,10 +353,7 @@ handle_signal(int canrestart, unsigned long sig,
 		}
 	}
 
-	if (ka->sa.sa_flags & SA_SIGINFO)
-		setup_rt_frame(sig, ka, info, oldset, regs);
-	else
-		setup_rt_frame(sig, ka, NULL, oldset, regs);
+	setup_rt_frame(sig, ka, info, oldset, regs);
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
