@@ -612,13 +612,7 @@ _syscall_call:
         l.lwz   r30,0(r30)
 	
 	l.jalr  r30
-
-# r8 is actually the 6th parameter of the syscall
-# stupid to overwrite it.
-# put a l.nop in the delay slot instead...
-# FIXME:  Does this have consequences????
-#	l.addi  r8,r1,0                 // regs pointer
-	l.nop
+	 l.nop
 
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
