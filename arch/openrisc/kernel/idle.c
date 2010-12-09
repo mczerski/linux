@@ -71,6 +71,7 @@ void cpu_idle(void)
 /*                        if (cpu_is_offline(cpu))
                                 play_dead();
 */
+			clear_thread_flag(TIF_POLLING_NRFLAG);
 
                         local_irq_disable();
                         /* Don't trace irqs off for idle */
@@ -79,6 +80,7 @@ void cpu_idle(void)
 				powersave();
 			start_critical_timings();
 			local_irq_enable();
+		        set_thread_flag(TIF_POLLING_NRFLAG);
                 }
 
                 tick_nohz_restart_sched_tick();
