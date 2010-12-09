@@ -143,34 +143,45 @@ void release_thread(struct task_struct *dead_task)
 {
 }
 
-int copy_thread(unsigned long clone_flags, unsigned long usp,
-		unsigned long unused, struct task_struct *p, struct pt_regs *regs)
+/*
+ * Copy the thread-specific (arch specific) info from the current
+ * process to the new one p
+ */
+
+extern asmlinkage void ret_from_fork(void);
+
+int 
+copy_thread(unsigned long clone_flags, unsigned long usp,
+	    unsigned long unused,
+	    struct task_struct *p, struct pt_regs *regs)
 {
-        struct pt_regs *childregs, *kregs;
-        extern void ret_from_fork(void);
-	unsigned long sp = (unsigned long)p->stack + THREAD_SIZE;
-        unsigned long childframe;
-        struct thread_info *tmp;
+	struct pt_regs* childregs;
+	struct pt_regs* kregs;
+	unsigned long sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
+	struct thread_info *ti;
+
 	p->set_child_tid = p->clear_child_tid = NULL;
 
-        /* Copy registers */
+	/* Copy registers */
+	/* redzone */
+	sp -= STACK_FRAME_OVERHEAD;
 	sp -= sizeof(struct pt_regs);
-        childregs = (struct pt_regs *) sp;
+	childregs = (struct pt_regs *) sp;
 
-        *childregs = *regs;
+	/* Copy parent registers */
+	*childregs = *regs;
         
 	if ((childregs->sr & SPR_SR_SM) == 1) {
-                /* for kernel thread, set `current' and stackptr in new task */
-                childregs->sp = sp + sizeof(struct pt_regs);
-                childregs->gprs[8] = (unsigned long)p->stack;
-                /* __PHX__ :: i think this thread.regs is not needed */
-                p->thread.regs = NULL;  /* no user register state */
-        } else
-                p->thread.regs = childregs;
+                /* for kernel thread, set `current_thread_info'
+	         * and stackptr in new task
+		 */
+		childregs->sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
+                childregs->gprs[8] = (unsigned long)task_thread_info(p);
+        } else {
+		childregs->sp = usp;
+	}
 
         childregs->gprs[9] = 0;  /* Result from fork() */
-//	sp -= STACK_FRAME_OVERHEAD;
-	childframe = sp;
 
         /*
          * The way this works is that at some point in the future
@@ -180,22 +191,22 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
          * do some house keeping and then return from the fork or clone
          * system call, using the stack frame created above.
          */
+	/* redzone */
+     	sp -= STACK_FRAME_OVERHEAD;
 	sp -= sizeof(struct pt_regs);
         kregs = (struct pt_regs *) sp;
-       
-//      sp -= STACK_FRAME_OVERHEAD;
-        tmp = (struct thread_info*)p->stack;
-        tmp->ksp = sp;
+ 
+	ti = task_thread_info(p);
+        ti->ksp = sp;
 	
 	kregs->sr = regs->sr | SPR_SR_SM;
-	kregs->sp = sp + sizeof(struct pt_regs);
-	kregs->gprs[1] = (unsigned long)p;              /* for schedule_tail */
-	kregs->gprs[8] = (unsigned long)p->stack; /* current           */
+	kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
+	kregs->gprs[1] = (unsigned long)current;  /* arg to schedule_tail */
+	kregs->gprs[8] = (unsigned long)task_thread_info(p);
         kregs->pc = (unsigned long)ret_from_fork;
-        p->thread.last_syscall = -1;
+
         return 0;
 }
-
 
 /*
  * Set up a thread for executing a new program
@@ -274,7 +285,7 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
         regs.sr = mfspr(SPR_SR);
         regs.pc = (unsigned long)kernel_thread_helper;
 
-        return do_fork(flags | CLONE_VM | CLONE_UNTRACED, \
+        return do_fork(flags | CLONE_VM | CLONE_UNTRACED,
                         0, &regs, 0, NULL, NULL);
 }
 
