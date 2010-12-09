@@ -185,7 +185,6 @@ MODULE_PARM_DESC(buffer_size, "DMA buffer allocation size");
  * @netdev:	pointer to network device structure
  * @napi:	NAPI structure
  * @msg_enable:	device state flags
- * @rx_lock:	receive lock
  * @lock:	device lock
  * @phy:	attached PHY
  * @mdio:	MDIO bus for PHY access
@@ -409,15 +408,11 @@ static int ethoc_rx(struct net_device *dev, int limit)
 	struct ethoc *priv = netdev_priv(dev);
 	int count;
 
-	/* Prevent overflow of priv->cur_rx by rewinding it */	
-	if (priv->cur_rx > priv->num_rx)
-		priv->cur_rx = priv->cur_rx % priv->num_rx;
-
 	for (count = 0; count < limit; ++count) {
 		unsigned int entry;
 		struct ethoc_bd bd;
 
-		entry = priv->num_tx + (priv->cur_rx % priv->num_rx);
+		entry = priv->num_tx + priv->cur_rx;
 		ethoc_read_bd(priv, entry, &bd);
 		if (bd.stat & RX_BD_EMPTY) {
 			ethoc_ack_irq(priv, INT_MASK_RX);
@@ -429,9 +424,8 @@ static int ethoc_rx(struct net_device *dev, int limit)
 			 * packet waiting for us...
 			 */
 			ethoc_read_bd(priv, entry, &bd);
-			if (bd.stat & RX_BD_EMPTY) 
+			if (bd.stat & RX_BD_EMPTY)
 				break;
-
 		}
 
 		if (ethoc_update_rx_stats(priv, &bd) == 0) {
@@ -462,7 +456,8 @@ static int ethoc_rx(struct net_device *dev, int limit)
 		bd.stat &= ~RX_BD_STATS;
 		bd.stat |=  RX_BD_EMPTY;
 		ethoc_write_bd(priv, entry, &bd);
-		priv->cur_rx++;
+		if (++priv->cur_rx == priv->num_rx)
+			priv->cur_rx = 0;
 	}
 
 	return count;
@@ -509,50 +504,31 @@ static int ethoc_tx(struct net_device *dev, int limit)
 	for (count = 0; count < limit; ++count) {
 		unsigned int entry;
 
-		entry = priv->dty_tx % priv->num_tx;
+		entry = priv->dty_tx & (priv->num_tx-1);
 
 		ethoc_read_bd(priv, entry, &bd);
-		if (count == 0 && priv->dty_tx == priv->cur_tx) {
-			int i;
-			for (i = 0; i < priv->num_tx; i++) {
-				ethoc_read_bd(priv, entry, &bd);
-			}	
-		}
-
-		if (priv->dty_tx == priv->cur_tx) {
-			int i;
-			for (i = 0; i < priv->num_tx; i++) {
-				ethoc_read_bd(priv, entry, &bd);
-				if (bd.stat & TX_BD_READY)
-					printk("BD %i = %d\n", i, bd.stat & TX_BD_READY);
-			}	
-			ethoc_ack_irq(priv, INT_MASK_TX);
-			if (priv->dty_tx == priv->cur_tx)
-				break;
-		}
 
 		if (bd.stat & TX_BD_READY || (priv->dty_tx == priv->cur_tx)) {
 			ethoc_ack_irq(priv, INT_MASK_TX);
 			/* If interrupt came in between reading in the BD
-			 * and clearing the interrupt source, then we risk 
+			 * and clearing the interrupt source, then we risk
 			 * missing the event as the TX interrupt won't trigger
-			 * right away when we reenable it; hence, check 
+			 * right away when we reenable it; hence, check
 			 * BD_EMPTY here again to make sure there isn't such an
 			 * event pending...
 			 */
 			ethoc_read_bd(priv, entry, &bd);
-			if (bd.stat & TX_BD_READY)
+			if (bd.stat & TX_BD_READY ||
+			    (priv->dty_tx == priv->cur_tx))
 				break;
 		}
 
 		ethoc_update_tx_stats(priv, &bd);
-
-		priv->dty_tx += 1;
+		priv->dty_tx++;
 	}
 
-	if ((priv->cur_tx - priv->dty_tx) <= (priv->num_tx / 2)) {
+	if ((priv->cur_tx - priv->dty_tx) <= (priv->num_tx / 2))
 		netif_wake_queue(dev);
-	}
 
 	return count;
 }
@@ -1025,8 +1001,16 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 	/* calculate the number of TX/RX buffers, maximum 128 supported */
 	num_bd = min_t(unsigned int,
 		128, (netdev->mem_end - netdev->mem_start + 1) / ETHOC_BUFSIZ);
-	priv->num_tx = max(2, num_bd / 4);
+	if (num_bd < 4) {
+		ret = -ENODEV;
+		goto error;
+	}
+	/* num_tx must be a power of two */
+	priv->num_tx = rounddown_pow_of_two(num_bd >> 1);
 	priv->num_rx = num_bd - priv->num_tx;
+
+	dev_dbg(&pdev->dev, "ethoc: num_tx: %d num_rx: %d\n",
+		priv->num_tx, priv->num_rx);
 
 	priv->vma = devm_kzalloc(&pdev->dev, num_bd*sizeof(void*), GFP_KERNEL);
 	if (!priv->vma) {
@@ -1036,21 +1020,24 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 
 	/* Allow the platform setup code to pass in a MAC address. */
 	if (pdev->dev.platform_data) {
-		struct ethoc_platform_data *pdata =
-			(struct ethoc_platform_data *)pdev->dev.platform_data;
+		struct ethoc_platform_data *pdata = pdev->dev.platform_data;
 		memcpy(netdev->dev_addr, pdata->hwaddr, IFHWADDRLEN);
 		priv->phy_id = pdata->phy_id;
 	} else {
-		uint8_t* mac;
 		priv->phy_id = -1;
 
 #ifdef CONFIG_OF
-		mac = (uint8_t*)of_get_property(pdev->dev.of_node, "local-mac-address",
+		{
+		const uint8_t* mac;
+
+		mac = of_get_property(pdev->dev.of_node,
+				      "local-mac-address",
 				      NULL);
 		if (mac)
 			memcpy(netdev->dev_addr, mac, IFHWADDRLEN);
+		}
 #endif
-	} 
+	}
 
 	/* Check that the given MAC address is valid. If it isn't, read the
 	 * current MAC from the controller. */
@@ -1176,6 +1163,7 @@ static int ethoc_resume(struct platform_device *pdev)
 # define ethoc_resume  NULL
 #endif
 
+#ifdef CONFIG_OF
 static struct of_device_id ethoc_match[] = {
 	{
 		.compatible = "opencores,ethoc",
@@ -1183,6 +1171,7 @@ static struct of_device_id ethoc_match[] = {
 	{},
 };
 MODULE_DEVICE_TABLE(of, ethoc_match);
+#endif
 
 static struct platform_driver ethoc_driver = {
 	.probe   = ethoc_probe,
