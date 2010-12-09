@@ -86,15 +86,29 @@ menu "Class II Instructions"
 
 config OPENRISC_HAVE_INST_FF1
 	bool "Have instruction l.ff1"
+	default y
 	help
 	  Select this if your implementation has the Class II instruction l.ff1
 
 config OPENRISC_HAVE_INST_FL1
 	bool "Have instruction l.fl1"
+	default y
 	help
 	  Select this if your implementation has the Class II instruction l.fl1
 
+config OPENRISC_HAVE_INST_MUL
+	bool "Have instruction l.mul for hardware multiply"
+	default y
+	help
+	  Select this if your implementation has a hardware multiply instruction
+
+config OPENRISC_HAVE_INST_DIV
+	bool "Have instruction l.div for hardware divide"
+	default y
+	help
+	  Select this if your implementation has a hardware divide instruction
 endmenu
+
 
 config OPENRISC_FLASH_BOOT
 	bool "Boot from FLASH"
