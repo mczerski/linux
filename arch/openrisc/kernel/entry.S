@@ -774,59 +774,46 @@ _work_pending:
 	 * if (current_thread_info->flags & _TIF_NEED_RESCHED)
 	 *     schedule();
 	 */ 
-	l.lwz   r3,TI_FLAGS(r10)
-	l.andi	r3,r3,_TIF_NEED_RESCHED
-	l.sfeqi r3,0
-	l.bf    work_notifysig
-	l.nop
-
-work_resched:
-	l.jal   schedule
-	l.nop
-	DISABLE_INTERRUPTS(r3,r4)
-
-	l.lwz	r3,TI_FLAGS(r10)
-	l.andi	r30,r3,_TIF_WORK_MASK
-	l.sfnei	r30,0
-	l.bnf	_restore_all
-	l.nop
-	l.andi	r30,r3,_TIF_NEED_RESCHED
-	l.sfnei	r30,0
-	l.bf	work_resched
-	l.nop
-	/* 
-	 * if (current_thread_info->flags & _TIF_SIGPENDING)
-	 *     do_signal(r3,r4);
-	 */
-work_notifysig:
 	l.lwz   r5,TI_FLAGS(r10)
-	l.andi	r5,r5,_TIF_SIGPENDING	
-	l.sfeqi r5,0
-	l.bf    _resume_userspace
-	l.addi	r3,r0,1
-	l.addi  r4,r0,0
-	l.addi  r5,r1,0
-	l.jal   do_signal
-	l.nop
+	l.andi	r3,r5,_TIF_NEED_RESCHED
+	l.sfnei r3,0
+	l.bnf   _work_notifysig
+	 l.nop
+	l.jal   schedule
+	 l.nop
 	l.j	_resume_userspace
-	l.nop
+	 l.nop
 
+/* Handle pending signals and notify-resume requests */
+_work_notifysig:
+	l.ori	r3,r1,0
+	/* FIXME: how do we know if this is from syscall or not? */
+	l.ori	r4,r0,1
+	l.jal	do_notify_resume
+	 l.nop
 
-ENTRY(ret_from_fork)
-	l.jal	schedule_tail
-	l.nop
+_resume_userspace:
+	DISABLE_INTERRUPTS(r3,r4)
+	l.lwz	r3,TI_FLAGS(r10)
+	l.andi	r3,r3,_TIF_WORK_MASK
+	l.sfnei	r3,0
+	l.bf	_work_pending
+	 l.nop
 
-	l.j	_syscall_exit
-	l.nop
-
-
-ENTRY(_restore_all)
+_restore_all:
 	// we need to save KSP here too
 	// or else fork's 'eat' stack space
 	l.addi  r4,r1,INT_FRAME_SIZE
         l.sw    (TI_KSP)(r10),r4
 	RESTORE_ALL
-	
+	/* This returns to userspace code */
+
+ENTRY(ret_from_fork)
+	l.jal	schedule_tail
+	 l.nop
+	l.j	_syscall_exit
+	 l.nop
+
 ENTRY(_ret_from_intr)
 	// i386 version:	
 	// GET_CURRENT(%ebx)
@@ -836,19 +823,9 @@ ENTRY(_ret_from_exception)
         l.andi	r3,r4,SPR_SR_SM
         l.sfeqi	r3,0
         l.bnf	_restore_all
-	l.nop
-	/* 
-	 * return to usermode
-	 */
-_resume_userspace:
-	DISABLE_INTERRUPTS(r3,r4)
-	l.lwz	r3,TI_FLAGS(r10)
-	l.andi	r3,r3,_TIF_WORK_MASK
-	l.sfeqi	r3,0
-	l.bnf	_work_pending
-	l.nop
-	l.j	_restore_all
-	l.nop
+	 l.nop
+	l.j	_resume_userspace
+	 l.nop
 
 /* ========================================================[ switch ] === */
 

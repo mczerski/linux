@@ -31,6 +31,7 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
+#include <linux/tracehook.h>
 
 #include <asm/processor.h>
 #include <asm/ucontext.h>
@@ -49,7 +50,7 @@
  */
 #define RESTART_OR32_SYS(regs) regs->gprs[1] = regs->orig_gpr3; regs->pc -= 4;
 
-int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs);
+int do_signal(int, struct pt_regs*);
 
 asmlinkage long
 _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
@@ -378,7 +379,7 @@ handle_signal(int canrestart, unsigned long sig,
  * mode below.
  */
 
-int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
+int do_signal(int canrestart, struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
@@ -386,8 +387,6 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 #if 0
 	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
 #endif
-	phx_signal("canrestart %d, oldset %p, regs %p",
-		   canrestart, oldset, regs);
 
 	/*
 	 * We want the common case to go fast, which
@@ -442,3 +441,18 @@ int do_signal(int canrestart, sigset_t *oldset, struct pt_regs *regs)
 
 	return 0;
 }
+
+asmlinkage void
+do_notify_resume(struct pt_regs *regs, int syscall)
+{
+	if (current_thread_info()->flags & _TIF_SIGPENDING)
+		do_signal(syscall, regs);
+
+	if (current_thread_info()->flags & _TIF_NOTIFY_RESUME) {
+		clear_thread_flag(TIF_NOTIFY_RESUME);
+		tracehook_notify_resume(regs);
+		if (current->replacement_session_keyring)
+			key_replace_session_keyring();
+	}
+}
+
