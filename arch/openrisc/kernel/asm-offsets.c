@@ -52,7 +52,9 @@ main(void)
   DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
   DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
   DEFINE(TI_KSP, offsetof(struct thread_info, ksp));
-  
+ 
+  DEFINE(PT_SIZE, sizeof(struct pt_regs));
+ 
   /* Interrupt register frame */
   DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
   DEFINE(INT_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs));

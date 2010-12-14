@@ -1371,6 +1371,7 @@ boot_itlb_miss_handler:
 	EXCEPTION_STORE_GPR5
 	EXCEPTION_STORE_GPR6
 
+#if 0
 	l.mfspr r6,r0,SPR_ESR_BASE         //
 	l.andi  r6,r6,SPR_SR_SM            // are we in kernel mode ?
 	l.sfeqi r6,0                       // r6 == 0x1 --> SM

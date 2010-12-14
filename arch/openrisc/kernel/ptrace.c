@@ -41,6 +41,7 @@
 #include <linux/ptrace.h>
 #include <linux/audit.h>
 #include <linux/tracehook.h>
+#include <linux/regset.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
@@ -49,34 +50,128 @@
 #include <asm/or32-hf.h>
 
 /*
+ * retrieve the contents of OpenRISC userspace general registers
+ */
+static int genregs_get(struct task_struct *target,
+		       const struct user_regset *regset,
+		       unsigned int pos, unsigned int count,
+		       void *kbuf, void __user *ubuf)
+{
+	const struct pt_regs *regs = task_pt_regs(target);
+	int ret;
+
+#if 0
+	/* r0 */
+	ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
+					0, offsetof(struct pt_regs, regs));
+#endif
+
+	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+				  regs, 0, sizeof(*regs));
+
+/* put PPC here */
+
+#if 0
+	/* fill out rest of elf_gregset_t structure with zeroes */
+	if (!ret)
+		ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
+						sizeof(struct pt_regs), -1);
+#endif
+
+	return ret;
+}
+
+/*
+ * update the contents of the OpenRISC userspace general registers
+ */
+static int genregs_set(struct task_struct *target,
+		       const struct user_regset *regset,
+		       unsigned int pos, unsigned int count,
+		       const void *kbuf, const void __user *ubuf)
+{
+	struct pt_regs *regs = task_pt_regs(target);
+	int ret;
+
+	/* PC */
+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				  regs,
+				  0, offsetof(struct pt_regs, sr));
+
+	/* skip SR */
+	ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
+					offsetof(struct pt_regs, sr),
+					offsetof(struct pt_regs, sp));
+
+	/* SP, r2 - r31 */
+	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				  regs,
+				  offsetof(struct pt_regs, sp),
+				  sizeof(struct pt_regs));
+
+#if 0
+	/* read out the rest of the elf_gregset_t structure */
+	if (!ret)
+		ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
+						sizeof(struct pt_regs), -1);
+#endif
+
+	return ret;
+}
+
+/*
+ * Define the register sets available on OpenRISC under Linux
+ */
+enum openrisc_regset {
+	REGSET_GENERAL,
+};
+
+static const struct user_regset openrisc_regsets[] = {
+	[REGSET_GENERAL] = {
+		.core_note_type	= NT_PRSTATUS,
+		.n		= ELF_NGREG,
+		.size		= sizeof(long),
+		.align		= sizeof(long),
+		.get		= genregs_get,
+		.set		= genregs_set,
+	},
+};
+
+static const struct user_regset_view user_openrisc_native_view = {
+	.name		= "OpenRISC",
+	.e_machine	= EM_OPENRISC,
+	.regsets	= openrisc_regsets,
+	.n		= ARRAY_SIZE(openrisc_regsets),
+};
+
+const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+{
+	return &user_openrisc_native_view;
+}
+
+void user_enable_single_step(struct task_struct *child)
+{
+	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+}
+
+void user_disable_single_step(struct task_struct *child)
+{
+	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
+}
+
+
+
+
+
+
+
+
+/*
  * does not yet catch signals sent when the child dies.
  * in exit.c or in signal.c.
  */
 
 
-/*
- * Get contents of register REGNO in task TASK.
- */
-static inline long get_reg(struct task_struct *task, int regno)
-{
-	if(regno < sizeof(struct pt_regs))
-		return *((unsigned long *)user_regs(task->stack) + (regno >> 2));
 #if 0
-	switch(regno) {
-	case offsetof(struct user, start_code):
-		return task->mm->start_code;
-	case offsetof(struct user, start_data):
-		return task->mm->start_data;
-	case offsetof(struct user, start_stack):
-		return task->mm->start_stack;
-	default:
-		printk("Don't know how to get offset %i of struct user\n",
-		       regno);
-	}
-#endif
-	return 0;
-}
-
 /*
  * Write contents of register REGNO in task TASK.
  */
@@ -92,6 +187,7 @@ static inline int put_reg(struct task_struct *task, int regno,
 	}
 	return -EIO;
 }
+#endif
 
 static void set_singlestep(struct task_struct *child)
 {
@@ -136,6 +232,7 @@ static void clear_singlestep(struct task_struct *child)
 #endif
 }
 
+
 /*
  * Called by kernel/ptrace.c when detaching..
  *
@@ -144,10 +241,96 @@ static void clear_singlestep(struct task_struct *child)
 void ptrace_disable(struct task_struct *child)
 {
 	printk("ptrace_disable(): TODO\n");
-	clear_singlestep(child);
+
+	user_disable_single_step(child);
 	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 }
 
+
+/*
+ * Read the word at offset "off" into the "struct user".  We
+ * actually access the pt_regs stored on the kernel stack.
+ */
+static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
+                            unsigned long __user *ret)
+{
+	struct pt_regs* regs;
+	unsigned long tmp;
+
+/*	if (off & 3 || off >= sizeof(struct user))
+		return -EIO;
+*/
+
+	regs = task_pt_regs(tsk);
+
+	tmp = 0;
+	if (off == PT_TEXT_ADDR)
+		tmp = tsk->mm->start_code;
+	else if (off == PT_DATA_ADDR)
+		tmp = tsk->mm->start_data;
+	else if (off == PT_TEXT_END_ADDR)
+		tmp = tsk->mm->end_code;
+	else if (off < sizeof(struct pt_regs)) {
+		tmp = *((unsigned long*)((char*)regs + off));
+	}
+
+	return put_user(tmp, ret);
+}
+
+/*
+ * Write the word at offset "off" into "struct user".  We
+ * actually access the pt_regs stored on the kernel stack.
+ */
+static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
+                             unsigned long val)
+{
+	struct pt_regs* regs;
+
+/*
+	if (off & 3 || off >= sizeof(struct user))
+		return -EIO;
+*/
+	if (off >= sizeof(struct pt_regs))
+		return 0;
+
+	regs = task_pt_regs(tsk);
+
+	if (off != offsetof(struct pt_regs, sr)) {
+		*((unsigned long*)((char*)regs + off)) = val;
+	} else {
+		/* Prevent any process from setting the SR flags and
+		 * thus elevating privileges
+		 */
+	}
+
+	return 0;
+}
+
+long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
+	         unsigned long data)
+{
+	int ret;
+	unsigned long __user *datap = (unsigned long __user *)data;
+
+	//printk("ptrace request: %d\n", request);
+
+	switch (request) {
+	/* read the word at location addr in the USER area. */
+	case PTRACE_PEEKUSR:
+		ret = ptrace_read_user(child, addr, datap);
+		break;
+	case PTRACE_POKEUSR:
+		ret = ptrace_write_user(child, addr, data);
+		break;
+	default:
+		ret = ptrace_request(child, request, addr, data);
+		break;
+	}
+
+	return ret;
+}
+
+#if 0
 long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 	         unsigned long data)
 {
@@ -263,6 +446,7 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 	}
 	return ret;
 }
+#endif
 
 /* notification of system call entry/exit
  * - triggered by current->work.syscall_trace

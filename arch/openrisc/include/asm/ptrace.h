@@ -18,6 +18,14 @@
  * the values below.
  */
 
+/* 
+ * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
+ * process is located in memory.
+ */
+#define PT_TEXT_ADDR            0x10000
+#define PT_DATA_ADDR            0x10004
+#define PT_TEXT_END_ADDR        0x10008
+
 #ifndef __ASSEMBLY__
 
 struct pt_regs {
@@ -51,6 +59,8 @@ struct pt_regs {
 #define user_mode(regs)			(((regs)->sr & SPR_SR_SM) == 0)
 #define user_stack_pointer(regs)	((unsigned long)(regs)->sp)
 #define profile_pc(regs)		instruction_pointer(regs)
+
+#define arch_has_single_step()  (1)
 
 #endif /* __KERNEL__ */
 
