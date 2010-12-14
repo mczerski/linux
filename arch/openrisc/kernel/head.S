@@ -503,7 +503,7 @@ reset_start:
 /* ---[ 0x200: BUS exception ]------------------------------------------- */
     .org 0x200
 _dispatch_bus_fault:
-	UNHANDLED_EXCEPTION(_vector_0x200)
+	EXCEPTION_HANDLE(_bus_fault_handler)
 
 /* ---[ 0x300: Data Page Fault exception ]------------------------------- */
     .org 0x300
@@ -529,12 +529,11 @@ _dispatch_do_ipage_fault:
 
 /* ---[ 0x600: Aligment exception ]-------------------------------------- */
     .org 0x600
-//	UNHANDLED_EXCEPTION(_vector_0x600)
 	EXCEPTION_HANDLE(_alignment_handler)
 	
 /* ---[ 0x700: Illegal insn exception ]---------------------------------- */
     .org 0x700
-	UNHANDLED_EXCEPTION(_vector_0x700)
+	EXCEPTION_HANDLE(_illegal_instruction_handler)
 
 /* ---[ 0x800: External interrupt exception ]---------------------------- */
     .org 0x800

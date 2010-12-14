@@ -337,15 +337,72 @@ void __init trap_init(void)
 	/* Nothing needs to be done */
 }
 
-void do_trap(struct pt_regs* regs)
+asmlinkage void do_trap(struct pt_regs *regs, unsigned long address)
 {
 	siginfo_t info;
 
 	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGTRAP;
 	info.si_code = TRAP_TRACE;
-	info.si_addr = regs->pc;
+	info.si_addr = (void*) address;
 	force_sig_info(SIGTRAP, &info, current);
 
 	regs->pc += 4;
+}
+
+asmlinkage void do_unaligned_access(struct pt_regs *regs, unsigned long address)
+{
+	siginfo_t info;
+
+	if (user_mode(regs)) {
+		/* Send a SIGSEGV */
+		info.si_signo = SIGSEGV;
+		info.si_errno = 0;
+		/* info.si_code has been set above */
+		info.si_addr = (void *)address;
+		force_sig_info(SIGSEGV, &info, current);
+	} else {
+		printk("KERNEL: Unaligned Access 0x%.8lx\n", address);
+		show_regs(regs);
+		die("Die:", regs, address);
+	}
+
+}
+
+asmlinkage void do_bus_fault(struct pt_regs *regs, unsigned long address)
+{
+	siginfo_t info;
+
+	if (user_mode(regs)) {
+		/* Send a SIGBUS */
+		info.si_signo = SIGBUS;
+		info.si_errno = 0;
+		info.si_code = BUS_ADRERR;
+		info.si_addr = (void *)address;
+		force_sig_info(SIGBUS, &info, current);
+	} else {		/* Kernel mode */
+		printk("KERNEL: Bus error (SIGBUS) 0x%.8lx\n", address);
+		show_regs(regs);
+		die("Die:", regs, address);
+	}
+}
+
+asmlinkage void do_illegal_instruction(struct pt_regs *regs,
+				       unsigned long address)
+{
+	siginfo_t info;
+
+	if (user_mode(regs)) {
+		/* Send a SIGILL */
+		info.si_signo = SIGILL;
+		info.si_errno = 0;
+		info.si_code = ILL_ILLOPC;
+		info.si_addr = (void *)address;
+		force_sig_info(SIGBUS, &info, current);
+	} else {		/* Kernel mode */
+		printk("KERNEL: Illegal instruction (SIGILL) 0x%.8lx\n",
+		       address);
+		show_regs(regs);
+		die("Die:", regs, address);
+	}
 }

@@ -268,8 +268,14 @@ EXCEPTION_ENTRY(_tng_kernel_start)
 	l.nop
 	
 /* ---[ 0x200: BUS exception ]------------------------------------------- */
-	
-UNHANDLED_EXCEPTION(_vector_0x200,0x200)
+
+EXCEPTION_ENTRY(_bus_fault_handler)
+	/* r4: EA of fault (set by EXCEPTION_HANDLE) */
+	l.jal   do_bus_fault
+	 l.addi  r3,r1,0 /* pt_regs */
+
+	l.j     _ret_from_exception
+	 l.nop
 
 /* ---[ 0x300: Data Page Fault exception ]------------------------------- */
 
@@ -534,7 +540,13 @@ align_end:
 
 /* ---[ 0x700: Illegal insn exception ]---------------------------------- */
 
-UNHANDLED_EXCEPTION(_vector_0x700,0x700)
+EXCEPTION_ENTRY(_illegal_instruction_handler)
+	/* r4: EA of fault (set by EXCEPTION_HANDLE) */
+	l.jal   do_illegal_instruction
+	 l.addi  r3,r1,0 /* pt_regs */
+
+	l.j     _ret_from_exception
+	 l.nop
 
 /* ---[ 0x800: External interrupt exception ]---------------------------- */
 
