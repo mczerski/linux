@@ -77,8 +77,7 @@ extern inline void prepare_to_copy(struct task_struct *tsk)
 
 #define INIT_SP         (sizeof(init_stack) + (unsigned long) &init_stack)
 
-#define INIT_THREAD  { \
-   0, INIT_SP, NULL, KERNEL_DS, 0 }
+#define INIT_THREAD  { }
 
 
 #define KSTK_EIP(tsk)   (task_pt_regs(tsk)->pc);
