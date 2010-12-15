@@ -47,9 +47,10 @@ struct pt_regs {
 #define STACK_FRAME_OVERHEAD  128  /* size of minimum stack frame */
 //#define STACK_FRAME_OVERHEAD  0  /* size of minimum stack frame */
 
-#define instruction_pointer(regs) ((regs)->pc)
-#define user_mode(regs) (((regs)->sr & SPR_SR_SM) == 0)
-#define profile_pc(regs) instruction_pointer(regs)
+#define instruction_pointer(regs)	((regs)->pc)
+#define user_mode(regs)			(((regs)->sr & SPR_SR_SM) == 0)
+#define user_stack_pointer(regs)	((unsigned long)(regs)->sp)
+#define profile_pc(regs)		instruction_pointer(regs)
 
 #endif /* __KERNEL__ */
 
