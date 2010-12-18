@@ -55,11 +55,12 @@ struct thread_struct {
 };
 
 /*
- * At user->kernel entry, the pt_regs struct is stacked on the top of the kernel-stack.
- * This macro allows us to find those regs for a task.
- * Notice that subsequent pt_regs stackings, like recursive interrupts occuring while
- * we're in the kernel, won't affect this - only the first user->kernel transition
- * registers are reached by this.
+ * At user->kernel entry, the pt_regs struct is stacked on the top of the
+ * kernel-stack.  This macro allows us to find those regs for a task.
+ * Notice that subsequent pt_regs stackings, like recursive interrupts
+ * occurring while we're in the kernel, won't affect this - only the first
+ * user->kernel transition registers are reached by this (i.e. not regs
+ * for running signal handler)
  */
 #define user_regs(thread_info) (((struct pt_regs *)((unsigned long)(thread_info) + THREAD_SIZE - STACK_FRAME_OVERHEAD)) - 1)
 
