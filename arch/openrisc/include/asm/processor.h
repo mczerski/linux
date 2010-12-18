@@ -68,8 +68,8 @@ struct thread_struct {
  * Dito but for the currently running task
  */
 
-#define task_pt_regs(task) user_regs(task_thread_info(task)) 
-#define current_regs() task_pt_regs(current) 
+#define task_pt_regs(task) user_regs(task_thread_info(task))
+#define current_regs() user_regs(current_thread_info())
 
 extern inline void prepare_to_copy(struct task_struct *tsk)
 {
