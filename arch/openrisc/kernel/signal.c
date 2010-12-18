@@ -42,16 +42,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-/* a syscall in Linux/OR32 is a "l.sys 1" instruction which is 4 bytes */
-/* manipulate regs so that upon return, it will be re-executed */
-
-/* We rely on that pc points to the instruction after "l.sys 1", so the
- * library must never do strange things like putting it in a delay slot.
- */
-#define RESTART_OR32_SYS(regs) regs->gprs[1] = regs->orig_gpr3; regs->pc -= 4;
-
-int do_signal(int, struct pt_regs*);
-
 asmlinkage long
 _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 {
@@ -74,6 +64,9 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 
 	phx_signal("regs %p, sc %p",
 		   regs, sc);
+
+	/* Alwys make any pending restarted system call return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	/* restore the regs from &sc->regs (same as sc, since regs is first)
 	 * (sc is already checked for VERIFY_READ since the sigframe was
@@ -147,7 +140,8 @@ _sys_rt_sigreturn(struct pt_regs *regs)
 	   call it and ignore errors.  */
 	do_sigaltstack(&st, NULL, regs->sp);
 
-	return regs->gprs[1];
+//	return regs->gprs[1];
+	return regs->gprs[9];
 
 badframe:
 	force_sig(SIGSEGV, current);
@@ -258,7 +252,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
         err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
 	/* Added by jonas */
         err |= __put_user(0, &frame->uc.uc_flags);
-        err |= __put_user(0, &frame->uc.uc_link);
+        err |= __put_user(NULL, &frame->uc.uc_link);
         err |= __put_user((void *)current->sas_ss_sp,
                         &frame->uc.uc_stack.ss_sp);
         err |= __put_user(sas_ss_flags(regs->sp),
@@ -317,42 +311,16 @@ give_sigsegv:
 
 
 static inline void
-handle_signal(int canrestart, unsigned long sig,
+handle_signal(unsigned long sig,
 	      siginfo_t *info, struct k_sigaction *ka,
 	      sigset_t *oldset, struct pt_regs * regs)
 {
 
-	phx_signal("canrestart %d, sig %ld, ka %p, info %p, oldset %p, regs %p",
-		   canrestart, sig, ka, info, oldset, regs);
+/*	phx_signal("canrestart %d, sig %ld, ka %p, info %p, oldset %p, regs %p",
+		   canrestart, sig, ka, info, oldset, regs);*/
 
 	phx_signal("(regs->pc 0x%lx, regs->sp 0x%lx, regs->gprs[7] 0x%lx)",
 		   regs->pc, regs->sp, regs->gprs[7]);
-
-	/* Are we from a system call? */
-	if (canrestart) {
-		/* If so, check system call restarting.. */
-		switch (regs->gprs[1]) {
-			case -ERESTARTNOHAND:
-				/* ERESTARTNOHAND means that the syscall should only be
-				   restarted if there was no handler for the signal, and since
-				   we only get here if there is a handler, we dont restart */
-				regs->gprs[1] = -EINTR;
-				break;
-
-			case -ERESTARTSYS:
-				/* ERESTARTSYS means to restart the syscall if there is no
-				   handler or the handler was registered with SA_RESTART */
-				if (!(ka->sa.sa_flags & SA_RESTART)) {
-					regs->gprs[1] = -EINTR;
-					break;
-				}
-			/* fallthrough */
-			case -ERESTARTNOINTR:
-				/* ERESTARTNOINTR means that the syscall should be called again
-				   after the signal handler returns. */
-				RESTART_OR32_SYS(regs);
-		}
-	}
 
 	setup_rt_frame(sig, ka, info, oldset, regs);
 
@@ -379,7 +347,7 @@ handle_signal(int canrestart, unsigned long sig,
  * mode below.
  */
 
-int do_signal(int canrestart, struct pt_regs *regs)
+void do_signal(struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
@@ -395,10 +363,60 @@ int do_signal(int canrestart, struct pt_regs *regs)
 	 * if so.
 	 */
 	if (!user_mode(regs))
-		return 1;
+		return;
 
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
-	if (signr > 0) {
+
+
+	/* If we are coming out of a syscall then we need
+	 * to check if the syscall was interrupted and wants to be
+	 * restarted after handling the signal.  If so, the original
+	 * syscall number is put back into r11 and the PC rewound to
+	 * point at the l.sys instruction that resulted in the 
+	 * original syscall.  Syscall results other than the four
+	 * below mean that the syscall executed to completion and no
+	 * restart is necessary.
+	 */
+	if (regs->syscallno) {
+		int restart = 0;
+
+		switch(regs->gprs[9]) {
+		case -ERESTART_RESTARTBLOCK:
+		case -ERESTARTNOHAND:
+			/* Restart if there is no signal handler */
+			restart = (signr <= 0);
+			break;
+		case -ERESTARTSYS:
+			/* Restart if there no signal handler or
+			 * SA_RESTART flag is set */
+			restart = (signr <= 0 || (ka.sa.sa_flags & SA_RESTART));
+			break;
+		case -ERESTARTNOINTR:
+			/* Always restart */
+			restart = 1;
+			break;
+		}
+
+		if (restart) {
+			if (regs->gprs[9] == -ERESTART_RESTARTBLOCK)
+				regs->gprs[9] = __NR_restart_syscall;
+			else
+				regs->gprs[9] = regs->orig_gpr11;
+			regs->pc -= 4;
+		} else {
+			regs->gprs[9] = -EINTR;
+		}
+	}
+
+
+	if (signr <= 0) {
+		/* no signal to deliver so we just put the saved sigmask
+		 * back */
+		if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
+			clear_thread_flag(TIF_RESTORE_SIGMASK);
+			sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
+		}
+	} else { /* signr > 0 */
 		sigset_t *oldset;
 
 		if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
@@ -407,46 +425,26 @@ int do_signal(int canrestart, struct pt_regs *regs)
 			oldset = &current->blocked;
 
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(canrestart, signr, &info, &ka, oldset, regs);
+		handle_signal(signr, &info, &ka, oldset, regs);
 		/* a signal was successfully delivered; the saved
 		 * sigmask will have been stored in the signal frame,
 		 * and will be restored by sigreturn, so we can simply
 		 * clear the TIF_RESTORE_SIGMASK flag */
 		if (test_thread_flag(TIF_RESTORE_SIGMASK))
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
-		return 1;
+
+		tracehook_signal_handler(signr, &info, &ka, regs,
+					 test_thread_flag(TIF_SINGLESTEP));
 	}
 
-	/* Did we come from a system call? */
-	if (canrestart) {
-		/* Restart the system call - no handlers present */
-		if (regs->gprs[1] == -ERESTARTNOHAND ||
-		    regs->gprs[1] == -ERESTARTSYS ||
-		    regs->gprs[1] == -ERESTARTNOINTR) {
-			RESTART_OR32_SYS(regs);
-		}
-		if (regs->gprs[1] == -ERESTART_RESTARTBLOCK){
-		  /* look at cris port how to handle this */
-		  printk("do_signal: (%s:%d): don't know how to handle ERESTART_RESTARTBLOCK\n",
-			 __FILE__, __LINE__);
-                }
-	}
-
-	/* if there's no signal to deliver, we just put the saved sigmask
-	* back */
-	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
-		clear_thread_flag(TIF_RESTORE_SIGMASK);
-		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
-	}
-
-	return 0;
+	return;
 }
 
 asmlinkage void
-do_notify_resume(struct pt_regs *regs, int syscall)
+do_notify_resume(struct pt_regs *regs)
 {
 	if (current_thread_info()->flags & _TIF_SIGPENDING)
-		do_signal(syscall, regs);
+		do_signal(regs);
 
 	if (current_thread_info()->flags & _TIF_NOTIFY_RESUME) {
 		clear_thread_flag(TIF_NOTIFY_RESUME);

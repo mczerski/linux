@@ -1816,7 +1816,7 @@ nommu_entry:
         /* r1, r10, EPCR, ESR a	already saved */		
 	l.sw    GPR2(r1),r2					
 	l.sw    GPR3(r1),r3					
-        l.sw    ORIG_GPR3(r1),r3				
+        l.sw    ORIG_GPR11(r1),r11			
         l.sw    GPR5(r1),r5					
         l.sw    GPR6(r1),r6					
         l.sw    GPR7(r1),r7					

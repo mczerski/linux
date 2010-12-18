@@ -47,7 +47,7 @@
 #define PUSH_PT_REGS_NO_TRANS					\
         l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
         l.sw    GPR3(r1),r3					;\
-        l.sw    ORIG_GPR3(r1),r3				;\
+        l.sw    ORIG_GPR11(r1),r11				;\
         l.mfspr r3,r0,SPR_EPCR_BASE				;\
         l.sw    PC(r1),r3					;\
         l.mfspr r3,r0,SPR_ESR_BASE				;\
@@ -84,7 +84,8 @@
         l.sw    GPR29(r1),r29					;\
         l.sw    GPR30(r1),r30					;\
         l.sw    GPR31(r1),r31					;\
-        l.sw    RESULT(r1),r0
+        l.sw    RESULT(r1),r0					;\
+        l.sw    SYSCALLNO(r1),r0
 
 	
 /*
@@ -178,7 +179,7 @@ handler:							;\
         /* r1, EPCR, ESR a already saved */			;\
 	l.sw	GPR2(r1),r2					;\
 	l.sw    GPR3(r1),r3					;\
-        l.sw    ORIG_GPR3(r1),r3				;\
+        l.sw    ORIG_GPR11(r1),r11				;\
 	/* r4 already save */					;\
         l.sw    GPR5(r1),r5					;\
         l.sw    GPR6(r1),r6					;\
@@ -206,7 +207,8 @@ handler:							;\
         l.sw    GPR29(r1),r29					;\
         l.sw    GPR30(r1),r30					;\
 	/* r31 already save */					;\
-        l.sw    RESULT(r1),r0
+        l.sw    RESULT(r1),r0					;\
+        l.sw    SYSCALLNO(r1),r0
 
 #define UNHANDLED_EXCEPTION(handler,vector)			\
 	.global	handler						;\
@@ -214,7 +216,7 @@ handler:							;\
         /* r1, EPCR, ESR already saved */			;\
 	l.sw    GPR2(r1),r2					;\
 	l.sw    GPR3(r1),r3					;\
-        l.sw    ORIG_GPR3(r1),r3				;\
+        l.sw    ORIG_GPR11(r1),r11				;\
         l.sw    GPR5(r1),r5					;\
         l.sw    GPR6(r1),r6					;\
         l.sw    GPR7(r1),r7					;\
@@ -600,6 +602,10 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	/* r4 holds the EEAR address of the fault, load the original r4 */
 	l.lwz	r4,GPR4(r1)
 
+	/* This is used by do_signal to determine whether to check for
+	 * syscall restart or not */
+	l.sw	SYSCALLNO(r1), r11
+
 	l.lwz	r30,TI_FLAGS(r10)
 	l.andi	r30,r30,_TIF_SYSCALL_TRACE
 	l.sfne	r30,r0
@@ -641,7 +647,6 @@ _syscall_exit:
 	l.nop
 
 _syscall_trace_entry:
-	l.sw	SYSCALLNO(r1),r11
 	l.addi	r3,r1,0
 	l.addi	r4,r0,0
 	l.jal	do_syscall_trace
@@ -790,13 +795,14 @@ _work_pending:
 	l.j	_resume_userspace
 	 l.nop
 
-/* Handle pending signals and notify-resume requests */
+/* Handle pending signals and notify-resume requests.
+ * do_notify_resume must be passed the latest pushed pt_regs, not
+ * necessarily the "userspace" ones.  Also, pt_regs->syscallno
+ * must be set so that the syscall restart functionality works.
+ */
 _work_notifysig:
-	l.ori	r3,r1,0
-	/* FIXME: how do we know if this is from syscall or not? */
-	l.ori	r4,r0,1
 	l.jal	do_notify_resume
-	 l.nop
+	 l.ori	r3,r1,0		  /* pt_regs */
 
 _resume_userspace:
 	DISABLE_INTERRUPTS(r3,r4)
