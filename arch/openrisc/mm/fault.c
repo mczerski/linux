@@ -216,7 +216,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 		info.si_addr = (void *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
 		DPG(show_regs(regs));
-		__asm__ __volatile__("l.nop 1");
 		return;
 	}
 //	DPG(show_regs(regs));

@@ -248,9 +248,9 @@ handler:							;\
 	/* r4 is exception EA */				;\
 	l.addi	r5,r0,vector					;\
 	l.jal	unhandled_exception				;\
-	l.nop							;\
+	 l.nop							;\
 	l.j	_ret_from_exception				;\
-	l.nop	1
+	 l.nop
 	
 /*
  * NOTE: one should never assume that SPR_EPC, SPR_ESR, SPR_EEAR
