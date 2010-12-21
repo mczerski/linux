@@ -89,9 +89,7 @@ SECTIONS
 	/* Align __setup_start on 16 byte boundary */
 	INIT_DATA_SECTION(16)
 
-	. = ALIGN(8192);
-
-	/* TODO: PERCPU sections should go here */
+	PERCPU(8192)
 
         __init_end = .;
 	
@@ -111,11 +109,10 @@ SECTIONS
 
         _end = .;
 
-        /* Sections to be discarded */
-
-	DISCARDS
-
 	/* Throw in the debugging sections */
 	STABS_DEBUG
 	DWARF_DEBUG
+
+        /* Sections to be discarded -- must be last */
+	DISCARDS
 }
