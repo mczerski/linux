@@ -100,9 +100,9 @@ SECTIONS
 	{
 		__initrd_start = .; 
 		*(.initrd)
+		__initrd_end = .; 
 		FILL (0);
                 . = ALIGN (8192);
-		__initrd_end = .; 
 	}
 
         __vmlinux_end = .;            /* last address of the physical file */

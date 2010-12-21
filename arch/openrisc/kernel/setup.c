@@ -70,7 +70,7 @@ extern int __init setup_early_serial8250_console(char *cmdline);
 #ifdef CONFIG_BLK_DEV_INITRD
 //extern unsigned long initrd_start, initrd_end;
 extern char __initrd_start, __initrd_end;
-extern char __initramfs_start, __initramfs_end;
+extern char __initramfs_start;
 #endif
 
 extern u32 _fdt_start;
@@ -302,6 +302,10 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_BLK_DEV_INITRD
 	initrd_start = (unsigned long)&__initrd_start;
 	initrd_end = (unsigned long)&__initrd_end;
+	if (initrd_start == initrd_end) {
+		initrd_start = 0;
+		initrd_end = 0;
+	}
 	initrd_below_start_ok = 1;
 #endif
 
