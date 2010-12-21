@@ -23,7 +23,7 @@ LDFLAGS_vmlinux :=
 LIBGCC 		 = $(shell $(CC) $(CFLAGS) -print-file-name=libgcc.a)
 
 #KBUILD_CFLAGS		+= -pipe -g -mredzone=0
-KBUILD_CFLAGS		+= -pipe -g -ffixed-r10
+KBUILD_CFLAGS		+= -pipe -ffixed-r10
 #KBUILD_CFLAGS		+= -fsigned-char -pipe -ffixed-r10 \
 #		   -ffixed-r16 -ffixed-r17 -ffixed-r18 -ffixed-r19 \
 #		   -ffixed-r20 -ffixed-r21 -ffixed-r22 -ffixed-r23 \
