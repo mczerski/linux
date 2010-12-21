@@ -127,7 +127,8 @@ static unsigned long __init setup_memory(void)
 	 * RAM usable.
 	 * init_bootmem sets the global values min_low_pfn, max_low_pfn.
 	 */ 
-	bootmap_size = init_bootmem(ram_start_pfn, ram_end_pfn-ram_start_pfn);
+	bootmap_size = init_bootmem(free_ram_start_pfn,
+				    ram_end_pfn-ram_start_pfn);
 	free_bootmem(PFN_PHYS(free_ram_start_pfn),
 		     (ram_end_pfn-free_ram_start_pfn)<< PAGE_SHIFT);
 	reserve_bootmem(PFN_PHYS(free_ram_start_pfn), bootmap_size,
