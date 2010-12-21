@@ -139,11 +139,6 @@ config OPENRISC_NO_SPR_SR_DSX
 	  Say N here if you know that your OpenRISC processor has
 	  SPR_SR_DSX bit implemented. Say Y if you are unsure.
 
-
-config OPENRISC_ANONYMOUS
-	bool "Enable anonymity"
-	default n
-
 config CMDLINE_BOOL
         bool "Default bootloader kernel arguments"
 
@@ -176,18 +171,6 @@ config DEBUG_STACKOVERFLOW
 	  but will catch most of kernel stack overruns and exit gracefuly.
 
 	  Say Y if you are unsure. 
-
-config OPENRISC_GUARD_PROTECTED_CORE
-	bool "Write protect read only part of kernel"
-	default y
-	help
-	  Write to .text or .rodata sections is most probably kernel bug.
-	  Enabling this will cause an oops at the instruction that tries to
-	  corrupt kernel.
-	
-	  This has no performance implication but should help locating bugs.
-
-	  Say Y if you are unsure.
 
 config JUMP_UPON_UNHANDLED_EXCEPTION
 	bool "Try to die gracefully"
