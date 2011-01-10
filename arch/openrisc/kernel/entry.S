@@ -267,7 +267,7 @@ handler:							;\
 
 EXCEPTION_ENTRY(_tng_kernel_start)
 	l.jal	_start
-	l.nop
+	 l.andi r0,r0,0
 	
 /* ---[ 0x200: BUS exception ]------------------------------------------- */
 
