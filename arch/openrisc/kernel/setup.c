@@ -134,6 +134,12 @@ static unsigned long __init setup_memory(void)
 	reserve_bootmem(PFN_PHYS(free_ram_start_pfn), bootmap_size,
 			BOOTMEM_DEFAULT);
 
+	for_each_memblock(reserved, region) {
+		printk("Reserved - 0x%08x-0x%08x\n",
+			(u32) region->base, (u32) region->size);
+		reserve_bootmem(region->base, region->size, BOOTMEM_DEFAULT);
+	}
+
 	return(ram_end_pfn);
 }
 
