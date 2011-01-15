@@ -230,12 +230,13 @@ int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 	return 0;
 } 
 
-void _switch_to(struct task_struct *old, 
-		struct task_struct *new,
-		struct task_struct **last)
+extern struct thread_info* _switch(struct thread_info *old_ti,
+				   struct thread_info *new_ti);
+
+struct task_struct* __switch_to(struct task_struct* old,
+				struct task_struct* new)
 {
-	extern struct thread_info *_switch(struct thread_info *old_ti,
-					   struct thread_info *new_ti);
+	struct task_struct* last;
 	struct thread_info *new_ti, *old_ti;
 	unsigned long flags;
 
@@ -251,11 +252,13 @@ void _switch_to(struct task_struct *old,
 	old_ti = old->stack;
 
 	current_thread_info_set[smp_processor_id()] = new_ti;
-	*last = (_switch(old_ti, new_ti))->task;
+	last = (_switch(old_ti, new_ti))->task;
 #if 0
 	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
 #endif
 	local_irq_restore(flags);
+
+	return last;
 } 
 
 /*
