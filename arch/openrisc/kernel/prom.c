@@ -53,12 +53,9 @@ void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 //	memblock_dump_all();
 }
 
-u64 __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
+void* __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 {
-	u64 alloc;
-	alloc = memblock_alloc(size, align);
-//	memblock_dump_all();
-	return alloc;
+	return __va(memblock_alloc(size, align));
 }
 
 void __init early_init_devtree(void *params)
