@@ -60,8 +60,11 @@ void* __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 
 void __init early_init_devtree(void *params)
 {
+	u8* alloc;
+
 	/* Setup flat device-tree pointer */
 	initial_boot_params = params;
+
 
 	/* Retrieve various informations from the /chosen node of the
 	 * device-tree, including the platform type, initrd location and
@@ -79,6 +82,22 @@ void __init early_init_devtree(void *params)
 //	parse_early_param();
 
 	memblock_analyze();
+
+	/* We must copy the flattend device tree from init memory to regular
+	 * memory because the device tree references the strings in it
+	 * directly.
+	 */
+
+	alloc = __va(memblock_alloc(initial_boot_params->totalsize, PAGE_SIZE));
+	printk("alloced: %lx\n", alloc);
+//	if (!alloc)
+//		kernel_panic();
+
+	memcpy(alloc, initial_boot_params, initial_boot_params->totalsize);
+
+	initial_boot_params = alloc;
+
+	printk("Set initial_boot_params to %lx\n", initial_boot_params);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD

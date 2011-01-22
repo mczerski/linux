@@ -2,13 +2,12 @@
 
 obj-y += linked_dtb.o
 
-# Where the DTS files live
-dtstree         := $(srctree)/$(src)/dts
+obj-y += system.dtb.o
+#obj-y += aac.dtb.o
 
-# Ensure system.dtb exists
-$(obj)/linked_dtb.o: $(obj)/system.dtb
+clean-files := *.dtb.S
 
-DTC_FLAGS ?= -p 1024
+#DTC_FLAGS ?= -p 1024
 
 $(obj)/%.dtb: $(src)/dts/%.dts
 	$(call cmd,dtc)

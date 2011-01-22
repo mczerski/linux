@@ -46,21 +46,21 @@ SECTIONS
 	  *(.text.__*)
 	  _etext = .;
 	}
+	/* TODO: Check if fixup and text.__* are really necessary
+	 * fixup is definitely necessary
+	 */
 	
 	/* FIXME: This should include the above .text bits but that currently
 	 * doesn't work... something's writing in there...
 	 */
 	_s_kernel_ro = .;
 
-	/* TODO: Check if fixup and text.__* are really necessary */
-
+#if 1
 	. = ALIGN (4) ;
-        _fdt_blob : AT(ADDR(_fdt_blob) - LOAD_OFFSET) {
-                _fdt_start = . ;                /* place for fdt blob */
-                *(_fdt_blob) ;                 /* Any link-placed DTB */
-                . = _fdt_start + 0x4000;        /* Pad up to 16kbyte */
-                _fdt_end = . ;
+        _fdt_blobbyx : AT(ADDR(_fdt_blobbyx) - LOAD_OFFSET) {
+                *(_fdt_blobby) ;                 /* Any link-placed DTB */
         }
+#endif
 
 	EXCEPTION_TABLE(4)
 

@@ -1,3 +1,2 @@
-.section _fdt_blob,"a"
-.incbin "arch/openrisc/boot/system.dtb"
-
+.section _fdt_blobby,"a"
+        .byte   0xd0

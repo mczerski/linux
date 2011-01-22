@@ -73,7 +73,7 @@ extern char __initrd_start, __initrd_end;
 extern char __initramfs_start;
 #endif
 
-extern u32 _fdt_start;
+extern u32 __dtb_start[];
  
 unsigned long or32_mem_size = 0;
 
@@ -246,15 +246,17 @@ void __init setup_cpuinfo(void)
 
 void __init or32_early_setup(/*unsigned long fdt*/ void) {
 
-	early_init_devtree((void *) &_fdt_start);
+	early_init_devtree((void *) __dtb_start);
+
 
 
 /*	if (fdt)
 		printk("FDT at 0x%08x\n", fdt);
 	else*/
 		printk("Compiled-in FDT at 0x%08x\n",
-		       (unsigned int)&_fdt_start);
+		       (unsigned int)__dtb_start);
 
+	printk("FDT: size %lx\n", ((struct boot_param_header*) __dtb_start)->totalsize);
 
 }
 
