@@ -1033,6 +1033,11 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 		mac = of_get_property(pdev->dev.of_node,
 				      "local-mac-address",
 				      NULL);
+		/* Better approach:
+		#include <linux/of_net.h>
+		mac = of_get_mac_address(pdev->dev.of_node);
+		*/
+
 		if (mac)
 			memcpy(netdev->dev_addr, mac, IFHWADDRLEN);
 		}
