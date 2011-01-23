@@ -6,7 +6,9 @@
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/current.h>
+/*#include <asm/spr_defs.h>*/
 #include <linux/sched.h>
+
 /*
  * TLB flushing (implemented in arch/or32/mm/tlb.c):
  *
@@ -18,26 +20,35 @@
  *
  */
 
-extern void flush_tlb_all(void);
-extern void flush_tlb_mm(struct mm_struct *mm);
-extern void flush_tlb_page(struct vm_area_struct *vma, 
-			   unsigned long addr);
-extern void flush_tlb_range(struct vm_area_struct *vma,
-			    unsigned long start,
-			    unsigned long end);
+void flush_tlb_all(void);
+void flush_tlb_mm(struct mm_struct* mm);
+void flush_tlb_page(struct vm_area_struct* vma, unsigned long addr);
+void flush_tlb_range(struct vm_area_struct* vma,
+		     unsigned long start,
+		     unsigned long end);
 
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
+
+#if 0
+static inline void flush_tlb_pgtables(struct mm_struct *mm,
                                       unsigned long start, unsigned long end)
 {
         /* OR32 does not keep any page table caches in TLB */
 }
 
+#endif
 
-extern inline void flush_tlb(void) 
+static inline void flush_tlb(void) 
 {
 	flush_tlb_mm(current->mm);
 }
 
-#define flush_tlb_kernel_range(start, end) flush_tlb_all()
+static inline void flush_tlb_kernel_range(unsigned long start,
+					  unsigned long end)
+{
+	flush_tlb_range(NULL, start, end);
+}
+
+
+
 
 #endif /* __ASM_OPENRISC_TLBFLUSH_H */

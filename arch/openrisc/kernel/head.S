@@ -43,7 +43,6 @@
 #undef  CONFIG_IMMU_WORKS
 #define CONFIG_IMMU_WORKS 1
 
-	
 #undef	CONFIG_OPENRISC_EXCEPTION_REGENERATE
 //#define	CONFIG_OPENRISC_EXCEPTION_REGENERATE 1
 #undef	CONFIG_OPENRISC_EXCEPTION_DEBUG
@@ -739,7 +738,7 @@ flush_tlb:
 	 */	
 	LOAD_SYMBOL_2_GPR(r5,SPR_DTLBMR_BASE(0))
 	LOAD_SYMBOL_2_GPR(r6,SPR_ITLBMR_BASE(0))
-	l.addi	r7,r0,64
+	l.addi	r7,r0,128 /* Maximum number of sets */
 1:		
 	l.mtspr	r5,r0,0x0
 	l.mtspr	r6,r0,0x0
@@ -1041,6 +1040,7 @@ dtlb_miss_handler:
 	EXCEPTION_STORE_GPR3
 	EXCEPTION_STORE_GPR4
 	EXCEPTION_STORE_GPR5
+	EXCEPTION_STORE_GPR6
 	/* 
 	 * get EA of the miss
 	 */
@@ -1093,7 +1093,15 @@ d_pmd_good:
 	 * fill DTLB TR register 
 	 */
 	l.and	r4,r2,r3		// apply the mask
-	l.andi	r5,r5,0x3f		// calc offset:	 & (NUM_TLB_ENTRIES-1), NUM_TLB_ENTRIES == 64
+	// Determine number of DMMU sets
+	l.mfspr r6, r0, SPR_DMMUCFGR
+	l.andi	r6, r6, SPR_DMMUCFGR_NTS
+	l.srli	r6, r6, SPR_DMMUCFGR_NTS_OFF
+	l.ori	r3, r0, 0x1
+	l.sll	r3, r3, r6 	// r3 = number DMMU sets DMMUCFGR
+	l.addi	r6, r3, -1  	// r6 = nsets mask
+	l.and	r5, r5, r6	// calc offset:	 & (NUM_TLB_ENTRIES-1)
+	                                                   //NUM_TLB_ENTRIES
 	l.mtspr	r5,r4,SPR_DTLBTR_BASE(0)
 	/* 
 	 * fill DTLB MR register 
@@ -1116,6 +1124,7 @@ d_pmd_good:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
 	l.rfe
 d_pmd_bad:	
 	l.nop	1
@@ -1123,6 +1132,7 @@ d_pmd_bad:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
 	l.rfe
 d_pmd_none:	
 d_pte_not_present:
@@ -1130,6 +1140,7 @@ d_pte_not_present:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
 	// __PHX__ for debugging purposes
 	DEBUG_TLB_PROBE(0x903)
 	l.j	_dispatch_do_dpage_fault
@@ -1144,6 +1155,7 @@ itlb_miss_handler:
 	EXCEPTION_STORE_GPR3
 	EXCEPTION_STORE_GPR4
 	EXCEPTION_STORE_GPR5
+	EXCEPTION_STORE_GPR6
 	/* 
 	 * get EA of the miss
 	 */
@@ -1250,7 +1262,15 @@ i_pmd_good:
 //	l.andi	r3,r2,0x400		// _PAGE_EXEC
 	l.sfeq	r3,r0
 	l.bf	itlb_tr_fill //_workaround
-	l.andi	r5,r5,0x3f		// calc offset:	 & (NUM_TLB_ENTRIES-1), NUM_TLB_ENTRIES == 64
+	// Determine number of IMMU sets
+	l.mfspr r6, r0, SPR_IMMUCFGR
+	l.andi	r6, r6, SPR_IMMUCFGR_NTS
+	l.srli	r6, r6, SPR_IMMUCFGR_NTS_OFF
+	l.ori	r3, r0, 0x1
+	l.sll	r3, r3, r6 	// r3 = number IMMU sets IMMUCFGR
+	l.addi	r6, r3, -1  	// r6 = nsets mask
+	l.and	r5, r5, r6	// calc offset:	 & (NUM_TLB_ENTRIES-1)
+	
 /*
  * __PHX__ :: fixme
  * we should not just blindly set executable flags, 
@@ -1283,6 +1303,7 @@ itlb_tr_fill:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
 	l.rfe
 
 i_pmd_bad:	
@@ -1291,6 +1312,7 @@ i_pmd_bad:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6
 	l.rfe
 i_pmd_none:	
 i_pte_not_present:
@@ -1298,6 +1320,7 @@ i_pte_not_present:
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
+	EXCEPTION_LOAD_GPR6	
 	// __PHX__ for debugging purposes
 	DEBUG_TLB_PROBE(0xa04)
 	l.j	_dispatch_do_ipage_fault
@@ -1325,13 +1348,6 @@ boot_dtlb_miss_handler:
 #define VPN_MASK 0xfffff000
 #define PPN_MASK 0xfffff000
 
-/*
- * a % 64 = a & MOD_64_MASK
- */
-#define MOD_64_MASK 0x3f
-
-#define MOD_64(dest,src)          \
-	l.andi  dest,src,MOD_64_MASK
 
 	EXCEPTION_DEBUG_VALUE_ER(0x9b0)
 	EXCEPTION_STORE_GPR6
@@ -1358,7 +1374,15 @@ immediate_translation:
 	CLEAR_GPR(r6)	
 	
 	l.srli	r3,r4,0xd                  // r3 <- r4 / 8192 (sets are relative to page size (8Kb) NOT VPN size (4Kb)
-	l.andi  r2,r3,MOD_64_MASK          // r2 <- r3 % 64: ok this is SET
+
+	l.mfspr r6, r0, SPR_DMMUCFGR
+	l.andi	r6, r6, SPR_DMMUCFGR_NTS
+	l.srli	r6, r6, SPR_DMMUCFGR_NTS_OFF
+	l.ori	r5, r0, 0x1
+	l.sll	r5, r5, r6 	// r5 = number DMMU sets
+	l.addi	r6, r5, -1  	// r6 = nsets mask
+	l.and	r2, r3, r6	// r2 <- r3 % NSETS_MASK
+	
 	l.or    r6,r6,r4                   // r6 <- r4
 	l.ori   r6,r6,~(VPN_MASK)          // r6 <- VPN :VPN .xfff - clear up lo(r6) to 0x**** *fff
 	l.movhi r5,hi(DTLB_MR_MASK)        // r5 <- ffff:0000.x000
@@ -1421,14 +1445,8 @@ boot_itlb_miss_handler:
 #define VPN_MASK 0xfffff000
 #define PPN_MASK 0xfffff000
 
-/*
- * a % 64 = a & MOD_64_MASK
- */
-#define MOD_64_MASK 0x3f
 
-#define MOD_64(dest,src)          \
-	l.andi  dest,src,MOD_64_MASK
-
+	
 	EXCEPTION_DEBUG_VALUE_ER(0xab0)
 	
 	EXCEPTION_STORE_GPR2
@@ -1480,7 +1498,15 @@ earlyearly:
 	CLEAR_GPR(r6)	
 		
 	l.srli  r3,r4,0xd                  // r3 <- r4 / 8192 (sets are relative to page size (8Kb) NOT VPN size (4Kb)
-	l.andi  r2,r3,MOD_64_MASK          // r2 <- r3 % 64: ok this is SET
+
+	l.mfspr r6, r0, SPR_IMMUCFGR
+	l.andi	r6, r6, SPR_IMMUCFGR_NTS
+	l.srli	r6, r6, SPR_IMMUCFGR_NTS_OFF
+	l.ori	r5, r0, 0x1
+	l.sll	r5, r5, r6 	// r5 = number IMMU sets from IMMUCFGR
+	l.addi	r6, r5, -1  	// r6 = nsets mask
+	l.and	r2, r3, r6	// r2 <- r3 % NSETS_MASK
+
 	l.or    r6,r6,r4                   // r6 <- r4
 	l.ori   r6,r6,~(VPN_MASK)          // r6 <- VPN :VPN .xfff - clear up lo(r6) to 0x**** *fff
 	l.movhi r5,hi(ITLB_MR_MASK)        // r5 <- ffff:0000.x000

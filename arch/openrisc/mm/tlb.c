@@ -1,13 +1,11 @@
 /*
- *  linux/arch/or32/mm/tlb.c
+ *  linux/arch/openrisc/mm/tlb.c
  *
  *  or32 version
  *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ *               Jonas Bonn (jonas@southpole.se)
+ *               Julius Baxter (julius.baxter@orsoc.se)
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
- *    
  *  derived from cris, i386, m68k, ppc, sh ports.
  *
  *  changes:
@@ -38,158 +36,116 @@
 #include <asm/or32-hf.h>
 #include <asm/spr_defs.h>
 
-#define D(x)
-
-#define NUM_TLB_ENTRIES 64
-#define TLB_OFFSET(add) (((add) >> PAGE_SHIFT) & (NUM_TLB_ENTRIES-1))
-
 #define NO_CONTEXT -1
 
-/* this is to work around for certian problems */
-#define CONFIG_OPENRISC_FLUSH_ALL
-
-#define or32_disable_immu()                \
-{                                          \
-	unsigned long __t1, __t2;          \
-	__asm__ __volatile__(              \
-                "l.movhi  %6,hi(99f)    ;" \
-		"l.ori    %6,%6,lo(99f) ;" \
-                "l.movhi  %0,%5         ;" \
-                "l.add    %0,%0,%6      ;" \
-		"l.mtspr  r0,%0,%1      ;" \
-		"l.mfspr  %0,r0,%2      ;" \
-		"l.andi   %0,%0,lo(%3)  ;" \
-		"l.mtspr  r0,%0,%4      ;" \
-		"l.rfe   ;l.nop;l.nop;l.nop;l.nop;l.nop               ;" \
-		"99:                     " \
-		: "=r"(__t1)               \
-                : "K"(SPR_EPCR_BASE), "K"(SPR_SR),        \
-		  "K"(0x0000ffff&(~(SPR_SR_IME))), "K"(SPR_ESR_BASE), \
-		  "K"((-KERNELBASE)>>16), "r"(__t2)); \
-}
-
-#define or32_enable_immu()            \
-{                                     \
-	unsigned long __t1;                \
-	__asm__ __volatile__(         \
-                "l.movhi  %0,hi(99f);" \
-		"l.ori    %0,%0,lo(99f);" \
-		"l.mtspr  r0,%0,%1  ;" \
-		"l.mfspr  %0,r0,%2  ;" \
-		"l.ori    %0,%0,lo(%3) ;" \
-		"l.mtspr  r0,%0,%4  ;" \
-		"l.rfe              ;" \
-                "l.nop;l.nop;l.nop;l.nop;" \
-		"99:                " \
-		: "=r"(__t1)     \
-		: "K"(SPR_EPCR_BASE), "K"(SPR_SR),         \
-		  "K"(SPR_SR_IME), "K"(SPR_ESR_BASE));     \
-}
- 
-
-
-
-/* invalidate all TLB entries */
+#define NUM_DTLB_SETS (1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> \
+			    SPR_DMMUCFGR_NTS_OFF))
+#define NUM_ITLB_SETS (1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> \
+			    SPR_IMMUCFGR_NTS_OFF))
+#define DTLB_OFFSET(addr) (((addr) >> PAGE_SHIFT) & (NUM_DTLB_SETS-1))
+#define ITLB_OFFSET(addr) (((addr) >> PAGE_SHIFT) & (NUM_ITLB_SETS-1))
+/*
+ * Invalidate all TLB entries.
+ *
+ * This comes down to setting the 'valid' bit for all xTLBMR registers to 0.
+ * Easiest way to accomplish this is to just zero out the xTLBMR register
+ * completely.
+ *
+ */
 
 void flush_tlb_all(void)
 {
 	int i;
-	unsigned long flags;
-	
-	D(printk("tlb: flushed all\n"));
-	
-	local_irq_save(flags); /* flush needs to be atomic */
-//	or32_disable_immu();
+	unsigned long num_tlb_sets;
 
-	for(i = 0; i < NUM_TLB_ENTRIES; i++) {
+	/* Determine number of sets for IMMU. */
+	/* FIXME: Assumption is I & D nsets equal. */
+	num_tlb_sets = NUM_ITLB_SETS;
+
+	for(i = 0; i < num_tlb_sets; i++) {
 		mtspr_off(SPR_DTLBMR_BASE(0), i, 0);
 		mtspr_off(SPR_ITLBMR_BASE(0), i, 0);
 	}
-	
-//	or32_enable_immu();
-	local_irq_restore(flags);
 }
 
-/* invalidate the selected mm context only */
 
-void flush_tlb_mm(struct mm_struct *mm)
+#define have_dtlbeir (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_TEIRI)
+#define have_itlbeir (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_TEIRI)
+
+/*
+ * Invalidate a single page.  This is what the xTLBEIR register is for.
+ *
+ * There's no point in checking the vma for PAGE_EXEC to determine whether it's
+ * the data or instruction TLB that should be flushed... that would take more
+ * than the few instructions that the following compiles down to!
+ *
+ * The case where we don't have the xTLBEIR register really only works for
+ * MMU's with a single way and is hard-coded that way.
+ */
+
+#define flush_dtlb_page_eir(addr) mtspr(SPR_DTLBEIR, addr)
+#define flush_dtlb_page_no_eir(addr) mtspr_off(SPR_DTLBMR_BASE(0), DTLB_OFFSET(addr), 0);
+
+#define flush_itlb_page_eir(addr) mtspr(SPR_ITLBEIR, addr)
+#define flush_itlb_page_no_eir(addr) mtspr_off(SPR_ITLBMR_BASE(0), ITLB_OFFSET(addr), 0);
+
+void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 {
-#ifdef CONFIG_OPENRISC_FLUSH_ALL
-	flush_tlb_all();
-#else
-        D(printk("tlb: flush mm (%p)\n", mm));
-	
-	if(mm->map_count) {
-		struct vm_area_struct *mp;
-		for(mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			flush_tlb_range(mp, mp->vm_start,  mp->vm_end);
+	if (have_dtlbeir) {
+		flush_dtlb_page_eir(addr);
+	} else {
+		flush_dtlb_page_no_eir(addr);
 	}
-#endif
+
+	if (have_itlbeir) {
+		flush_itlb_page_eir(addr);
+	} else {
+		flush_itlb_page_no_eir(addr);
+	}
 }
 
-/* invalidate a single page */
-
-void flush_tlb_page(struct vm_area_struct *vma, 
-		    unsigned long addr)
-{
-#ifdef CONFIG_OPENRISC_FLUSH_ALL
-	flush_tlb_all();
-#else
-	unsigned long tlb_offset, flags;
-
-	D(printk("tlb: flush page %p \n", addr));
-	
-	addr &= PAGE_MASK; /* perhaps not necessary */
-	tlb_offset = TLB_OFFSET(addr);
-	
-	local_irq_save(flags);  /* flush needs to be atomic */
-	
-	
-	if((mfspr(SPR_DTLBMR_BASE(0) + tlb_offset) & PAGE_MASK) == addr) 
-		mtspr(SPR_DTLBMR_BASE(0) + tlb_offset, 0);
-	
-	if((mfspr(SPR_ITLBMR_BASE(0) + tlb_offset) & PAGE_MASK) == addr)
-		mtspr(SPR_ITLBMR_BASE(0) + tlb_offset, 0);
-  
-	local_irq_restore(flags);
-#endif
-}
-
-/* invalidate a page range */
-
-void flush_tlb_range(struct vm_area_struct *vma, 
+void flush_tlb_range(struct vm_area_struct *vma,
 		     unsigned long start,
 		     unsigned long end)
 {
-#ifdef CONFIG_OPENRISC_FLUSH_ALL
-	flush_tlb_all();
-#else
-	unsigned long vpn, flags;
-	
-	D(printk("tlb: flush range %p<->%p (%p)\n",
-		 start, end, vma));
-	
-	start = start >> PAGE_SHIFT;
-	end   = end   >> PAGE_SHIFT;
-	
-	local_irq_save(flags);  /* flush needs to be atomic */
-	
-	for (vpn = start; vpn < end; vpn++) {
-		unsigned long slot = vpn%NUM_TLB_ENTRIES;
-		
-		if (vpn == (mfspr(SPR_DTLBMR_BASE(0) + slot) >> PAGE_SHIFT)) {
-			mtspr(SPR_DTLBMR_BASE(0) + slot,0);
-			D(printk("DTLB invalidate :: vpn 0x%x, set %d\n", vpn, slot)); 
-		}
-		
-		if (vpn == (mfspr(SPR_ITLBMR_BASE(0) + slot) >> PAGE_SHIFT)) {
-			mtspr(SPR_ITLBMR_BASE(0) + slot,0);
-			D(printk("ITLB invalidate :: vpn 0x%x, set %d\n", vpn, slot)); 
-		}
+	int addr;
+	bool dtlbeir;
+	bool itlbeir;
+
+	dtlbeir = have_dtlbeir;
+	itlbeir = have_itlbeir;
+
+	for (addr = start; addr < end; addr += PAGE_SIZE) {
+		if (dtlbeir)
+			flush_dtlb_page_eir(addr);
+		else
+			flush_dtlb_page_no_eir(addr);
+
+		if (itlbeir)
+			flush_itlb_page_eir(addr);
+		else
+			flush_itlb_page_no_eir(addr);
 	}
-	local_irq_restore(flags);
-#endif
 }
+
+/* 
+ * Invalidate the selected mm context only.
+ *
+ * FIXME: Due to some bug here, we're flushing everything for now.
+ * This should be changed to loop over over mm and call flush_tlb_range.
+ */
+
+void flush_tlb_mm(struct mm_struct *mm)
+{
+
+	/* Was seeing bugs with the mm struct passed to us. Scrapped most of
+	   this function. */
+	/* Several architctures do this */
+	flush_tlb_all();
+}
+
+
+
 
 /* called in schedule() just before actually doing the switch_to */
 
@@ -208,18 +164,9 @@ void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	 * entries belonging to previous map
 	 */
 
-/*	
-	phx_mmu("prev_mm %p, next_mm %p, next_tsk %p, "
-		"next_tsk->mm %p, current %p", 
-		prev, next, next_tsk, next_tsk ? next_tsk->mm : 0, current);
-*/
-
-#ifdef CONFIG_OPENRISC_FLUSH_ALL
-	flush_tlb_all();
-#else
 	if (prev != next)
 		flush_tlb_mm(prev);
-#endif
+
 }
 
 /*
@@ -240,13 +187,7 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 
 void destroy_context(struct mm_struct *mm)
 {
-	D(printk("destroy_context %d (%p)\n", mm->context, mm));
-	
-#ifdef CONFIG_OPENRISC_FLUSH_ALL
-	flush_tlb_all();
-#else
 	flush_tlb_mm(mm);
-#endif
 
 }
 
