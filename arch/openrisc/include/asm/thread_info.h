@@ -116,6 +116,7 @@ register struct thread_info *current_thread_info_reg asm("r10");
 #define TIF_SIGPENDING		2	/* signal pending */
 #define TIF_NEED_RESCHED	3	/* rescheduling necessary */
 #define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */
+#define TIF_SYSCALL_TRACEPOINT  8       /* for ftrace syscall instrumentation */
 #define TIF_RESTORE_SIGMASK     9
 #define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
 #define TIF_MEMDIE              17
@@ -129,11 +130,9 @@ register struct thread_info *current_thread_info_reg asm("r10");
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 
 
-/* work to do on interrupt/exception return */
-#define _TIF_WORK_MASK \
-  (0x0000FFFE & ~(_TIF_SYSCALL_TRACE|_TIF_SINGLESTEP))
-/* work to do on any return to u-space */
-#define _TIF_ALLWORK_MASK	0x0000FFFF
+/* Work to do when returning from interrupt/exception */
+/* For OpenRISC, this is anything in the LSW other than syscall trace */
+#define _TIF_WORK_MASK (0xff & (~_TIF_SYSCALL_TRACE|~TIF_SINGLESTEP))
 
 #endif /* __KERNEL__ */
 
