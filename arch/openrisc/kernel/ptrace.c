@@ -262,20 +262,35 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 /* notification of system call entry/exit
  * - triggered by current->work.syscall_trace
  */
-asmlinkage void do_syscall_trace(struct pt_regs *regs, int entryexit)
+asmlinkage long
+do_syscall_trace_enter(struct pt_regs *regs)
 {
- 	if (unlikely(current->audit_context) && entryexit)
-	  audit_syscall_exit(AUDITSC_RESULT(regs->regs[2]), regs->regs[2]);/*RGD current*/
+	long ret = 0;
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
-		goto out;
-	if (!(current->ptrace & PT_PTRACED))
-		goto out;
+	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
+	    tracehook_report_syscall_entry(regs))
+		/*
+		 * Tracing decided this syscall should not happen.
+		 * We'll return a bogus call number to get an ENOSYS
+		 * error, but leave the original number in <something>.
+		 */
+                ret = -1L;
 
-	/* The 0x80 provides a way for the tracing parent to distinguish
-	   between a syscall stop and SIGTRAP delivery */
-	ptrace_notify(SIGTRAP | ((current->ptrace & PT_TRACESYSGOOD) ?
-	                         0x80 : 0));
+	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+		trace_sys_enter(regs, regs->syscallno);
+
+
+	/* Are these regs right??? */
+	if (unlikely(current->audit_context))
+		audit_syscall_entry(audit_arch(), regs->syscallno,
+				    regs->gprs[1], regs->gprs[2],
+				    regs->gprs[3], regs->gprs[4]);
+
+	return ret ?: regs->syscallno;
+
+
+/*FIXME : audit the rest of this */
+
 
 	/*
 	 * this isn't the same as continuing with a signal, but it will do
@@ -287,9 +302,28 @@ asmlinkage void do_syscall_trace(struct pt_regs *regs, int entryexit)
 		current->exit_code = 0;
 	}
  out:
+	/*FIXME: audit_arch isn't even defined for openrisc */
+	/*FIXME:  What's with the register numbers here... makes no sense */
 	if (unlikely(current->audit_context) && !entryexit)
 		audit_syscall_entry(audit_arch(), regs->regs[2],
 				    regs->regs[4], regs->regs[5],
 				    regs->regs[6], regs->regs[7]);/*RGD*/
   
+}
+
+asmlinkage void
+do_syscall_trace_leave(struct pt_regs* regs)
+{
+	int step;
+
+	if (unlikely(current->audit_context))
+		audit_syscall_exit(AUDITSC_RESULT(regs->result), 
+				   regs->result);
+
+	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+		trace_sys_exit(regs, regs->result);
+
+	step = test_thread_flag(TIF_SINGLESTEP);
+	if (step || test_thread_flag(TIF_SYSCALL_TRACE))
+		tracehook_report_syscall_exit(regs, step);
 }
