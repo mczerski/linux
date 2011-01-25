@@ -41,6 +41,7 @@
 #include <linux/ptrace.h>
 #include <linux/user.h>
 #include <linux/audit.h>
+#include <linux/tracehook.h>
 
 #include <asm/segment.h>
 #include <asm/page.h>
@@ -276,9 +277,9 @@ do_syscall_trace_enter(struct pt_regs *regs)
 		 */
                 ret = -1L;
 
-	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+/*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
 		trace_sys_enter(regs, regs->syscallno);
-
+*/
 
 	/* Are these regs right??? */
 	if (unlikely(current->audit_context))
@@ -288,7 +289,7 @@ do_syscall_trace_enter(struct pt_regs *regs)
 
 	return ret ?: regs->syscallno;
 
-
+#if 0
 /*FIXME : audit the rest of this */
 
 
@@ -309,6 +310,7 @@ do_syscall_trace_enter(struct pt_regs *regs)
 				    regs->regs[4], regs->regs[5],
 				    regs->regs[6], regs->regs[7]);/*RGD*/
   
+#endif
 }
 
 asmlinkage void
@@ -320,8 +322,9 @@ do_syscall_trace_leave(struct pt_regs* regs)
 		audit_syscall_exit(AUDITSC_RESULT(regs->result), 
 				   regs->result);
 
-	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
+/*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
 		trace_sys_exit(regs, regs->result);
+*/
 
 	step = test_thread_flag(TIF_SINGLESTEP);
 	if (step || test_thread_flag(TIF_SYSCALL_TRACE))
