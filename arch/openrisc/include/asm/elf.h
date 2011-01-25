@@ -56,7 +56,12 @@ typedef unsigned long elf_fpregset_t;
 
 #define ELF_ET_DYN_BASE         (0x08000000)
 
-#define USE_ELF_CORE_DUMP
+/*
+ * Enable dump using regset.
+ * This covers all of general/DSP/FPU regs.
+ */
+#define CORE_DUMP_USE_REGSET
+
 #define ELF_EXEC_PAGESIZE	8192
 
 #define ELF_CORE_COPY_REGS(gregs, regs) \
