@@ -269,8 +269,11 @@ void dump_thread(struct pt_regs *regs, struct user *dump)
 	phx_warn("TODO");
 }
 
-static void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
+extern void _kernel_thread_helper(void);
+
+void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
 {
+/*	printk("Kernel thread fn called = %lx\n", fn);*/
         do_exit(fn(arg));
 }
 
@@ -283,10 +286,14 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 
         memset(&regs, 0, sizeof(regs));
 
-        regs.gprs[1] = (unsigned long)fn;
-        regs.gprs[2] = (unsigned long)arg;
+/*	printk("Kernel thread fn = %lx\n", fn);
+	printk("kernel_thread_helper = %lx\n", kernel_thread_helper);
+	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);*/
+
+        regs.gprs[18] = (unsigned long)fn;
+        regs.gprs[20] = (unsigned long)arg;
         regs.sr = mfspr(SPR_SR);
-        regs.pc = (unsigned long)kernel_thread_helper;
+        regs.pc = (unsigned long)_kernel_thread_helper;
 
         return do_fork(flags | CLONE_VM | CLONE_UNTRACED,
                         0, &regs, 0, NULL, NULL);
@@ -302,6 +309,8 @@ asmlinkage long _sys_execve(const char __user *name,
 {
 	int error;
 	char * filename;
+
+	printk("in execve\n");
 
 	filename = getname(name);
 	error = PTR_ERR(filename);
@@ -330,8 +339,10 @@ envp[])
   register long __a asm("r3") = (long)(filename);
   register long __b asm("r4") = (long)(argv);
   register long __c asm("r5") = (long)(envp);
-  __asm__ volatile ("l.sys 1" : "=r" (__res)
-           : "r" (__res), "r" (__a), "r" (__b), "r" (__c));
+  __asm__ volatile ("l.sys 1"
+	   : "=r" (__res), "=r" (__a), "=r" (__b), "=r" (__c)
+           : "0" (__res), "1" (__a), "2" (__b), "3" (__c)
+	   : "r6", "r7", "r8", "r12", "r13", "r15", "r17", "r19", "r21", "r23", "r25", "r27", "r29", "r31");
   __asm__ volatile("l.nop");
   return __res;
 }

@@ -839,6 +839,27 @@ ENTRY(_ret_from_exception)
 	l.j	_resume_userspace
 	 l.nop
 
+
+/* Since syscalls don't save call-clobbered registers, the args to
+ * kernel_thread_helper will need to be passed through callee-saved
+ * registers and copied to the parameter registers when the thread
+ * begins running.
+ *
+ * See arch/openrisc/kernel/process.c:
+ * The args are passed as follows:
+ *   arg1 (r3) : passed in r20
+ *   arg2 (r4) : passed in r22
+ */
+
+ENTRY(_kernel_thread_helper)
+	l.or	r3,r20,r0
+	l.or	r4,r22,r0
+	l.movhi	r31,hi(kernel_thread_helper)
+	l.ori	r31,r31,lo(kernel_thread_helper)
+	l.jr	r31
+	 l.nop
+	
+
 /* ========================================================[ switch ] === */
 
 /*
