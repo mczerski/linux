@@ -635,12 +635,13 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	 * syscall restart or not */
 	l.sw	SYSCALLNO(r1), r11
 
+#if 0
 	l.lwz	r30,TI_FLAGS(r10)
 	l.andi	r30,r30,_TIF_SYSCALL_TRACE
 	l.sfne	r30,r0
 	l.bf	_syscall_trace_entry
 	l.nop
-
+#endif
 	/* check that userspace didn't try to fool us with 
 	 * syscall number greater then __NR_syscall. 
 	 */	
@@ -661,9 +662,35 @@ _syscall_call:
 	l.jalr  r30
 	 l.nop
 
+_syscall_return:
+	/* All syscalls return here... just pay attention to ret_from_fork
+	 * which does it in a round-about way.
+	 */
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
 
+
+#if 0
+	/* r30 is a callee-saved register so this should still hold the
+	 * _TIF_SYSCALL_TRACE flag from _syscall_check_trace above */
+	l.sfne	r30,r0
+	l.bf	_syscall_trace_leave
+	 l.nop
+#endif
+
+#if 1
+_syscall_check_work:
+	l.lwz	r30,TI_FLAGS(r10)
+	l.andi	r30,r30,_TIF_WORK_MASK
+	l.sfne	r30,r0
+	l.bf	_work_pending
+	 l.nop
+#endif
+
+	l.j	_syscall_resume_userspace
+	 l.nop
+
+#if 0
 _syscall_exit:
 	DISABLE_INTERRUPTS(r3,r4)
 	l.lwz	r30,TI_FLAGS(r10)
@@ -699,6 +726,7 @@ _syscall_trace_entry:
 
 	l.j	_syscall_exit
 	l.nop
+#endif
 
 _syscall_badsys:
 	/* Just return -ENOSYS */
@@ -708,6 +736,7 @@ _syscall_badsys:
 	l.j	_resume_userspace
 	l.nop
 
+#if 0
 _syscall_exit_work:
 	/* r30 holds TI_flags */
 	l.andi	r3,r30,_TIF_SYSCALL_TRACE|_TIF_SINGLESTEP
@@ -721,8 +750,8 @@ _syscall_exit_work:
 	l.addi	r4,r0,1
 	l.jal	do_syscall_trace
 	l.nop
+#endif
 
-_syscall_return:
 _syscall_resume_userspace:
 
 /* This is the hot path for returning to userspace from a syscall.  If there's
