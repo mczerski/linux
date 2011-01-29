@@ -1,12 +1,7 @@
 /*
- *  linux/arch/or32/kernel/head.S
- *
- *  or32 version
- *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
- *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
+ *  author(s):
+ *    Matjaz Breskvar (phoenix@bsemi.com)
+ *    Jonas Bonn (jonas@southpole.se)
  *
  *  changes:
  *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
@@ -133,11 +128,12 @@
 #define EXCEPTION_LOAD_GPR6		l.lwz   r6,0x74(r0)
 	
 			
-/* 
- * EXCEPTION_HANDLE temporary stores 
- */	
-#define EXCEPTION_T_STORE_GPR31		l.sw    0x78(r0),r31
-#define EXCEPTION_T_LOAD_GPR31(reg)	l.lwz   reg,0x78(r0)
+/*
+ * EXCEPTION_HANDLE temporary stores
+ */
+
+#define EXCEPTION_T_STORE_GPR30		l.sw    0x78(r0),r30
+#define EXCEPTION_T_LOAD_GPR30(reg)	l.lwz   reg,0x78(r0)
 
 #define EXCEPTION_T_STORE_GPR10		l.sw    0x7c(r0),r10
 #define EXCEPTION_T_LOAD_GPR10(reg)	l.lwz   reg,0x7c(r0)
@@ -145,17 +141,12 @@
 #define EXCEPTION_T_STORE_SP		l.sw	0x80(r0),r1
 #define EXCEPTION_T_LOAD_SP(reg)	l.lwz   reg,0x80(r0)
 
-/* 
- * UNHANDLED_EXCEPTION temporary stores 
+/*
+ * For UNHANLDED_EXCEPTION 
  */
-#define UNH_EXCEPTION_T_STORE_GPR31	l.sw    0x84(r0),r31
-#define UNH_EXCEPTION_T_LOAD_GPR31(reg)	l.lwz   reg,0x84(r0)
 
-#define UNH_EXCEPTION_T_STORE_GPR2	l.sw    0x88(r0),r2
-#define UNH_EXCEPTION_T_LOAD_GPR2(reg)	l.lwz   reg,0x88(r0)
-
-#define UNH_EXCEPTION_T_STORE_SP	l.sw	0x8c(r0),r1
-#define UNH_EXCEPTION_T_LOAD_SP(reg)	l.lwz   reg,0x8c(r0)	
+#define EXCEPTION_T_STORE_GPR31		l.sw    0x84(r0),r31
+#define EXCEPTION_T_LOAD_GPR31(reg)	l.lwz   reg,0x84(r0)
 
 /* =========================================================[ macros ]=== */
 
@@ -303,57 +294,56 @@
  *
  * OPTM: no need to make it so wasteful to extract ksp when in user mode
  */
+
 #define EXCEPTION_HANDLE(handler)				\
 	EXCEPTION_DEBUG						;\
-	EXCEPTION_T_STORE_GPR31					;\
+	EXCEPTION_T_STORE_GPR30					;\
+	l.mfspr r30,r0,SPR_ESR_BASE				;\
+	l.andi  r30,r30,SPR_SR_SM				;\
+	l.sfeqi r30,0						;\
 	EXCEPTION_T_STORE_GPR10					;\
-	EXCEPTION_T_STORE_SP					;\
-	l.mfspr r31,r0,SPR_ESR_BASE				;\
-	l.andi  r31,r31,SPR_SR_SM				;\
-	l.sfeqi r31,0						;\
-	l.bnf   2f /* kernel_mode */				;\
-	l.nop							;\
+	l.bnf   2f                            /* kernel_mode */	;\
+	 EXCEPTION_T_STORE_SP                 /* delay slot */	;\
 1: /* user_mode:   */						;\
 	LOAD_SYMBOL_2_GPR(r1,current_thread_info_set)		;\
-	tophys  (r31,r1)					;\
+	tophys  (r30,r1)					;\
 	/* r10: current_thread_info  */				;\
-	l.lwz   r10,0(r31)					;\
-	tophys  (r31,r10)					;\
-	l.lwz   r1,(TI_KSP)(r31)				;\
+	l.lwz   r10,0(r30)					;\
+	tophys  (r30,r10)					;\
+	l.lwz   r1,(TI_KSP)(r30)				;\
 	/* fall through */					;\
 2: /* kernel_mode: */						;\
 	/* create new stack frame, save only needed gprs */	;\
 	/* r1: KSP, r10: current, r4: EEAR, r31: __pa(KSP) */	;\
-	/* r12:	temp, syscall indicator, r13 temp */		;\
+	/* r12:	temp, syscall indicator */			;\
 	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
-	/* r1 is KSP, r31 is __pa(KSP) */			;\
-	tophys  (r31,r1)					;\
-        l.sw    GPR12(r31),r12					;\
+	/* r1 is KSP, r30 is __pa(KSP) */			;\
+	tophys  (r30,r1)					;\
+        l.sw    GPR12(r30),r12					;\
 	l.mfspr r12,r0,SPR_EPCR_BASE				;\
-        l.sw    PC(r31),r12					;\
+        l.sw    PC(r30),r12					;\
         l.mfspr r12,r0,SPR_ESR_BASE				;\
-        l.sw    SR(r31),r12					;\
-	/* save r31 */						;\
-	EXCEPTION_T_LOAD_GPR31(r12)				;\
-	l.sw	GPR31(r31),r12					;\
+        l.sw    SR(r30),r12					;\
+	/* save r30 */						;\
+	EXCEPTION_T_LOAD_GPR30(r12)				;\
+	l.sw	GPR30(r30),r12					;\
 	/* save r10 as was prior to exception */		;\
 	EXCEPTION_T_LOAD_GPR10(r12)				;\
-	l.sw	GPR10(r31),r12					;\
+	l.sw	GPR10(r30),r12					;\
 	/* save SP as was prior to exception */			;\
 	EXCEPTION_T_LOAD_SP(r12)				;\
-	l.sw	SP(r31),r12					;\
-        l.sw    GPR13(r31),r13					;\
+	l.sw	SP(r30),r12					;\
 	/* save exception r4, set r4 = EA */			;\
-	l.sw	GPR4(r31),r4					;\
+	l.sw	GPR4(r30),r4					;\
 	l.mfspr r4,r0,SPR_EEAR_BASE				;\
 	/* r12 == 1 if we come from syscall */			;\
 	CLEAR_GPR(r12)						;\
 	/* ----- turn on MMU ----- */				;\
-	l.ori	r31,r0,(EXCEPTION_SR)				;\
-	l.mtspr	r0,r31,SPR_ESR_BASE				;\
-	/* r31:	EA address of handler */			;\
-	LOAD_SYMBOL_2_GPR(r31,handler)				;\
-	l.mtspr r0,r31,SPR_EPCR_BASE				;\
+	l.ori	r30,r0,(EXCEPTION_SR)				;\
+	l.mtspr	r0,r30,SPR_ESR_BASE				;\
+	/* r30:	EA address of handler */			;\
+	LOAD_SYMBOL_2_GPR(r30,handler)				;\
+	l.mtspr r0,r30,SPR_EPCR_BASE				;\
 	l.rfe
 
 /*
@@ -1442,8 +1432,8 @@ boot_itlb_miss_handler:
  */
 #define ITLB_TR_MASK 0xfffff050
 
-#define VPN_MASK 0xfffff000
-#define PPN_MASK 0xfffff000
+#define VPN_MASK 0xffffe000
+#define PPN_MASK 0xffffe000
 
 
 	

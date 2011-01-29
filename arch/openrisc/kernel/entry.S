@@ -106,7 +106,8 @@ handler:							;\
         l.sw    GPR9(r1),r9					;\
 	/* r10 already saved */					;\
         l.sw    GPR11(r1),r11					;\
-	/* r12,r13 already saved */				;\
+	/* r12 already saved */					;\
+        l.sw    GPR13(r1),r13					;\
         l.sw    GPR14(r1),r14					;\
         l.sw    GPR15(r1),r15					;\
         l.sw    GPR16(r1),r16					;\
@@ -123,8 +124,9 @@ handler:							;\
         l.sw    GPR27(r1),r27					;\
         l.sw    GPR28(r1),r28					;\
         l.sw    GPR29(r1),r29					;\
-        l.sw    GPR30(r1),r30					;\
-	/* r31 already save */					;\
+	/* r30 already save */					;\
+/*        l.sw    GPR30(r1),r30*/					;\
+        l.sw    GPR31(r1),r31					;\
         l.sw    RESULT(r1),r0					;\
         l.sw    SYSCALLNO(r1),r0
 
@@ -142,7 +144,8 @@ handler:							;\
         l.sw    GPR9(r1),r9					;\
 	/* r10 already saved */					;\
         l.sw    GPR11(r1),r11					;\
-	/* r12,r13 already saved */				;\
+	/* r12 already saved */					;\
+        l.sw    GPR13(r1),r13					;\
         l.sw    GPR14(r1),r14					;\
         l.sw    GPR15(r1),r15					;\
         l.sw    GPR16(r1),r16					;\
@@ -159,8 +162,9 @@ handler:							;\
         l.sw    GPR27(r1),r27					;\
         l.sw    GPR28(r1),r28					;\
         l.sw    GPR29(r1),r29					;\
-        l.sw    GPR30(r1),r30					;\
 	/* r31 already saved */					;\
+       l.sw    GPR30(r1),r30					;\
+/*        l.sw    GPR31(r1),r31	*/				;\
         l.sw    RESULT(r1),r0					;\
 	l.addi	r3,r1,0						;\
 	/* r4 is exception EA */				;\
@@ -560,7 +564,7 @@ ENTRY(_sys_call_handler)
 	 * and clone, below).
 
 	/* r30 is the only register we clobber in the fast path */
-	l.sw    GPR30(r1),r30
+/*	l.sw    GPR30(r1),r30 */
 	l.sw    RESULT(r1),r0
 	/* This is used by do_signal to determine whether to check for
 	 * syscall restart or not */
