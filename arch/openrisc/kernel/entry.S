@@ -647,7 +647,7 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	 */	
 	l.sfgeui r11,__NR_syscalls
 	l.bf	_syscall_badsys
-	l.nop
+	 l.nop
 	
 	/* WTF: no other arch has this?? */
 	ENABLE_INTERRUPTS(r9)		// enable interrupts, r9 is temp
@@ -727,14 +727,6 @@ _syscall_trace_entry:
 	l.j	_syscall_exit
 	l.nop
 #endif
-
-_syscall_badsys:
-	/* Just return -ENOSYS */
-	l.addi	r30,r0,-ENOSYS
-	l.sw	RESULT(r1),r30
-	l.sw	GPR11(r1),r30
-	l.j	_resume_userspace
-	l.nop
 
 #if 0
 _syscall_exit_work:
@@ -821,6 +813,59 @@ _syscall_resume_userspace:
 	l.nop
 */
 
+#if 0
+_syscall_trace_enter:
+	/* Alright, we need to save our arguments after all...
+	 * do_syscall_trace_enter has the right to clobber them!
+	 */
+	l.sw	GPR3(r1),r3	
+	l.sw	GPR4(r1),r4	
+	l.sw	GPR5(r1),r5	
+	l.sw	GPR6(r1),r6	
+	l.sw	GPR7(r1),r7	
+	l.sw	GPR8(r1),r8	
+
+	/* Here we pass pt_regs to do_syscall_trace_enter.  Make sure
+	 * that function is really getting all the info it needs as
+	 * pt_regs isn't a complete set of userspace regs, just the
+	 * ones relevant to the syscall...
+	 *
+	 * Note use of delay slot for setting argument.
+	 */
+	l.jal	do_syscall_trace_enter
+	 l.addi	r3,r1,0
+
+	/* Restore arguments so that we can do the syscall for real and
+	 * return to the syscall hot path.
+	 */
+	l.lwz	r11,SYSCALLNO(r1)
+	l.lwz	r3,GPR3(r1)
+	l.lwz	r4,GPR4(r1)
+	l.lwz	r5,GPR5(r1)
+	l.lwz	r6,GPR6(r1)
+	l.lwz	r7,GPR7(r1)
+
+	l.j	_syscall_check
+	 l.lwz	r8,GPR8(r1)
+
+_syscall_trace_leave:
+	l.jal	do_syscall_trace_leave
+	 l.addi	r3,r1,0
+
+	l.j	_syscall_check_work
+	 l.nop
+#endif
+
+_syscall_badsys:
+	/* Here we effectively pretend to have executed an imaginary
+	 * syscall that returns -ENOSYS and then return to the regular
+	 * syscall hot path.
+	 * Note that "return value" is set in the delay slot...
+	 */
+	l.j	_syscall_return
+	 l.addi	r11,r0,-ENOSYS
+
+/******* END SYSCALL HANDLING *******/
 
 /* ---[ 0xd00: Trap exception ]------------------------------------------ */
 
