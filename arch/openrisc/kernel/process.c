@@ -159,6 +159,9 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	struct pt_regs* kregs;
 	unsigned long sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
 	struct thread_info *ti;
+	unsigned long top_of_kernel_stack;
+
+	top_of_kernel_stack = sp;
 
 	p->set_child_tid = p->clear_child_tid = NULL;
 
@@ -199,11 +202,17 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	ti = task_thread_info(p);
         ti->ksp = sp;
 	
-	kregs->sr = regs->sr | SPR_SR_SM;
-	kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
+//	kregs->sr = regs->sr | SPR_SR_SM;
+	/* kregs->sp must store the location of the 'pre-switch' kernel stack
+	 * pointer... for a newly forked process, this is simply the top of
+	 * the kernel stack.
+	 */
+	kregs->sp = top_of_kernel_stack;
+//	kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
 	kregs->gprs[1] = (unsigned long)current;  /* arg to schedule_tail */
 	kregs->gprs[8] = (unsigned long)task_thread_info(p);
-        kregs->pc = (unsigned long)ret_from_fork;
+//        kregs->pc = (unsigned long)ret_from_fork;
+	kregs->gprs[7] = (unsigned long)ret_from_fork;
 
         return 0;
 }
@@ -221,6 +230,8 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 	regs->pc = pc;
 	regs->sr = regs->sr & ~ SPR_SR_SM;
 	regs->sp = sp;
+
+	printk("start thread, ksp = %lx\n", current_thread_info()->ksp);
 }
 
 /* Fill in the fpu structure for a core dump.  */
@@ -273,7 +284,7 @@ extern void _kernel_thread_helper(void);
 
 void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
 {
-/*	printk("Kernel thread fn called = %lx\n", fn);*/
+	printk("Kernel thread fn called = %lx\n", fn);
         do_exit(fn(arg));
 }
 
@@ -286,9 +297,9 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 
         memset(&regs, 0, sizeof(regs));
 
-/*	printk("Kernel thread fn = %lx\n", fn);
+	printk("Kernel thread fn = %lx\n", fn);
 	printk("kernel_thread_helper = %lx\n", kernel_thread_helper);
-	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);*/
+	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);
 
         regs.gprs[18] = (unsigned long)fn;
         regs.gprs[20] = (unsigned long)arg;

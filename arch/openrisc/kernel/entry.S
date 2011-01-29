@@ -608,6 +608,10 @@ UNHANDLED_EXCEPTION(_vector_0xb00,0xb00)
  * and not the call-clobbered ones.
  */
 
+_string_syscall_return:
+        .string "syscall return %ld \n\r\0"
+        .align 4
+
 EXCEPTION_ENTRY(_sys_call_handler)
 	/* syscalls run with interrupts enabled */
 	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
@@ -664,7 +668,9 @@ _syscall_check:
 	 l.nop
 	
 _syscall_call:
-        l.movhi r29,hi(sys_call_table)
+ 	/* syscalls run with interrupts enabled */
+//	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
+       l.movhi r29,hi(sys_call_table)
         l.ori   r29,r29,lo(sys_call_table)
         l.slli  r11,r11,2
         l.add   r29,r29,r11
@@ -680,6 +686,19 @@ _syscall_return:
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
 
+_syscall_debug: 
+        l.movhi r3,hi(_string_syscall_return) 
+        l.ori   r3,r3,lo(_string_syscall_return) 
+        l.ori   r27,r0,1 
+        l.sw    -4(r1),r27 
+        l.sw    -8(r1),r11 
+        l.addi  r1,r1,-8 
+        l.movhi r27,hi(printk) 
+        l.ori   r27,r27,lo(printk) 
+        l.jalr  r27 
+         l.nop 
+        l.addi  r1,r1,8
+
 _syscall_check_trace_leave:
 	/* r30 is a callee-saved register so this should still hold the
 	 * _TIF_SYSCALL_TRACE flag from _syscall_check_trace_enter above */
@@ -687,10 +706,19 @@ _syscall_check_trace_leave:
 	l.bf	_syscall_trace_leave
 	 l.nop
 
+/* This is where the exception-return code begins... interrupts need to be
+ * disabled the rest of the way here because we can't afford to miss any
+ * interrupts that set NEED_RESCHED or SIGNALPENDING... really true? */
+
 _syscall_check_work:
+	/* Here we need to disable interrupts */ 
+	DISABLE_INTERRUPTS(r27,r29)
 	l.lwz	r30,TI_FLAGS(r10)
 	l.andi	r30,r30,_TIF_WORK_MASK
 	l.sfne	r30,r0
+
+	l.bnf	_syscall_resume_userspace
+	 l.nop
 
 	/* Work pending follows a different return path, so we need to
 	 * make sure that all the call-saved registers get into pt_regs
@@ -705,10 +733,13 @@ _syscall_check_work:
 	l.sw    GPR26(r1),r26
 	l.sw    GPR28(r1),r28
 
-	l.bf	_work_pending
+	/* _work_pending needs to be called with interrupts disabled */
+	l.j	_work_pending
 	 l.nop
 
 _syscall_resume_userspace:
+//	ENABLE_INTERRUPTS(r29)
+
 
 /* This is the hot path for returning to userspace from a syscall.  If there's
  * work to be done and the branch to _work_pending was taken above, then the
@@ -729,14 +760,19 @@ _syscall_resume_userspace:
  * clobbered... we should even be using 'scratch' (odd) regs above so that
  * we don't need to restore anything, hardly...
  */
+
 	// we need to save KSP here too
 	// or else fork's 'eat' stack space
-	l.addi  r4,r1,INT_FRAME_SIZE
+/*	l.addi  r4,r1,INT_FRAME_SIZE
         l.sw    (TI_KSP)(r10),r4
+*/
 
 	l.lwz	r2,GPR2(r1)
 
 	/* Restore args */
+	/* r3-r8 are technically clobbered, but syscall restart needs these
+	 * to be restored...
+	 */
 	l.lwz	r3,GPR3(r1)
 	l.lwz	r4,GPR4(r1)
 	l.lwz	r5,GPR5(r1)
@@ -929,8 +965,8 @@ _resume_userspace:
 _restore_all:
 	// we need to save KSP here too
 	// or else fork's 'eat' stack space
-	l.addi  r4,r1,INT_FRAME_SIZE
-        l.sw    (TI_KSP)(r10),r4
+/*	l.addi  r4,r1,INT_FRAME_SIZE
+        l.sw    (TI_KSP)(r10),r4*/
 	RESTORE_ALL
 	/* This returns to userspace code */
 
@@ -938,7 +974,7 @@ ENTRY(ret_from_fork)
 	l.jal	schedule_tail
 	 l.nop
 
-	/* _syscall_return expect r11 to contain return value */
+	/* _syscall_returns expect r11 to contain return value */
 	l.lwz	r11,GPR11(r1)
 
 	/* The syscall fast path return expects call-saved registers
@@ -955,6 +991,12 @@ ENTRY(ret_from_fork)
 	l.lwz	r24,GPR24(r1)
 	l.lwz	r26,GPR26(r1)
 	l.lwz	r28,GPR28(r1)
+
+
+	// we need to save KSP here too
+	// or else fork's 'eat' stack space
+/*	l.addi  r29,r1,INT_FRAME_SIZE
+        l.sw    (TI_KSP)(r10),r29*/
 
 	l.j	_syscall_return
 	 l.nop
@@ -1027,23 +1069,107 @@ ENTRY(_kernel_thread_helper)
 	
 	.align 0x400
 ENTRY(_switch)
-	l.sw    (GPR3-INT_FRAME_SIZE)(r1),r3
-        l.mtspr r0,r9,SPR_EPCR_BASE		/* Link register to EPCR */
-        l.mfspr r3,r0,SPR_SR			/* From SR to ESR */
-        l.mtspr r0,r3,SPR_ESR_BASE
+	/* We don't store SR as _switch only gets called in a context where
+	 * the SR will be the same going in and coming out... */
+
+	/* Set up new pt_regs struct for saving task state */
+        l.addi  r1,r1,-(INT_FRAME_SIZE)
+
+	/* No need to store SP as it goes into KSP below */
+	l.sw    GPR2(r1),r2
+	l.sw    GPR3(r1),r3
+	l.sw    GPR4(r1),r4
+        l.sw    GPR5(r1),r5
+        l.sw    GPR6(r1),r6
+        l.sw    GPR7(r1),r7
+        l.sw    GPR8(r1),r8
+        l.sw    GPR9(r1),r9
+        l.sw    GPR10(r1),r10
+        l.sw    GPR11(r1),r11
+        l.sw    GPR12(r1),r12
+        l.sw    GPR13(r1),r13
+        l.sw    GPR14(r1),r14
+        l.sw    GPR15(r1),r15
+        l.sw    GPR16(r1),r16
+        l.sw    GPR17(r1),r17
+        l.sw    GPR18(r1),r18
+        l.sw    GPR19(r1),r19
+        l.sw    GPR20(r1),r20
+        l.sw    GPR21(r1),r21
+        l.sw    GPR22(r1),r22
+        l.sw    GPR23(r1),r23
+        l.sw    GPR24(r1),r24
+        l.sw    GPR25(r1),r25
+        l.sw    GPR26(r1),r26
+        l.sw    GPR27(r1),r27
+        l.sw    GPR28(r1),r28
+        l.sw    GPR29(r1),r29
+        l.sw    GPR30(r1),r30
+        l.sw    GPR31(r1),r31
+
 	l.addi	r11,r10,0			/* Save old 'current' to 'last' return value*/
-	l.lwz   r3,(GPR3-INT_FRAME_SIZE)(r1)
-	PUSH_PT_REGS_NO_TRANS
-/* DEBUGING HELP */
-	l.or	r21,r1,r0
-	l.or	r22,r2,r0
-	l.or	r23,r3,r0
-	l.or	r24,r4,r0
-/* END DEBUGGING HELP */
-	l.sw    TI_KSP(r3),r1			/* Save old stack pointer */
-        l.lwz   r1,TI_KSP(r4)			/* Load new stack pointer */
-	l.addi  r10,r5,0			/* set current (r10) to new */
-	RESTORE_ALL_NO_R11
+
+	/* We use thread_info->ksp for storing the address of the above
+	 * structure so that we can get back to it later... we don't want
+	 * to lose the value of thread_info->ksp, though, so store it as
+	 * pt_regs->sp so that we can easily restore it when we are made
+	 * live again...
+	 */
+
+	/* Save the old value of thread_info->ksp as pt_regs->sp */
+	l.lwz	r29,TI_KSP(r10)
+	l.sw	SP(r1),r29
+
+	/* Swap kernel stack pointers */
+	l.sw    TI_KSP(r10),r1			/* Save old stack pointer */
+	l.or	r10,r4,r0			/* Set up new current_thread_info */
+        l.lwz   r1,TI_KSP(r10)			/* Load new stack pointer */
+
+	/* Restore the old value of thread_info->ksp */
+	l.lwz	r29,SP(r1)
+	l.sw	TI_KSP(r10),r29
+
+	/* ...and restore the registers, except r11 because the return value
+	 * has already been set above.
+	 */
+        l.lwz   r2,GPR2(r1)
+        l.lwz   r3,GPR3(r1)
+        l.lwz   r4,GPR4(r1)
+        l.lwz   r5,GPR5(r1)
+        l.lwz   r6,GPR6(r1)
+        l.lwz   r7,GPR7(r1)
+        l.lwz   r8,GPR8(r1)
+        l.lwz   r9,GPR9(r1)
+	/* No need to restore r10 */
+	/* ...and do not restore r11 */
+        l.lwz   r12,GPR12(r1)
+        l.lwz   r13,GPR13(r1)
+        l.lwz   r14,GPR14(r1)
+        l.lwz   r15,GPR15(r1)
+        l.lwz   r16,GPR16(r1)
+        l.lwz   r17,GPR17(r1)
+        l.lwz   r18,GPR18(r1)
+        l.lwz   r19,GPR19(r1)
+        l.lwz   r20,GPR20(r1)
+        l.lwz   r21,GPR21(r1)
+        l.lwz   r22,GPR22(r1)
+        l.lwz   r23,GPR23(r1)
+        l.lwz   r24,GPR24(r1)
+        l.lwz   r25,GPR25(r1)
+        l.lwz   r26,GPR26(r1)
+        l.lwz   r27,GPR27(r1)
+        l.lwz   r28,GPR28(r1)
+        l.lwz   r29,GPR29(r1)
+        l.lwz   r30,GPR30(r1)
+        l.lwz   r31,GPR31(r1)
+
+	/* Unwind stack to pre-switch state */
+        l.addi  r1,r1,(INT_FRAME_SIZE)
+
+	/* Return via the link-register back to where we 'came from', where that can be
+	 * either schedule() or return_from_fork()... */
+	l.jr	r9
+	 l.nop
 		
 /* ==================================================================== */
 
