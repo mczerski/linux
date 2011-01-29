@@ -721,8 +721,61 @@ _syscall_exit_work:
 	l.jal	do_syscall_trace
 	l.nop
 
-	l.j	_resume_userspace
+_syscall_resume_userspace:
+
+/* This is the hot path for returning to userspace from a syscall.  If there's
+ * work to be done and the branch to _work_pending was taken above, then the
+ * return to userspace will be done via the normal exception return path...
+ * that path restores _all_ registers and will overwrite the "clobbered"
+ * registers with whatever garbage is in pt_regs -- that's OK because those
+ * registers are clobbered anyway and because the extra work is insignificant
+ * in the context of the extra work that _work_pending is doing.
+
+/* Once again, syscalls are special and only guarantee to preserve the
+ * same registers as a normal function call */
+
+/* This is still too much... we should only be restoring what we actually
+ * clobbered... we should even be using 'scratch' (odd) regs above so that
+ * we don't need to restore anything, hardly...
+ */
+
+	l.lwz	r2,GPR2(r1)
+	l.lwz	r9,GPR9(r1)
+	l.lwz	r10,GPR10(r1)
+	l.lwz	r11,RESULT(r1)
+
+	l.lwz	r14,GPR14(r1)
+	l.lwz	r16,GPR16(r1)
+	l.lwz	r18,GPR18(r1)
+	l.lwz	r20,GPR20(r1)
+	l.lwz	r22,GPR22(r1)
+	l.lwz	r24,GPR24(r1)
+	l.lwz	r26,GPR26(r1)
+	l.lwz	r28,GPR28(r1)
+	l.lwz	r30,GPR30(r1)
+
+	/* Here we use r3 - r6 as scratch regs */
+	/* FIXME: use other scratch regs... args need to be 
+	 * rstored  for syscall restart */
+	l.lwz   r3,PC(r1)
+        l.lwz   r4,SR(r1)
+	l.lwz	r1,SP(r1)
+	/* Interrupts need to be disabled for setting EPCR and ESR
+	 * so that another interrupt doesn't come in here and clobber
+	 * them before we can use them for our l.rfe */
+	DISABLE_INTERRUPTS(r5,r6)
+        l.mtspr r0,r3,SPR_EPCR_BASE
+        l.mtspr r0,r4,SPR_ESR_BASE
+	l.rfe
+
+/* End of hot path!
+ * Keep the below tracing and error handling out of the hot path...
+*/
+
+
+/*	l.j	_resume_userspace
 	l.nop
+*/
 
 
 /* ---[ 0xd00: Trap exception ]------------------------------------------ */
