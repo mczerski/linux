@@ -26,7 +26,6 @@ struct pt_regs {
 	long  sp;
 	long  gprs[30];
 	long  orig_gpr11;  /* Used for restarting system calls */
-	long  result;     /* Result of a system call */
 	long  syscallno;  /* Syscall no. (used by strace) */
 };
 #endif /* __ASSEMBLY__ */
@@ -78,7 +77,6 @@ struct pt_regs {
 #define PT_GPR30     124
 #define PT_GPR31     128
 #define PT_ORIG_GPR11 132
-#define PT_RESULT    136
 #define PT_SYSCALLNO 140
 
 #endif /* __ASM_OPENRISC_PTRACE_H */

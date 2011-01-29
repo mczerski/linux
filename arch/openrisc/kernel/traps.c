@@ -161,7 +161,7 @@ void show_registers(struct pt_regs *regs)
 	printk("GPR28: %08lx GPR29: %08lx GPR30: %08lx GPR31: %08lx\n",
 	       regs->gprs[26], regs->gprs[27], regs->gprs[28], regs->gprs[29]);
 	printk("  RES: %08lx oGPR11: %08lx syscallno: %08lx\n",
-	       regs->result, regs->orig_gpr11, regs->syscallno);
+	       regs->gprs[9], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 	       current->comm, current->pid, (unsigned long)current);
@@ -225,7 +225,7 @@ void nommu_dump_state(struct pt_regs *regs,
 	printk("GPR28: %08lx GPR29: %08lx GPR30: %08lx GPR31: %08lx\n",
 	       regs->gprs[26], regs->gprs[27], regs->gprs[28], regs->gprs[29]);
 	printk("  RES: %08lx oGPR11: %08lx syscallno: %08lx\n",
-	       regs->result, regs->orig_gpr11, regs->syscallno);
+	       regs->gprs[9], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 	       ((struct task_struct*)(__pa(current)))->comm, 

@@ -127,7 +127,6 @@ handler:							;\
 	/* r30 already save */					;\
 /*        l.sw    PT_GPR30(r1),r30*/					;\
 	l.sw    PT_GPR31(r1),r31					;\
-	l.sw    PT_RESULT(r1),r0					;\
 	l.sw    PT_SYSCALLNO(r1),r0
 
 #define UNHANDLED_EXCEPTION(handler,vector)			\
@@ -165,7 +164,7 @@ handler:							;\
 	/* r31 already saved */					;\
        l.sw    PT_GPR30(r1),r30					;\
 /*        l.sw    PT_GPR31(r1),r31	*/				;\
-	l.sw    PT_RESULT(r1),r0					;\
+	l.sw    PT_SYSCALLNO(r1),r0				;\
 	l.addi	r3,r1,0						;\
 	/* r4 is exception EA */				;\
 	l.addi	r5,r0,vector					;\
@@ -565,7 +564,6 @@ ENTRY(_sys_call_handler)
 
 	/* r30 is the only register we clobber in the fast path */
 /*	l.sw    PT_GPR30(r1),r30 */
-	l.sw    PT_RESULT(r1),r0
 	/* This is used by do_signal to determine whether to check for
 	 * syscall restart or not */
 	l.sw    PT_SYSCALLNO(r1),r11
@@ -606,7 +604,6 @@ _syscall_return:
 	 * which does it in a round-about way.
 	 */
 	l.sw    PT_GPR11(r1),r11           // save return value
-	l.sw    PT_RESULT(r1),r11          // save result
 
 #if 0
 _syscall_debug:
@@ -700,7 +697,7 @@ _syscall_resume_userspace:
 
 	l.lwz	r9,PT_GPR9(r1)
 	l.lwz	r10,PT_GPR10(r1)
-	l.lwz	r11,PT_RESULT(r1)
+	l.lwz	r11,PT_GPR11(r1)
 
 	/* r30 is the only register we clobber in the fast path */
 	l.lwz	r30,PT_GPR30(r1)

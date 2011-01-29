@@ -319,11 +319,11 @@ do_syscall_trace_leave(struct pt_regs* regs)
 	int step;
 
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(AUDITSC_RESULT(regs->result), 
-				   regs->result);
+		audit_syscall_exit(AUDITSC_RESULT(regs->gprs[9]), 
+				   regs->gprs[9]);
 
 /*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
-		trace_sys_exit(regs, regs->result);
+		trace_sys_exit(regs, regs->gprs[9]);
 */
 
 	step = test_thread_flag(TIF_SINGLESTEP);

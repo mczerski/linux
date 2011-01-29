@@ -1865,7 +1865,6 @@ nommu_entry:
 	l.sw    PT_GPR29(r1),r29
 	l.sw    PT_GPR30(r1),r30
 	/* r31 already saved */
-	l.sw    PT_RESULT(r1),r0
 	l.addi	r3,r1,0
 	/* r4 is exception EA */
 	l.addi	r5,r0,0xdead
