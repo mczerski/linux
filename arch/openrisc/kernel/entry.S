@@ -609,6 +609,9 @@ UNHANDLED_EXCEPTION(_vector_0xb00,0xb00)
  */
 
 EXCEPTION_ENTRY(_sys_call_handler)
+	/* syscalls run with interrupts enabled */
+	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
+
 	/* r1, EPCR, ESR a already saved */
 	l.sw	GPR2(r1),r2
 	/* r3-r8 must be saved because syscall restart relies
@@ -661,9 +664,6 @@ _syscall_check:
 	 l.nop
 	
 _syscall_call:
-	/* WTF: no other arch has this?? */
-	ENABLE_INTERRUPTS(r9)		// enable interrupts, r9 is temp
-
         l.movhi r29,hi(sys_call_table)
         l.ori   r29,r29,lo(sys_call_table)
         l.slli  r11,r11,2
