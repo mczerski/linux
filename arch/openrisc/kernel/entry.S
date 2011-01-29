@@ -624,6 +624,8 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	l.sw    GPR28(r1),r28
 	l.sw    GPR30(r1),r30
 	l.sw    RESULT(r1),r0
+	/* This is used by do_signal to determine whether to check for
+	 * syscall restart or not */
 	l.sw    SYSCALLNO(r1),r11
 
 	/* r3 is not tainted by EXCEPTION_HANDLE() */
@@ -631,11 +633,6 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	/* r4 holds the EEAR address of the fault, load the original r4 */
 	l.lwz	r4,GPR4(r1)
 
-	/* This is used by do_signal to determine whether to check for
-	 * syscall restart or not */
-	l.sw	SYSCALLNO(r1), r11
-
-#if 1
 _syscall_check_trace_enter:
 	/* If TIF_SYSCALL_TRACE is set, then we want to do syscall tracing */
 	l.lwz	r30,TI_FLAGS(r10)
@@ -643,15 +640,6 @@ _syscall_check_trace_enter:
 	l.sfne	r30,r0
 	l.bf	_syscall_trace_enter
 	 l.nop
-#endif
-
-#if 0
-	l.lwz	r30,TI_FLAGS(r10)
-	l.andi	r30,r30,_TIF_SYSCALL_TRACE
-	l.sfne	r30,r0
-	l.bf	_syscall_trace_entry
-	l.nop
-#endif
 
 _syscall_check:
 	/* Ensure that the syscall number is reasonable */
@@ -659,10 +647,10 @@ _syscall_check:
 	l.bf	_syscall_badsys
 	 l.nop
 	
+_syscall_call:
 	/* WTF: no other arch has this?? */
 	ENABLE_INTERRUPTS(r9)		// enable interrupts, r9 is temp
 
-_syscall_call:
         l.movhi r29,hi(sys_call_table)
         l.ori   r29,r29,lo(sys_call_table)
         l.slli  r11,r11,2
@@ -679,81 +667,19 @@ _syscall_return:
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
 
-
-#if 1
 _syscall_check_trace_leave:
 	/* r30 is a callee-saved register so this should still hold the
 	 * _TIF_SYSCALL_TRACE flag from _syscall_check_trace_enter above */
 	l.sfne	r30,r0
 	l.bf	_syscall_trace_leave
 	 l.nop
-#endif
 
-#if 1
 _syscall_check_work:
 	l.lwz	r30,TI_FLAGS(r10)
 	l.andi	r30,r30,_TIF_WORK_MASK
 	l.sfne	r30,r0
 	l.bf	_work_pending
 	 l.nop
-#endif
-
-	l.j	_syscall_resume_userspace
-	 l.nop
-
-#if 0
-_syscall_exit:
-	DISABLE_INTERRUPTS(r3,r4)
-	l.lwz	r30,TI_FLAGS(r10)
-	l.andi	r3,r30,_TIF_ALLWORK_MASK
-	l.sfne	r3,r0
-	l.bf	_syscall_exit_work
-	l.nop
-
-/*	l.j	_restore_all*/
-	l.j	_syscall_return
-	l.nop
-
-_syscall_trace_entry:
-	l.addi	r3,r1,0
-	l.addi	r4,r0,0
-	l.jal	do_syscall_trace
-	l.nop
-
-	/* Restore arguments */
-	l.lwz	r11,SYSCALLNO(r1)
-	l.lwz	r3,GPR3(r1)
-	l.lwz	r4,GPR4(r1)
-	l.lwz	r5,GPR5(r1)
-	l.lwz	r6,GPR6(r1)
-	l.lwz	r7,GPR7(r1)
-	l.sfgeui r11,__NR_syscalls
-	l.bnf	_syscall_call
-	l.nop
-
-	l.addi	r30,r0,-ENOSYS
-	l.sw	GPR11(r1),r30
-	l.sw	RESULT(r1),r30
-
-	l.j	_syscall_exit
-	l.nop
-#endif
-
-#if 0
-_syscall_exit_work:
-	/* r30 holds TI_flags */
-	l.andi	r3,r30,_TIF_SYSCALL_TRACE|_TIF_SINGLESTEP
-	l.sfne	r3,r0
-	l.bnf	_work_pending
-	l.nop
-
-	ENABLE_INTERRUPTS(r3)
-
-	l.addi	r3,r1,0
-	l.addi	r4,r0,1
-	l.jal	do_syscall_trace
-	l.nop
-#endif
 
 _syscall_resume_userspace:
 
@@ -819,12 +745,6 @@ _syscall_resume_userspace:
  * Keep the below tracing and error handling out of the hot path...
 */
 
-
-/*	l.j	_resume_userspace
-	l.nop
-*/
-
-#if 1
 _syscall_trace_enter:
 	/* Here we pass pt_regs to do_syscall_trace_enter.  Make sure
 	 * that function is really getting all the info it needs as
@@ -856,7 +776,6 @@ _syscall_trace_leave:
 */
 	l.j	_syscall_check_work
 	 l.nop
-#endif
 
 _syscall_badsys:
 	/* Here we effectively pretend to have executed an imaginary
