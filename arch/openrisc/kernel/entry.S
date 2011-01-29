@@ -672,7 +672,7 @@ _syscall_resume_userspace:
 /* Once again, syscalls are special and only guarantee to preserve the
  * same registers as a normal function call */
 
-/* The assumption here is that the registers r12-r28 (even) are untouched and
+/* The assumption here is that the registers r14-r28 (even) are untouched and
  * don't need to be restored... be sure that that's really the case!
  */
 
@@ -680,12 +680,6 @@ _syscall_resume_userspace:
  * clobbered... we should even be using 'scratch' (odd) regs above so that
  * we don't need to restore anything, hardly...
  */
-
-	// we need to save KSP here too
-	// or else fork's 'eat' stack space
-/*	l.addi  r4,r1,INT_FRAME_SIZE
-        l.sw    (TI_KSP)(r10),r4
-*/
 
 	l.lwz	r2,GPR2(r1)
 
@@ -883,12 +877,22 @@ _resume_userspace:
 	 l.nop
 
 _restore_all:
-	// we need to save KSP here too
-	// or else fork's 'eat' stack space
-/*	l.addi  r4,r1,INT_FRAME_SIZE
-        l.sw    (TI_KSP)(r10),r4*/
 	RESTORE_ALL
 	/* This returns to userspace code */
+
+
+ENTRY(_ret_from_intr)
+	// i386 version:	
+	// GET_CURRENT(%ebx)
+
+ENTRY(_ret_from_exception)
+	l.lwz	r4,SR(r1)
+        l.andi	r3,r4,SPR_SR_SM
+        l.sfeqi	r3,0
+        l.bnf	_restore_all
+	 l.nop
+	l.j	_resume_userspace
+	 l.nop
 
 ENTRY(ret_from_fork)
 	l.jal	schedule_tail
@@ -912,28 +916,8 @@ ENTRY(ret_from_fork)
 	l.lwz	r26,GPR26(r1)
 	l.lwz	r28,GPR28(r1)
 
-
-	// we need to save KSP here too
-	// or else fork's 'eat' stack space
-/*	l.addi  r29,r1,INT_FRAME_SIZE
-        l.sw    (TI_KSP)(r10),r29*/
-
 	l.j	_syscall_return
 	 l.nop
-
-ENTRY(_ret_from_intr)
-	// i386 version:	
-	// GET_CURRENT(%ebx)
-
-ENTRY(_ret_from_exception)
-	l.lwz	r4,SR(r1)
-        l.andi	r3,r4,SPR_SR_SM
-        l.sfeqi	r3,0
-        l.bnf	_restore_all
-	 l.nop
-	l.j	_resume_userspace
-	 l.nop
-
 
 /* Since syscalls don't save call-clobbered registers, the args to
  * kernel_thread_helper will need to be passed through callee-saved
