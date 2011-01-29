@@ -162,7 +162,7 @@ handler:							;\
 	l.sw    PT_GPR28(r1),r28					;\
 	l.sw    PT_GPR29(r1),r29					;\
 	/* r31 already saved */					;\
-       l.sw    PT_GPR30(r1),r30					;\
+	l.sw    PT_GPR30(r1),r30					;\
 /*        l.sw    PT_GPR31(r1),r31	*/				;\
 	l.sw    PT_SYSCALLNO(r1),r0				;\
 	l.addi	r3,r1,0						;\
@@ -545,6 +545,8 @@ ENTRY(_sys_call_handler)
 	 */
 	l.sw    PT_GPR3(r1),r3
 	/* r4 already saved */
+	/* r4 holds the EEAR address of the fault, load the original r4 */
+	l.lwz	r4,PT_GPR4(r1)
 	l.sw    PT_GPR5(r1),r5
 	l.sw    PT_GPR6(r1),r6
 	l.sw    PT_GPR7(r1),r7
@@ -563,15 +565,11 @@ ENTRY(_sys_call_handler)
 	 * and clone, below).
 
 	/* r30 is the only register we clobber in the fast path */
+	/* r30 already saved */
 /*	l.sw    PT_GPR30(r1),r30 */
 	/* This is used by do_signal to determine whether to check for
 	 * syscall restart or not */
 	l.sw    PT_SYSCALLNO(r1),r11
-
-	/* r3 is not tainted by EXCEPTION_HANDLE() */
-
-	/* r4 holds the EEAR address of the fault, load the original r4 */
-	l.lwz	r4,PT_GPR4(r1)
 
 _syscall_check_trace_enter:
 	/* If TIF_SYSCALL_TRACE is set, then we want to do syscall tracing */
@@ -588,8 +586,6 @@ _syscall_check:
 	 l.nop
 
 _syscall_call:
- 	/* syscalls run with interrupts enabled */
-//	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
 	l.movhi r29,hi(sys_call_table)
 	l.ori   r29,r29,lo(sys_call_table)
 	l.slli  r11,r11,2
@@ -622,7 +618,9 @@ _syscall_debug:
 
 _syscall_check_trace_leave:
 	/* r30 is a callee-saved register so this should still hold the
-	 * _TIF_SYSCALL_TRACE flag from _syscall_check_trace_enter above */
+	 * _TIF_SYSCALL_TRACE flag from _syscall_check_trace_enter above...
+	 * _syscall_trace_leave expects syscall result to be in pt_regs->r11.
+	 */
 	l.sfne	r30,r0
 	l.bf	_syscall_trace_leave
 	 l.nop
