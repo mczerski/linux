@@ -725,9 +725,9 @@ _syscall_trace_enter:
 	 *
 	 * Note use of delay slot for setting argument.
 	 */
-/*	l.jal	do_syscall_trace_enter
+	l.jal	do_syscall_trace_enter
 	 l.addi	r3,r1,0
-*/
+
 	/* Restore arguments (not preserved across do_syscall_trace_enter)
 	 * so that we can do the syscall for real and return to the syscall
 	 * hot path.
@@ -743,9 +743,9 @@ _syscall_trace_enter:
 	 l.lwz	r8,GPR8(r1)
 
 _syscall_trace_leave:
-/*	l.jal	do_syscall_trace_leave
+	l.jal	do_syscall_trace_leave
 	 l.addi	r3,r1,0
-*/
+
 	l.j	_syscall_check_work
 	 l.nop
 
