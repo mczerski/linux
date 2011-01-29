@@ -596,6 +596,18 @@ UNHANDLED_EXCEPTION(_vector_0xb00,0xb00)
 
 /* ---[ 0xc00: Syscall exception ]--------------------------------------- */
 
+/*
+ * Syscalls are a special type of exception in that they are
+ * _explicitly_ invoked by userspace and can therefore be 
+ * held to conform to the same ABI as normal functions with
+ * respect to whether registers are preserved across the call
+ * or not.
+ */
+
+/* Upon syscall entry we just save the callee-saved registers
+ * and not the call-clobbered ones.
+ */
+
 EXCEPTION_ENTRY(_sys_call_handler)
 	/* r1, EPCR, ESR a already saved */
 	l.sw	GPR2(r1),r2
@@ -1036,7 +1048,12 @@ ENTRY(_switch)
 /* ==================================================================== */
 
 /* These all use the delay slot for setting the argument register, so the
- * jump is always happening after the l.addi instruction */
+ * jump is always happening after the l.addi instruction.
+ *
+ * These are all just wrappers that don't touch the link-register r9, so the
+ * return from the "real" syscall function will return back to the syscall
+ * code that did the l.jal that brought us here.
+ */
 
 /* fork requires that we save all the callee-saved registers because they
  * are all effectively clobbered by the call to _switch.  Here we store
