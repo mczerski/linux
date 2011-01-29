@@ -231,7 +231,7 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 	regs->sr = regs->sr & ~ SPR_SR_SM;
 	regs->sp = sp;
 
-	printk("start thread, ksp = %lx\n", current_thread_info()->ksp);
+/*	printk("start thread, ksp = %lx\n", current_thread_info()->ksp);*/
 }
 
 /* Fill in the fpu structure for a core dump.  */
@@ -323,7 +323,7 @@ asmlinkage long _sys_execve(const char __user *name,
 	int error;
 	char * filename;
 
-	printk("in execve\n");
+/*	printk("in execve\n");*/
 
 	filename = getname(name);
 	error = PTR_ERR(filename);
