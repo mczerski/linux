@@ -530,7 +530,7 @@ _string_syscall_return:
         .string "syscall return %ld \n\r\0"
         .align 4
 
-EXCEPTION_ENTRY(_sys_call_handler)
+ENTRY(_sys_call_handler)
 	/* syscalls run with interrupts enabled */
 	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
 
