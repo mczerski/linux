@@ -597,6 +597,35 @@ UNHANDLED_EXCEPTION(_vector_0xb00,0xb00)
 /* ---[ 0xc00: Syscall exception ]--------------------------------------- */
 
 EXCEPTION_ENTRY(_sys_call_handler)
+	/* r1, EPCR, ESR a already saved */
+	l.sw	GPR2(r1),r2
+	/* r3-r8 must be saved because syscall restart relies
+	 * on us being able to restart the syscall args... technically
+	 * they should be clobbered, otherwise
+	 */
+	l.sw    GPR3(r1),r3
+	/* r4 already saved */
+	l.sw    GPR5(r1),r5
+	l.sw    GPR6(r1),r6
+	l.sw    GPR7(r1),r7
+	l.sw    GPR8(r1),r8
+	l.sw    GPR9(r1),r9
+	/* r10 already saved */	
+	l.sw    GPR11(r1),r11
+	l.sw    ORIG_GPR11(r1),r11
+	/* r12,r13 already saved */
+	l.sw    GPR14(r1),r14
+	l.sw    GPR16(r1),r16
+	l.sw    GPR18(r1),r18
+	l.sw    GPR20(r1),r20
+	l.sw    GPR22(r1),r22
+	l.sw    GPR24(r1),r24
+	l.sw    GPR26(r1),r26
+	l.sw    GPR28(r1),r28
+	l.sw    GPR30(r1),r30
+	l.sw    RESULT(r1),r0
+	l.sw    SYSCALLNO(r1),r11
+
 	/* r3 is not tainted by EXCEPTION_HANDLE() */
 	
 	/* r4 holds the EEAR address of the fault, load the original r4 */
