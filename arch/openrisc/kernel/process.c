@@ -284,7 +284,7 @@ extern void _kernel_thread_helper(void);
 
 void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
 {
-	printk("Kernel thread fn called = %lx\n", fn);
+/*	printk("Kernel thread fn called = %lx\n", fn); */
         do_exit(fn(arg));
 }
 
@@ -297,9 +297,11 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 
         memset(&regs, 0, sizeof(regs));
 
+/*
 	printk("Kernel thread fn = %lx\n", fn);
 	printk("kernel_thread_helper = %lx\n", kernel_thread_helper);
 	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);
+*/
 
         regs.gprs[18] = (unsigned long)fn;
         regs.gprs[20] = (unsigned long)arg;

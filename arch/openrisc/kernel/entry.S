@@ -604,6 +604,7 @@ _syscall_return:
 	l.sw    GPR11(r1),r11           // save return value
         l.sw    RESULT(r1),r11          // save result
 
+#if 0
 _syscall_debug: 
         l.movhi r3,hi(_string_syscall_return) 
         l.ori   r3,r3,lo(_string_syscall_return) 
@@ -616,6 +617,7 @@ _syscall_debug:
         l.jalr  r27 
          l.nop 
         l.addi  r1,r1,8
+#endif
 
 _syscall_check_trace_leave:
 	/* r30 is a callee-saved register so this should still hold the
