@@ -53,41 +53,41 @@
 	
 #define RESTORE_ALL						\
 	DISABLE_INTERRUPTS(r3,r4)				;\
-	l.lwz   r3,PC(r1)					;\
+	l.lwz   r3,PT_PC(r1)					;\
         l.mtspr r0,r3,SPR_EPCR_BASE				;\
-        l.lwz   r3,SR(r1)					;\
+        l.lwz   r3,PT_SR(r1)					;\
         l.mtspr r0,r3,SPR_ESR_BASE				;\
-        l.lwz   r2,GPR2(r1)					;\
-        l.lwz   r3,GPR3(r1)					;\
-        l.lwz   r4,GPR4(r1)					;\
-        l.lwz   r5,GPR5(r1)					;\
-        l.lwz   r6,GPR6(r1)					;\
-        l.lwz   r7,GPR7(r1)					;\
-        l.lwz   r8,GPR8(r1)					;\
-        l.lwz   r9,GPR9(r1)					;\
-        l.lwz   r10,GPR10(r1)					;\
-        l.lwz   r11,GPR11(r1)					;\
-        l.lwz   r12,GPR12(r1)					;\
-        l.lwz   r13,GPR13(r1)					;\
-        l.lwz   r14,GPR14(r1)					;\
-        l.lwz   r15,GPR15(r1)					;\
-        l.lwz   r16,GPR16(r1)					;\
-        l.lwz   r17,GPR17(r1)					;\
-        l.lwz   r18,GPR18(r1)					;\
-        l.lwz   r19,GPR19(r1)					;\
-        l.lwz   r20,GPR20(r1)					;\
-        l.lwz   r21,GPR21(r1)					;\
-        l.lwz   r22,GPR22(r1)					;\
-        l.lwz   r23,GPR23(r1)					;\
-        l.lwz   r24,GPR24(r1)					;\
-        l.lwz   r25,GPR25(r1)					;\
-        l.lwz   r26,GPR26(r1)					;\
-        l.lwz   r27,GPR27(r1)					;\
-        l.lwz   r28,GPR28(r1)					;\
-        l.lwz   r29,GPR29(r1)					;\
-        l.lwz   r30,GPR30(r1)					;\
-        l.lwz   r31,GPR31(r1)					;\
-        l.lwz   r1,SP(r1)					;\
+        l.lwz   r2,PT_GPR2(r1)					;\
+        l.lwz   r3,PT_GPR3(r1)					;\
+        l.lwz   r4,PT_GPR4(r1)					;\
+        l.lwz   r5,PT_GPR5(r1)					;\
+        l.lwz   r6,PT_GPR6(r1)					;\
+        l.lwz   r7,PT_GPR7(r1)					;\
+        l.lwz   r8,PT_GPR8(r1)					;\
+        l.lwz   r9,PT_GPR9(r1)					;\
+        l.lwz   r10,PT_GPR10(r1)					;\
+        l.lwz   r11,PT_GPR11(r1)					;\
+        l.lwz   r12,PT_GPR12(r1)					;\
+        l.lwz   r13,PT_GPR13(r1)					;\
+        l.lwz   r14,PT_GPR14(r1)					;\
+        l.lwz   r15,PT_GPR15(r1)					;\
+        l.lwz   r16,PT_GPR16(r1)					;\
+        l.lwz   r17,PT_GPR17(r1)					;\
+        l.lwz   r18,PT_GPR18(r1)					;\
+        l.lwz   r19,PT_GPR19(r1)					;\
+        l.lwz   r20,PT_GPR20(r1)					;\
+        l.lwz   r21,PT_GPR21(r1)					;\
+        l.lwz   r22,PT_GPR22(r1)					;\
+        l.lwz   r23,PT_GPR23(r1)					;\
+        l.lwz   r24,PT_GPR24(r1)					;\
+        l.lwz   r25,PT_GPR25(r1)					;\
+        l.lwz   r26,PT_GPR26(r1)					;\
+        l.lwz   r27,PT_GPR27(r1)					;\
+        l.lwz   r28,PT_GPR28(r1)					;\
+        l.lwz   r29,PT_GPR29(r1)					;\
+        l.lwz   r30,PT_GPR30(r1)					;\
+        l.lwz   r31,PT_GPR31(r1)					;\
+        l.lwz   r1,PT_SP(r1)					;\
 	l.rfe
 
 		
@@ -95,77 +95,77 @@
 	.global	handler						;\
 handler:							;\
         /* r1, EPCR, ESR a already saved */			;\
-	l.sw	GPR2(r1),r2					;\
-	l.sw    GPR3(r1),r3					;\
-        l.sw    ORIG_GPR11(r1),r11				;\
+	l.sw	PT_GPR2(r1),r2					;\
+	l.sw    PT_GPR3(r1),r3					;\
+        l.sw    PT_ORIG_GPR11(r1),r11				;\
 	/* r4 already save */					;\
-        l.sw    GPR5(r1),r5					;\
-        l.sw    GPR6(r1),r6					;\
-        l.sw    GPR7(r1),r7					;\
-        l.sw    GPR8(r1),r8					;\
-        l.sw    GPR9(r1),r9					;\
+        l.sw    PT_GPR5(r1),r5					;\
+        l.sw    PT_GPR6(r1),r6					;\
+        l.sw    PT_GPR7(r1),r7					;\
+        l.sw    PT_GPR8(r1),r8					;\
+        l.sw    PT_GPR9(r1),r9					;\
 	/* r10 already saved */					;\
-        l.sw    GPR11(r1),r11					;\
+        l.sw    PT_GPR11(r1),r11					;\
 	/* r12 already saved */					;\
-        l.sw    GPR13(r1),r13					;\
-        l.sw    GPR14(r1),r14					;\
-        l.sw    GPR15(r1),r15					;\
-        l.sw    GPR16(r1),r16					;\
-        l.sw    GPR17(r1),r17					;\
-        l.sw    GPR18(r1),r18					;\
-        l.sw    GPR19(r1),r19					;\
-        l.sw    GPR20(r1),r20					;\
-        l.sw    GPR21(r1),r21					;\
-        l.sw    GPR22(r1),r22					;\
-        l.sw    GPR23(r1),r23					;\
-        l.sw    GPR24(r1),r24					;\
-        l.sw    GPR25(r1),r25					;\
-        l.sw    GPR26(r1),r26					;\
-        l.sw    GPR27(r1),r27					;\
-        l.sw    GPR28(r1),r28					;\
-        l.sw    GPR29(r1),r29					;\
+        l.sw    PT_GPR13(r1),r13					;\
+        l.sw    PT_GPR14(r1),r14					;\
+        l.sw    PT_GPR15(r1),r15					;\
+        l.sw    PT_GPR16(r1),r16					;\
+        l.sw    PT_GPR17(r1),r17					;\
+        l.sw    PT_GPR18(r1),r18					;\
+        l.sw    PT_GPR19(r1),r19					;\
+        l.sw    PT_GPR20(r1),r20					;\
+        l.sw    PT_GPR21(r1),r21					;\
+        l.sw    PT_GPR22(r1),r22					;\
+        l.sw    PT_GPR23(r1),r23					;\
+        l.sw    PT_GPR24(r1),r24					;\
+        l.sw    PT_GPR25(r1),r25					;\
+        l.sw    PT_GPR26(r1),r26					;\
+        l.sw    PT_GPR27(r1),r27					;\
+        l.sw    PT_GPR28(r1),r28					;\
+        l.sw    PT_GPR29(r1),r29					;\
 	/* r30 already save */					;\
-/*        l.sw    GPR30(r1),r30*/					;\
-        l.sw    GPR31(r1),r31					;\
-        l.sw    RESULT(r1),r0					;\
-        l.sw    SYSCALLNO(r1),r0
+/*        l.sw    PT_GPR30(r1),r30*/					;\
+        l.sw    PT_GPR31(r1),r31					;\
+        l.sw    PT_RESULT(r1),r0					;\
+        l.sw    PT_SYSCALLNO(r1),r0
 
 #define UNHANDLED_EXCEPTION(handler,vector)			\
 	.global	handler						;\
 handler:							;\
         /* r1, EPCR, ESR already saved */			;\
-	l.sw    GPR2(r1),r2					;\
-	l.sw    GPR3(r1),r3					;\
-        l.sw    ORIG_GPR11(r1),r11				;\
-        l.sw    GPR5(r1),r5					;\
-        l.sw    GPR6(r1),r6					;\
-        l.sw    GPR7(r1),r7					;\
-        l.sw    GPR8(r1),r8					;\
-        l.sw    GPR9(r1),r9					;\
+	l.sw    PT_GPR2(r1),r2					;\
+	l.sw    PT_GPR3(r1),r3					;\
+        l.sw    PT_ORIG_GPR11(r1),r11				;\
+        l.sw    PT_GPR5(r1),r5					;\
+        l.sw    PT_GPR6(r1),r6					;\
+        l.sw    PT_GPR7(r1),r7					;\
+        l.sw    PT_GPR8(r1),r8					;\
+        l.sw    PT_GPR9(r1),r9					;\
 	/* r10 already saved */					;\
-        l.sw    GPR11(r1),r11					;\
+        l.sw    PT_GPR11(r1),r11					;\
 	/* r12 already saved */					;\
-        l.sw    GPR13(r1),r13					;\
-        l.sw    GPR14(r1),r14					;\
-        l.sw    GPR15(r1),r15					;\
-        l.sw    GPR16(r1),r16					;\
-        l.sw    GPR17(r1),r17					;\
-        l.sw    GPR18(r1),r18					;\
-        l.sw    GPR19(r1),r19					;\
-        l.sw    GPR20(r1),r20					;\
-        l.sw    GPR21(r1),r21					;\
-        l.sw    GPR22(r1),r22					;\
-        l.sw    GPR23(r1),r23					;\
-        l.sw    GPR24(r1),r24					;\
-        l.sw    GPR25(r1),r25					;\
-        l.sw    GPR26(r1),r26					;\
-        l.sw    GPR27(r1),r27					;\
-        l.sw    GPR28(r1),r28					;\
-        l.sw    GPR29(r1),r29					;\
+        l.sw    PT_GPR13(r1),r13					;\
+        l.sw    PT_GPR14(r1),r14					;\
+        l.sw    PT_GPR15(r1),r15					;\
+        l.sw    PT_GPR16(r1),r16					;\
+        l.sw    PT_GPR17(r1),r17					;\
+        l.sw    PT_GPR18(r1),r18					;\
+        l.sw    PT_GPR19(r1),r19					;\
+        l.sw    PT_GPR20(r1),r20					;\
+        l.sw    PT_GPR21(r1),r21					;\
+        l.sw    PT_GPR22(r1),r22					;\
+        l.sw    PT_GPR23(r1),r23					;\
+        l.sw    PT_GPR24(r1),r24					;\
+        l.sw    PT_GPR25(r1),r25					;\
+        l.sw    PT_GPR26(r1),r26					;\
+        l.sw    PT_GPR27(r1),r27					;\
+        l.sw    PT_GPR28(r1),r28					;\
+        l.sw    PT_GPR29(r1),r29					;\
 	/* r31 already saved */					;\
-       l.sw    GPR30(r1),r30					;\
-/*        l.sw    GPR31(r1),r31	*/				;\
-        l.sw    RESULT(r1),r0					;\
+       l.sw    PT_GPR30(r1),r30					;\
+/*        l.sw    PT_GPR31(r1),r31	*/				;\
+        l.sw    PT_RESULT(r1),r0					;\
 	l.addi	r3,r1,0						;\
 	/* r4 is exception EA */				;\
 	l.addi	r5,r0,vector					;\
@@ -216,7 +216,7 @@ EXCEPTION_ENTRY(_data_page_fault_handler)
 	 * DTLB miss handler in the CONFIG_GUARD_PROTECTED_CORE part
 	 */
 #ifdef CONFIG_OPENRISC_NO_SPR_SR_DSX
-	l.lwz   r6,PC(r3)                  // address of an offending insn
+	l.lwz   r6,PT_PC(r3)                  // address of an offending insn
         l.lwz   r6,0(r6)                   // instruction that caused pf
 
         l.srli  r6,r6,26                   // check opcode for jump insn
@@ -239,7 +239,7 @@ EXCEPTION_ENTRY(_data_page_fault_handler)
         l.nop
 8:
 
-        l.lwz   r6,PC(r3)                  // address of an offending insn
+        l.lwz   r6,PT_PC(r3)                  // address of an offending insn
         l.addi  r6,r6,4
         l.lwz   r6,0(r6)                   // instruction that caused pf
         l.srli  r6,r6,26                   // get opcode
@@ -248,11 +248,11 @@ EXCEPTION_ENTRY(_data_page_fault_handler)
 #else
 
 	l.mfspr r6,r0,SPR_SR		   // SR
-//	l.lwz	r6,SR(r3)		   // ESR
+//	l.lwz	r6,PT_SR(r3)		   // ESR
 	l.andi	r6,r6,SPR_SR_DSX	   // check for delay slot exception
 	l.sfeqi	r6,0x1			   // exception happened in delay slot
 	l.bnf	7f	
-	l.lwz	r6,PC(r3)		   // address of an offending insn
+	l.lwz	r6,PT_PC(r3)		   // address of an offending insn
 	
 	l.addi	r6,r6,4			   // offending insn is in delay slot
 7:
@@ -316,7 +316,7 @@ EXCEPTION_ENTRY(_aligment_handler)
 //        l.mfspr r2,r0,SPR_EEAR_BASE     /* Load the efective addres */
 	l.addi	r2,r4,0
 //        l.mfspr r5,r0,SPR_EPCR_BASE     /* Load the insn address */
-	l.lwz   r5,PC(r1)
+	l.lwz   r5,PT_PC(r1)
 	
         l.lwz   r3,0(r5)                /* Load insn */
         l.srli  r4,r3,26                /* Shift left to get the insn opcode */
@@ -362,7 +362,7 @@ jr:
         
 1:      
 //	  l.mtspr r0,r5,SPR_EPCR_BASE
-	l.sw	PC(r1),r5
+	l.sw	PT_PC(r1),r5
 	
         l.sfeqi r4,0x26
         l.bf    lhs
@@ -476,7 +476,7 @@ EXCEPTION_ENTRY(_illegal_instruction_handler)
 
 EXCEPTION_ENTRY(_external_irq_handler)
 #ifdef CONFIG_OPENRISC_ESR_EXCEPTION_BUG_CHECK
-	l.lwz	r4,SR(r1)		// were interrupts enabled ?
+	l.lwz	r4,PT_SR(r1)		// were interrupts enabled ?
 	l.andi	r4,r4,SPR_SR_IEE
 	l.sfeqi	r4,0
 	l.bnf	1f			// ext irq enabled, all ok.
@@ -496,7 +496,7 @@ EXCEPTION_ENTRY(_external_irq_handler)
 	.previous
 
 	l.ori	r4,r4,SPR_SR_IEE	// fix the bug
-//	l.sw	SR(r1),r4
+//	l.sw	PT_SR(r1),r4
 1:	
 #endif
 	l.addi r3,r1,0
@@ -539,21 +539,21 @@ ENTRY(_sys_call_handler)
 	ENABLE_INTERRUPTS(r29)		// enable interrupts, r29 is temp
 
 	/* r1, EPCR, ESR a already saved */
-	l.sw	GPR2(r1),r2
+	l.sw	PT_GPR2(r1),r2
 	/* r3-r8 must be saved because syscall restart relies
 	 * on us being able to restart the syscall args... technically
 	 * they should be clobbered, otherwise
 	 */
-	l.sw    GPR3(r1),r3
+	l.sw    PT_GPR3(r1),r3
 	/* r4 already saved */
-	l.sw    GPR5(r1),r5
-	l.sw    GPR6(r1),r6
-	l.sw    GPR7(r1),r7
-	l.sw    GPR8(r1),r8
-	l.sw    GPR9(r1),r9
+	l.sw    PT_GPR5(r1),r5
+	l.sw    PT_GPR6(r1),r6
+	l.sw    PT_GPR7(r1),r7
+	l.sw    PT_GPR8(r1),r8
+	l.sw    PT_GPR9(r1),r9
 	/* r10 already saved */	
-	l.sw    GPR11(r1),r11
-	l.sw    ORIG_GPR11(r1),r11
+	l.sw    PT_GPR11(r1),r11
+	l.sw    PT_ORIG_GPR11(r1),r11
 	/* r12,r13 already saved */
 
 	/* r14-r28 (even) aren't touched by the syscall fast path below
@@ -564,16 +564,16 @@ ENTRY(_sys_call_handler)
 	 * and clone, below).
 
 	/* r30 is the only register we clobber in the fast path */
-/*	l.sw    GPR30(r1),r30 */
-	l.sw    RESULT(r1),r0
+/*	l.sw    PT_GPR30(r1),r30 */
+	l.sw    PT_RESULT(r1),r0
 	/* This is used by do_signal to determine whether to check for
 	 * syscall restart or not */
-	l.sw    SYSCALLNO(r1),r11
+	l.sw    PT_SYSCALLNO(r1),r11
 
 	/* r3 is not tainted by EXCEPTION_HANDLE() */
 	
 	/* r4 holds the EEAR address of the fault, load the original r4 */
-	l.lwz	r4,GPR4(r1)
+	l.lwz	r4,PT_GPR4(r1)
 
 _syscall_check_trace_enter:
 	/* If TIF_SYSCALL_TRACE is set, then we want to do syscall tracing */
@@ -605,8 +605,8 @@ _syscall_return:
 	/* All syscalls return here... just pay attention to ret_from_fork
 	 * which does it in a round-about way.
 	 */
-	l.sw    GPR11(r1),r11           // save return value
-        l.sw    RESULT(r1),r11          // save result
+	l.sw    PT_GPR11(r1),r11           // save return value
+        l.sw    PT_RESULT(r1),r11          // save result
 
 #if 0
 _syscall_debug: 
@@ -648,14 +648,14 @@ _syscall_check_work:
 	 * make sure that all the call-saved registers get into pt_regs
 	 * before branching...
 	 */
-	l.sw    GPR14(r1),r14
-	l.sw    GPR16(r1),r16
-	l.sw    GPR18(r1),r18
-	l.sw    GPR20(r1),r20
-	l.sw    GPR22(r1),r22
-	l.sw    GPR24(r1),r24
-	l.sw    GPR26(r1),r26
-	l.sw    GPR28(r1),r28
+	l.sw    PT_GPR14(r1),r14
+	l.sw    PT_GPR16(r1),r16
+	l.sw    PT_GPR18(r1),r18
+	l.sw    PT_GPR20(r1),r20
+	l.sw    PT_GPR22(r1),r22
+	l.sw    PT_GPR24(r1),r24
+	l.sw    PT_GPR26(r1),r26
+	l.sw    PT_GPR28(r1),r28
 
 	/* _work_pending needs to be called with interrupts disabled */
 	l.j	_work_pending
@@ -685,30 +685,30 @@ _syscall_resume_userspace:
  * we don't need to restore anything, hardly...
  */
 
-	l.lwz	r2,GPR2(r1)
+	l.lwz	r2,PT_GPR2(r1)
 
 	/* Restore args */
 	/* r3-r8 are technically clobbered, but syscall restart needs these
 	 * to be restored...
 	 */
-	l.lwz	r3,GPR3(r1)
-	l.lwz	r4,GPR4(r1)
-	l.lwz	r5,GPR5(r1)
-	l.lwz	r6,GPR6(r1)
-	l.lwz	r7,GPR7(r1)
-	l.lwz	r8,GPR8(r1)
+	l.lwz	r3,PT_GPR3(r1)
+	l.lwz	r4,PT_GPR4(r1)
+	l.lwz	r5,PT_GPR5(r1)
+	l.lwz	r6,PT_GPR6(r1)
+	l.lwz	r7,PT_GPR7(r1)
+	l.lwz	r8,PT_GPR8(r1)
 
-	l.lwz	r9,GPR9(r1)
-	l.lwz	r10,GPR10(r1)
-	l.lwz	r11,RESULT(r1)
+	l.lwz	r9,PT_GPR9(r1)
+	l.lwz	r10,PT_GPR10(r1)
+	l.lwz	r11,PT_RESULT(r1)
 
 	/* r30 is the only register we clobber in the fast path */
-	l.lwz	r30,GPR30(r1)
+	l.lwz	r30,PT_GPR30(r1)
 
 	/* Here we use r13-r19 (odd) as scratch regs */
-	l.lwz   r13,PC(r1)
-        l.lwz   r15,SR(r1)
-	l.lwz	r1,SP(r1)
+	l.lwz   r13,PT_PC(r1)
+        l.lwz   r15,PT_SR(r1)
+	l.lwz	r1,PT_SP(r1)
 	/* Interrupts need to be disabled for setting EPCR and ESR
 	 * so that another interrupt doesn't come in here and clobber
 	 * them before we can use them for our l.rfe */
@@ -736,15 +736,15 @@ _syscall_trace_enter:
 	 * so that we can do the syscall for real and return to the syscall
 	 * hot path.
 	 */
-	l.lwz	r11,SYSCALLNO(r1)
-	l.lwz	r3,GPR3(r1)
-	l.lwz	r4,GPR4(r1)
-	l.lwz	r5,GPR5(r1)
-	l.lwz	r6,GPR6(r1)
-	l.lwz	r7,GPR7(r1)
+	l.lwz	r11,PT_SYSCALLNO(r1)
+	l.lwz	r3,PT_GPR3(r1)
+	l.lwz	r4,PT_GPR4(r1)
+	l.lwz	r5,PT_GPR5(r1)
+	l.lwz	r6,PT_GPR6(r1)
+	l.lwz	r7,PT_GPR7(r1)
 
 	l.j	_syscall_check
-	 l.lwz	r8,GPR8(r1)
+	 l.lwz	r8,PT_GPR8(r1)
 
 _syscall_trace_leave:
 	l.jal	do_syscall_trace_leave
@@ -890,7 +890,7 @@ ENTRY(_ret_from_intr)
 	// GET_CURRENT(%ebx)
 
 ENTRY(_ret_from_exception)
-	l.lwz	r4,SR(r1)
+	l.lwz	r4,PT_SR(r1)
         l.andi	r3,r4,SPR_SR_SM
         l.sfeqi	r3,0
         l.bnf	_restore_all
@@ -903,22 +903,22 @@ ENTRY(ret_from_fork)
 	 l.nop
 
 	/* _syscall_returns expect r11 to contain return value */
-	l.lwz	r11,GPR11(r1)
+	l.lwz	r11,PT_GPR11(r1)
 
 	/* The syscall fast path return expects call-saved registers
 	 * r12-r28 to be untouched, so we restore them here as they
 	 * will have been effectively clobbered when arriving here
 	 * via the call to switch()
 	 */
-	l.lwz	r12,GPR12(r1)
-	l.lwz	r14,GPR14(r1)
-	l.lwz	r16,GPR16(r1)
-	l.lwz	r18,GPR18(r1)
-	l.lwz	r20,GPR20(r1)
-	l.lwz	r22,GPR22(r1)
-	l.lwz	r24,GPR24(r1)
-	l.lwz	r26,GPR26(r1)
-	l.lwz	r28,GPR28(r1)
+	l.lwz	r12,PT_GPR12(r1)
+	l.lwz	r14,PT_GPR14(r1)
+	l.lwz	r16,PT_GPR16(r1)
+	l.lwz	r18,PT_GPR18(r1)
+	l.lwz	r20,PT_GPR20(r1)
+	l.lwz	r22,PT_GPR22(r1)
+	l.lwz	r24,PT_GPR24(r1)
+	l.lwz	r26,PT_GPR26(r1)
+	l.lwz	r28,PT_GPR28(r1)
 
 	l.j	_syscall_return
 	 l.nop
@@ -990,21 +990,21 @@ ENTRY(_switch)
 	/* Set up new pt_regs struct for saving task state */
         l.addi  r1,r1,-(INT_FRAME_SIZE)
 
-	/* No need to store r1/SP as it goes into KSP below */
-	l.sw    GPR2(r1),r2
-        l.sw    GPR9(r1),r9
+	/* No need to store r1/PT_SP as it goes into KSP below */
+	l.sw    PT_GPR2(r1),r2
+        l.sw    PT_GPR9(r1),r9
 	/* This is wrong, r12 shouldn't be here... but GCC is broken for the time being
 	 * and expects r12 to be callee-saved... */
-        l.sw    GPR12(r1),r12
-        l.sw    GPR14(r1),r14
-        l.sw    GPR16(r1),r16
-        l.sw    GPR18(r1),r18
-        l.sw    GPR20(r1),r20
-        l.sw    GPR22(r1),r22
-        l.sw    GPR24(r1),r24
-        l.sw    GPR26(r1),r26
-        l.sw    GPR28(r1),r28
-        l.sw    GPR30(r1),r30
+        l.sw    PT_GPR12(r1),r12
+        l.sw    PT_GPR14(r1),r14
+        l.sw    PT_GPR16(r1),r16
+        l.sw    PT_GPR18(r1),r18
+        l.sw    PT_GPR20(r1),r20
+        l.sw    PT_GPR22(r1),r22
+        l.sw    PT_GPR24(r1),r24
+        l.sw    PT_GPR26(r1),r26
+        l.sw    PT_GPR28(r1),r28
+        l.sw    PT_GPR30(r1),r30
 
 	l.addi	r11,r10,0			/* Save old 'current' to 'last' return value*/
 
@@ -1017,7 +1017,7 @@ ENTRY(_switch)
 
 	/* Save the old value of thread_info->ksp as pt_regs->sp */
 	l.lwz	r29,TI_KSP(r10)
-	l.sw	SP(r1),r29
+	l.sw	PT_SP(r1),r29
 
 	/* Swap kernel stack pointers */
 	l.sw    TI_KSP(r10),r1			/* Save old stack pointer */
@@ -1025,29 +1025,29 @@ ENTRY(_switch)
         l.lwz   r1,TI_KSP(r10)			/* Load new stack pointer */
 
 	/* Restore the old value of thread_info->ksp */
-	l.lwz	r29,SP(r1)
+	l.lwz	r29,PT_SP(r1)
 	l.sw	TI_KSP(r10),r29
 
 	/* ...and restore the registers, except r11 because the return value
 	 * has already been set above.
 	 */
-        l.lwz   r2,GPR2(r1)
-        l.lwz   r9,GPR9(r1)
+        l.lwz   r2,PT_GPR2(r1)
+        l.lwz   r9,PT_GPR9(r1)
 	/* No need to restore r10 */
 	/* ...and do not restore r11 */
 
         /* This is wrong, r12 shouldn't be here... but GCC is broken for the time being
 	 * and expects r12 to be callee-saved... */
-	l.lwz   r12,GPR12(r1)
-        l.lwz   r14,GPR14(r1)
-        l.lwz   r16,GPR16(r1)
-        l.lwz   r18,GPR18(r1)
-        l.lwz   r20,GPR20(r1)
-        l.lwz   r22,GPR22(r1)
-        l.lwz   r24,GPR24(r1)
-        l.lwz   r26,GPR26(r1)
-        l.lwz   r28,GPR28(r1)
-        l.lwz   r30,GPR30(r1)
+	l.lwz   r12,PT_GPR12(r1)
+        l.lwz   r14,PT_GPR14(r1)
+        l.lwz   r16,PT_GPR16(r1)
+        l.lwz   r18,PT_GPR18(r1)
+        l.lwz   r20,PT_GPR20(r1)
+        l.lwz   r22,PT_GPR22(r1)
+        l.lwz   r24,PT_GPR24(r1)
+        l.lwz   r26,PT_GPR26(r1)
+        l.lwz   r28,PT_GPR28(r1)
+        l.lwz   r30,PT_GPR30(r1)
 
 	/* Unwind stack to pre-switch state */
         l.addi  r1,r1,(INT_FRAME_SIZE)
@@ -1074,15 +1074,15 @@ ENTRY(_switch)
  */
 
 _fork_save_extra_regs_and_call:
-	l.sw    GPR14(r1),r14
-	l.sw    GPR16(r1),r16
-	l.sw    GPR18(r1),r18
-	l.sw    GPR20(r1),r20
-	l.sw    GPR22(r1),r22
-	l.sw    GPR24(r1),r24
-	l.sw    GPR26(r1),r26
+	l.sw    PT_GPR14(r1),r14
+	l.sw    PT_GPR16(r1),r16
+	l.sw    PT_GPR18(r1),r18
+	l.sw    PT_GPR20(r1),r20
+	l.sw    PT_GPR22(r1),r22
+	l.sw    PT_GPR24(r1),r24
+	l.sw    PT_GPR26(r1),r26
 	l.jr	r29
-	 l.sw    GPR28(r1),r28
+	 l.sw    PT_GPR28(r1),r28
 
 ENTRY(sys_clone)
 	l.movhi	r29,hi(_sys_clone)

@@ -319,22 +319,22 @@
 	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
 	/* r1 is KSP, r30 is __pa(KSP) */			;\
 	tophys  (r30,r1)					;\
-        l.sw    GPR12(r30),r12					;\
+        l.sw    PT_GPR12(r30),r12					;\
 	l.mfspr r12,r0,SPR_EPCR_BASE				;\
-        l.sw    PC(r30),r12					;\
+        l.sw    PT_PC(r30),r12					;\
         l.mfspr r12,r0,SPR_ESR_BASE				;\
-        l.sw    SR(r30),r12					;\
+        l.sw    PT_SR(r30),r12					;\
 	/* save r30 */						;\
 	EXCEPTION_T_LOAD_GPR30(r12)				;\
-	l.sw	GPR30(r30),r12					;\
+	l.sw	PT_GPR30(r30),r12					;\
 	/* save r10 as was prior to exception */		;\
 	EXCEPTION_T_LOAD_GPR10(r12)				;\
-	l.sw	GPR10(r30),r12					;\
-	/* save SP as was prior to exception */			;\
+	l.sw	PT_GPR10(r30),r12					;\
+	/* save PT_SP as was prior to exception */			;\
 	EXCEPTION_T_LOAD_SP(r12)				;\
-	l.sw	SP(r30),r12					;\
+	l.sw	PT_SP(r30),r12					;\
 	/* save exception r4, set r4 = EA */			;\
-	l.sw	GPR4(r30),r4					;\
+	l.sw	PT_GPR4(r30),r4					;\
 	l.mfspr r4,r0,SPR_EEAR_BASE				;\
 	/* r12 == 1 if we come from syscall */			;\
 	CLEAR_GPR(r12)						;\
@@ -363,7 +363,7 @@
  */ 	
 
 /* DSCR: this is the same as EXCEPTION_HANDLE(), we are just
- *       a bit more carefull (if we have a SP or current pointer	 
+ *       a bit more carefull (if we have a PT_SP or current pointer	 
  *       corruption) and set them up from 'current_set'
  *
  */
@@ -400,24 +400,24 @@
 	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
 	/* r1 is KSP, r31 is __pa(KSP) */			;\
 	tophys  (r31,r1)					;\
-        l.sw    GPR12(r31),r12					;\
+        l.sw    PT_GPR12(r31),r12					;\
 	l.mfspr r12,r0,SPR_EPCR_BASE				;\
-        l.sw    PC(r31),r12					;\
+        l.sw    PT_PC(r31),r12					;\
         l.mfspr r12,r0,SPR_ESR_BASE				;\
-        l.sw    SR(r31),r12					;\
+        l.sw    PT_SR(r31),r12					;\
 	/* save r31 */						;\
 	EXCEPTION_T_LOAD_GPR31(r12)				;\
-	l.sw	GPR31(r31),r12					;\
+	l.sw	PT_GPR31(r31),r12					;\
 	/* save r10 as was prior to exception */		;\
 	EXCEPTION_T_LOAD_GPR10(r12)				;\
-	l.sw	GPR10(r31),r12					;\
-	/* save SP as was prior to exception */			;\
+	l.sw	PT_GPR10(r31),r12					;\
+	/* save PT_SP as was prior to exception */			;\
 	EXCEPTION_T_LOAD_SP(r12)				;\
-	l.sw	SP(r31),r12					;\
-        l.sw    GPR13(r31),r13					;\
+	l.sw	PT_SP(r31),r12					;\
+        l.sw    PT_GPR13(r31),r13					;\
 	/* --> */						;\
 	/* save exception r4, set r4 = EA */			;\
-	l.sw	GPR4(r31),r4					;\
+	l.sw	PT_GPR4(r31),r4					;\
 	l.mfspr r4,r0,SPR_EEAR_BASE				;\
 	/* r12 == 1 if we come from syscall */			;\
 	CLEAR_GPR(r12)						;\
@@ -1814,58 +1814,58 @@ nommu_entry:
 	l.addi  r1,r1,-(INT_FRAME_SIZE)				
 	/* r1 is KSP, r31 is __pa(KSP) */			
 	tophys  (r31,r1)					
-        l.sw    GPR12(r31),r12					
+        l.sw    PT_GPR12(r31),r12					
 	l.mfspr r12,r0,SPR_EPCR_BASE				
-        l.sw    PC(r31),r12					
+        l.sw    PT_PC(r31),r12					
         l.mfspr r12,r0,SPR_ESR_BASE				
-        l.sw    SR(r31),r12					
+        l.sw    PT_SR(r31),r12					
 	/* save r31 */						
 	EXCEPTION_T_LOAD_GPR31(r12)				
-	l.sw	GPR31(r31),r12					
+	l.sw	PT_GPR31(r31),r12					
 	/* save r10 as was prior to exception */			
 	EXCEPTION_T_LOAD_GPR10(r12)				
-	l.sw	GPR10(r31),r12					
-	/* save SP as was prior to exception */			
+	l.sw	PT_GPR10(r31),r12					
+	/* save PT_SP as was prior to exception */			
 	EXCEPTION_T_LOAD_SP(r12)				
-	l.sw	SP(r31),r12					
-        l.sw    GPR13(r31),r13					
+	l.sw	PT_SP(r31),r12					
+        l.sw    PT_GPR13(r31),r13					
 	/* --> */						
 	/* save exception r4, set r4 = EA */			
-	l.sw	GPR4(r31),r4					
+	l.sw	PT_GPR4(r31),r4					
 	l.mfspr r4,r0,SPR_EEAR_BASE				
 	/* r31 is __pa(r1), r1 <- r31 */			
 	l.addi	r1,r31,0x0					
         /* r1, r10, EPCR, ESR a	already saved */		
-	l.sw    GPR2(r1),r2					
-	l.sw    GPR3(r1),r3					
-        l.sw    ORIG_GPR11(r1),r11			
-        l.sw    GPR5(r1),r5					
-        l.sw    GPR6(r1),r6					
-        l.sw    GPR7(r1),r7					
-        l.sw    GPR8(r1),r8					
-        l.sw    GPR9(r1),r9					
+	l.sw    PT_GPR2(r1),r2					
+	l.sw    PT_GPR3(r1),r3					
+        l.sw    PT_ORIG_GPR11(r1),r11			
+        l.sw    PT_GPR5(r1),r5					
+        l.sw    PT_GPR6(r1),r6					
+        l.sw    PT_GPR7(r1),r7					
+        l.sw    PT_GPR8(r1),r8					
+        l.sw    PT_GPR9(r1),r9					
 	/* r10 already saved */				
-        l.sw    GPR11(r1),r11					
+        l.sw    PT_GPR11(r1),r11					
 	/* r12,r13 already saved */				
-        l.sw    GPR14(r1),r14					
-        l.sw    GPR15(r1),r15					
-        l.sw    GPR16(r1),r16					
-        l.sw    GPR17(r1),r17					
-        l.sw    GPR18(r1),r18					
-        l.sw    GPR19(r1),r19					
-        l.sw    GPR20(r1),r20					
-        l.sw    GPR21(r1),r21					
-        l.sw    GPR22(r1),r22					
-        l.sw    GPR23(r1),r23					
-        l.sw    GPR24(r1),r24					
-        l.sw    GPR25(r1),r25					
-        l.sw    GPR26(r1),r26					
-        l.sw    GPR27(r1),r27					
-        l.sw    GPR28(r1),r28					
-        l.sw    GPR29(r1),r29					
-        l.sw    GPR30(r1),r30					
+        l.sw    PT_GPR14(r1),r14					
+        l.sw    PT_GPR15(r1),r15					
+        l.sw    PT_GPR16(r1),r16					
+        l.sw    PT_GPR17(r1),r17					
+        l.sw    PT_GPR18(r1),r18					
+        l.sw    PT_GPR19(r1),r19					
+        l.sw    PT_GPR20(r1),r20					
+        l.sw    PT_GPR21(r1),r21					
+        l.sw    PT_GPR22(r1),r22					
+        l.sw    PT_GPR23(r1),r23					
+        l.sw    PT_GPR24(r1),r24					
+        l.sw    PT_GPR25(r1),r25					
+        l.sw    PT_GPR26(r1),r26					
+        l.sw    PT_GPR27(r1),r27					
+        l.sw    PT_GPR28(r1),r28					
+        l.sw    PT_GPR29(r1),r29					
+        l.sw    PT_GPR30(r1),r30					
 	/* r31 already saved */					
-        l.sw    RESULT(r1),r0					
+        l.sw    PT_RESULT(r1),r0					
 	l.addi	r3,r1,0						
 	/* r4 is exception EA */				
 	l.addi	r5,r0,0xdead					
