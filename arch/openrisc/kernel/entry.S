@@ -614,14 +614,15 @@ EXCEPTION_ENTRY(_sys_call_handler)
 	l.sw    GPR11(r1),r11
 	l.sw    ORIG_GPR11(r1),r11
 	/* r12,r13 already saved */
-	l.sw    GPR14(r1),r14
-	l.sw    GPR16(r1),r16
-	l.sw    GPR18(r1),r18
-	l.sw    GPR20(r1),r20
-	l.sw    GPR22(r1),r22
-	l.sw    GPR24(r1),r24
-	l.sw    GPR26(r1),r26
-	l.sw    GPR28(r1),r28
+
+	/* r14-r28 (even) aren't touched by the syscall fast path below
+	 * so we don't need to save them.  However, the functions that return
+	 * to userspace via a call to switch() DO need to save these because
+	 * switch() effectively clobbers them... saving these registers for
+	 * such functions is handled in their syscall wrappers (see fork, vfork,
+	 * and clone, below).
+
+	/* r30 is the only register we clobber in the fast path */
 	l.sw    GPR30(r1),r30
 	l.sw    RESULT(r1),r0
 	/* This is used by do_signal to determine whether to check for
@@ -678,6 +679,20 @@ _syscall_check_work:
 	l.lwz	r30,TI_FLAGS(r10)
 	l.andi	r30,r30,_TIF_WORK_MASK
 	l.sfne	r30,r0
+
+	/* Work pending follows a different return path, so we need to
+	 * make sure that all the call-saved registers get into pt_regs
+	 * before branching...
+	 */
+	l.sw    GPR14(r1),r14
+	l.sw    GPR16(r1),r16
+	l.sw    GPR18(r1),r18
+	l.sw    GPR20(r1),r20
+	l.sw    GPR22(r1),r22
+	l.sw    GPR24(r1),r24
+	l.sw    GPR26(r1),r26
+	l.sw    GPR28(r1),r28
+
 	l.bf	_work_pending
 	 l.nop
 
@@ -693,6 +708,10 @@ _syscall_resume_userspace:
 
 /* Once again, syscalls are special and only guarantee to preserve the
  * same registers as a normal function call */
+
+/* The assumption here is that the registers r12-r28 (even) are untouched and
+ * don't need to be restored... be sure that that's really the case!
+ */
 
 /* This is still too much... we should only be restoring what we actually
  * clobbered... we should even be using 'scratch' (odd) regs above so that
@@ -717,14 +736,7 @@ _syscall_resume_userspace:
 	l.lwz	r10,GPR10(r1)
 	l.lwz	r11,RESULT(r1)
 
-	l.lwz	r14,GPR14(r1)
-	l.lwz	r16,GPR16(r1)
-	l.lwz	r18,GPR18(r1)
-	l.lwz	r20,GPR20(r1)
-	l.lwz	r22,GPR22(r1)
-	l.lwz	r24,GPR24(r1)
-	l.lwz	r26,GPR26(r1)
-	l.lwz	r28,GPR28(r1)
+	/* r30 is the only register we clobber in the fast path */
 	l.lwz	r30,GPR30(r1)
 
 	/* Here we use r13-r19 (odd) as scratch regs */
@@ -917,6 +929,21 @@ ENTRY(ret_from_fork)
 	/* _syscall_return expect r11 to contain return value */
 	l.lwz	r11,GPR11(r1)
 
+	/* The syscall fast path return expects call-saved registers
+	 * r12-r28 to be untouched, so we restore them here as they
+	 * will have been effectively clobbered when arriving here
+	 * via the call to switch()
+	 */
+	l.lwz	r12,GPR12(r1)
+	l.lwz	r14,GPR14(r1)
+	l.lwz	r16,GPR16(r1)
+	l.lwz	r18,GPR18(r1)
+	l.lwz	r20,GPR20(r1)
+	l.lwz	r22,GPR22(r1)
+	l.lwz	r24,GPR24(r1)
+	l.lwz	r26,GPR26(r1)
+	l.lwz	r28,GPR28(r1)
+
 	l.j	_syscall_return
 	 l.nop
 
@@ -1011,16 +1038,39 @@ ENTRY(_switch)
 /* These all use the delay slot for setting the argument register, so the
  * jump is always happening after the l.addi instruction */
 
+/* fork requires that we save all the callee-saved registers because they
+ * are all effectively clobbered by the call to _switch.  Here we store
+ * all the registers that aren't touched by the syscall fast path and thus
+ * weren't saved there.
+ */
+
+_fork_save_extra_regs_and_call:
+	l.sw    GPR14(r1),r14
+	l.sw    GPR16(r1),r16
+	l.sw    GPR18(r1),r18
+	l.sw    GPR20(r1),r20
+	l.sw    GPR22(r1),r22
+	l.sw    GPR24(r1),r24
+	l.sw    GPR26(r1),r26
+	l.jr	r29
+	 l.sw    GPR28(r1),r28
+
 ENTRY(sys_clone)
-	l.j	_sys_clone
+	l.movhi	r29,hi(_sys_clone)
+	l.ori	r29,r29,lo(_sys_clone)
+	l.j	_fork_save_extra_regs_and_call
 	 l.addi	r7,r1,0
 	
 ENTRY(sys_fork)
-	l.j	_sys_fork
+	l.movhi	r29,hi(_sys_fork)
+	l.ori	r29,r29,lo(_sys_fork)
+	l.j	_fork_save_extra_regs_and_call
 	 l.addi	r3,r1,0
 
 ENTRY(sys_vfork)
-	l.j	_sys_vfork
+	l.movhi	r29,hi(_sys_vfork)
+	l.ori	r29,r29,lo(_sys_vfork)
+	l.j	_fork_save_extra_regs_and_call
 	 l.addi	r3,r1,0
 	
 ENTRY(sys_execve)
