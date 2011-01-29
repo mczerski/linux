@@ -984,6 +984,13 @@ ENTRY(_kernel_thread_helper)
  * To avoid this problems it is sufficient to align _switch to
  * some nice round number smaller than it's size...
  */
+
+/* ABI rules apply here... we either enter _switch via schedule() or via
+ * an imaginary call to which we shall return at return_from_fork.  Either
+ * way, we are a function call and only need to preserve the callee-saved
+ * registers when we return.  As such, we don't need to save the registers
+ * on the stack that we won't be returning as they were...
+ */
 	
 	.align 0x400
 ENTRY(_switch)
@@ -993,37 +1000,21 @@ ENTRY(_switch)
 	/* Set up new pt_regs struct for saving task state */
         l.addi  r1,r1,-(INT_FRAME_SIZE)
 
-	/* No need to store SP as it goes into KSP below */
+	/* No need to store r1/SP as it goes into KSP below */
 	l.sw    GPR2(r1),r2
-	l.sw    GPR3(r1),r3
-	l.sw    GPR4(r1),r4
-        l.sw    GPR5(r1),r5
-        l.sw    GPR6(r1),r6
-        l.sw    GPR7(r1),r7
-        l.sw    GPR8(r1),r8
         l.sw    GPR9(r1),r9
-        l.sw    GPR10(r1),r10
-        l.sw    GPR11(r1),r11
+	/* This is wrong, r12 shouldn't be here... but GCC is broken for the time being
+	 * and expects r12 to be callee-saved... */
         l.sw    GPR12(r1),r12
-        l.sw    GPR13(r1),r13
         l.sw    GPR14(r1),r14
-        l.sw    GPR15(r1),r15
         l.sw    GPR16(r1),r16
-        l.sw    GPR17(r1),r17
         l.sw    GPR18(r1),r18
-        l.sw    GPR19(r1),r19
         l.sw    GPR20(r1),r20
-        l.sw    GPR21(r1),r21
         l.sw    GPR22(r1),r22
-        l.sw    GPR23(r1),r23
         l.sw    GPR24(r1),r24
-        l.sw    GPR25(r1),r25
         l.sw    GPR26(r1),r26
-        l.sw    GPR27(r1),r27
         l.sw    GPR28(r1),r28
-        l.sw    GPR29(r1),r29
         l.sw    GPR30(r1),r30
-        l.sw    GPR31(r1),r31
 
 	l.addi	r11,r10,0			/* Save old 'current' to 'last' return value*/
 
@@ -1051,35 +1042,22 @@ ENTRY(_switch)
 	 * has already been set above.
 	 */
         l.lwz   r2,GPR2(r1)
-        l.lwz   r3,GPR3(r1)
-        l.lwz   r4,GPR4(r1)
-        l.lwz   r5,GPR5(r1)
-        l.lwz   r6,GPR6(r1)
-        l.lwz   r7,GPR7(r1)
-        l.lwz   r8,GPR8(r1)
         l.lwz   r9,GPR9(r1)
 	/* No need to restore r10 */
 	/* ...and do not restore r11 */
-        l.lwz   r12,GPR12(r1)
-        l.lwz   r13,GPR13(r1)
+
+        /* This is wrong, r12 shouldn't be here... but GCC is broken for the time being
+	 * and expects r12 to be callee-saved... */
+	l.lwz   r12,GPR12(r1)
         l.lwz   r14,GPR14(r1)
-        l.lwz   r15,GPR15(r1)
         l.lwz   r16,GPR16(r1)
-        l.lwz   r17,GPR17(r1)
         l.lwz   r18,GPR18(r1)
-        l.lwz   r19,GPR19(r1)
         l.lwz   r20,GPR20(r1)
-        l.lwz   r21,GPR21(r1)
         l.lwz   r22,GPR22(r1)
-        l.lwz   r23,GPR23(r1)
         l.lwz   r24,GPR24(r1)
-        l.lwz   r25,GPR25(r1)
         l.lwz   r26,GPR26(r1)
-        l.lwz   r27,GPR27(r1)
         l.lwz   r28,GPR28(r1)
-        l.lwz   r29,GPR29(r1)
         l.lwz   r30,GPR30(r1)
-        l.lwz   r31,GPR31(r1)
 
 	/* Unwind stack to pre-switch state */
         l.addi  r1,r1,(INT_FRAME_SIZE)
