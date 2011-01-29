@@ -672,7 +672,8 @@ _syscall_exit:
 	l.bf	_syscall_exit_work
 	l.nop
 
-	l.j	_restore_all
+/*	l.j	_restore_all*/
+	l.j	_syscall_return
 	l.nop
 
 _syscall_trace_entry:
@@ -721,6 +722,7 @@ _syscall_exit_work:
 	l.jal	do_syscall_trace
 	l.nop
 
+_syscall_return:
 _syscall_resume_userspace:
 
 /* This is the hot path for returning to userspace from a syscall.  If there's
@@ -738,8 +740,21 @@ _syscall_resume_userspace:
  * clobbered... we should even be using 'scratch' (odd) regs above so that
  * we don't need to restore anything, hardly...
  */
+	// we need to save KSP here too
+	// or else fork's 'eat' stack space
+	l.addi  r4,r1,INT_FRAME_SIZE
+        l.sw    (TI_KSP)(r10),r4
 
 	l.lwz	r2,GPR2(r1)
+
+	/* Restore args */
+	l.lwz	r3,GPR3(r1)
+	l.lwz	r4,GPR4(r1)
+	l.lwz	r5,GPR5(r1)
+	l.lwz	r6,GPR6(r1)
+	l.lwz	r7,GPR7(r1)
+	l.lwz	r8,GPR8(r1)
+
 	l.lwz	r9,GPR9(r1)
 	l.lwz	r10,GPR10(r1)
 	l.lwz	r11,RESULT(r1)
@@ -905,7 +920,11 @@ _restore_all:
 ENTRY(ret_from_fork)
 	l.jal	schedule_tail
 	 l.nop
-	l.j	_syscall_exit
+
+	/* _syscall_return expect r11 to contain return value */
+	l.lwz	r11,GPR11(r1)
+
+	l.j	_syscall_return
 	 l.nop
 
 ENTRY(_ret_from_intr)
