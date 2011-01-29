@@ -727,18 +727,16 @@ _syscall_resume_userspace:
 	l.lwz	r28,GPR28(r1)
 	l.lwz	r30,GPR30(r1)
 
-	/* Here we use r3 - r6 as scratch regs */
-	/* FIXME: use other scratch regs... args need to be 
-	 * rstored  for syscall restart */
-	l.lwz   r3,PC(r1)
-        l.lwz   r4,SR(r1)
+	/* Here we use r13-r19 (odd) as scratch regs */
+	l.lwz   r13,PC(r1)
+        l.lwz   r15,SR(r1)
 	l.lwz	r1,SP(r1)
 	/* Interrupts need to be disabled for setting EPCR and ESR
 	 * so that another interrupt doesn't come in here and clobber
 	 * them before we can use them for our l.rfe */
-	DISABLE_INTERRUPTS(r5,r6)
-        l.mtspr r0,r3,SPR_EPCR_BASE
-        l.mtspr r0,r4,SPR_ESR_BASE
+	DISABLE_INTERRUPTS(r17,r19)
+        l.mtspr r0,r13,SPR_EPCR_BASE
+        l.mtspr r0,r15,SPR_ESR_BASE
 	l.rfe
 
 /* End of hot path!
