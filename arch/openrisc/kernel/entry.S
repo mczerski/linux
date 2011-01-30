@@ -881,9 +881,6 @@ _restore_all:
 
 
 ENTRY(_ret_from_intr)
-	// i386 version:
-	// GET_CURRENT(%ebx)
-
 ENTRY(_ret_from_exception)
 	l.lwz	r4,PT_SR(r1)
 	l.andi	r3,r4,SPR_SR_SM
@@ -1108,6 +1105,20 @@ ENTRY(sys_sigaltstack)
 ENTRY(sys_rt_sigreturn)
 	l.j	_sys_rt_sigreturn
 	 l.addi	r3,r1,0
+
+/* This is a catch-all syscall for atomic instructions for the OpenRISC 1000.
+ * The functions takes a variable number of parameters depending on which
+ * particular flavour of atomic you want... parameter 1 is a flag identifying
+ * the atomic in question.  Currently, this function implements the 
+ * following variants:
+ *
+ * XCHG:
+ *  @flag: 1
+ *  @ptr1:
+ *  @ptr2:
+ * Atomically exchange the values in pointers 1 and 2.
+ * 
+ */
 
 ENTRY(sys_or1k_atomic)
 	/* FIXME: This ignores r3 and always does an XCHG */
