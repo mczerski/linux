@@ -141,7 +141,7 @@ _sys_rt_sigreturn(struct pt_regs *regs)
 	do_sigaltstack(&st, NULL, regs->sp);
 
 //	return regs->gprs[1];
-	return regs->gprs[9];
+	return regs->gpr[11];
 
 badframe:
 	force_sig(SIGSEGV, current);
@@ -287,10 +287,10 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Set up registers for signal handler */
 	regs->pc = (unsigned long) ka->sa.sa_handler; /* what we enter NOW   */
-	regs->gprs[7] = (unsigned long) return_ip;    /* what we enter LATER */
-	regs->gprs[1] = (unsigned long) sig;          /* arg 1: signo */
-        regs->gprs[2] = (unsigned long) &frame->info; /* arg 2: (siginfo_t*) */
-        regs->gprs[3] = (unsigned long) &frame->uc;   /* arg 3: ucontext */
+	regs->gpr[9] = (unsigned long) return_ip;    /* what we enter LATER */
+	regs->gpr[3] = (unsigned long) sig;          /* arg 1: signo */
+        regs->gpr[4] = (unsigned long) &frame->info; /* arg 2: (siginfo_t*) */
+        regs->gpr[5] = (unsigned long) &frame->uc;   /* arg 3: ucontext */
 
 	/* actually move the usp to reflect the stacked frame */
 
@@ -315,13 +315,6 @@ handle_signal(unsigned long sig,
 	      siginfo_t *info, struct k_sigaction *ka,
 	      sigset_t *oldset, struct pt_regs * regs)
 {
-
-/*	phx_signal("canrestart %d, sig %ld, ka %p, info %p, oldset %p, regs %p",
-		   canrestart, sig, ka, info, oldset, regs);*/
-
-	phx_signal("(regs->pc 0x%lx, regs->sp 0x%lx, regs->gprs[7] 0x%lx)",
-		   regs->pc, regs->sp, regs->gprs[7]);
-
 	setup_rt_frame(sig, ka, info, oldset, regs);
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
@@ -380,7 +373,7 @@ void do_signal(struct pt_regs *regs)
 	if (regs->syscallno) {
 		int restart = 0;
 
-		switch(regs->gprs[9]) {
+		switch(regs->gpr[11]) {
 		case -ERESTART_RESTARTBLOCK:
 		case -ERESTARTNOHAND:
 			/* Restart if there is no signal handler */
@@ -398,13 +391,13 @@ void do_signal(struct pt_regs *regs)
 		}
 
 		if (restart) {
-			if (regs->gprs[9] == -ERESTART_RESTARTBLOCK)
-				regs->gprs[9] = __NR_restart_syscall;
+			if (regs->gpr[11] == -ERESTART_RESTARTBLOCK)
+				regs->gpr[11] = __NR_restart_syscall;
 			else
-				regs->gprs[9] = regs->orig_gpr11;
+				regs->gpr[11] = regs->orig_gpr11;
 			regs->pc -= 4;
 		} else {
-			regs->gprs[9] = -EINTR;
+			regs->gpr[11] = -EINTR;
 		}
 	}
 

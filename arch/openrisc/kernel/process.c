@@ -179,12 +179,12 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	         * and stackptr in new task
 		 */
 		childregs->sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
-                childregs->gprs[8] = (unsigned long)task_thread_info(p);
+                childregs->gpr[10] = (unsigned long)task_thread_info(p);
         } else {
 		childregs->sp = usp;
 	}
 
-        childregs->gprs[9] = 0;  /* Result from fork() */
+        childregs->gpr[11] = 0;  /* Result from fork() */
 
         /*
          * The way this works is that at some point in the future
@@ -209,10 +209,10 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	 */
 	kregs->sp = top_of_kernel_stack;
 //	kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
-	kregs->gprs[1] = (unsigned long)current;  /* arg to schedule_tail */
-	kregs->gprs[8] = (unsigned long)task_thread_info(p);
+	kregs->gpr[3] = (unsigned long)current;  /* arg to schedule_tail */
+	kregs->gpr[10] = (unsigned long)task_thread_info(p);
 //        kregs->pc = (unsigned long)ret_from_fork;
-	kregs->gprs[7] = (unsigned long)ret_from_fork;
+	kregs->gpr[9] = (unsigned long)ret_from_fork;
 
         return 0;
 }
@@ -222,13 +222,15 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
  */
 void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 {
+	unsigned long sr = regs->sr & ~SPR_SR_SM;
+
 	phx_warn("NIP: %lx, SP: %lx", pc, sp);
 
 	set_fs(USER_DS);
-	memset(regs->gprs, 0, sizeof(regs->gprs));
+	memset(regs->gpr, 0, sizeof(regs->gpr));
 
 	regs->pc = pc;
-	regs->sr = regs->sr & ~ SPR_SR_SM;
+	regs->sr = sr;
 	regs->sp = sp;
 
 /*	printk("start thread, ksp = %lx\n", current_thread_info()->ksp);*/
@@ -303,8 +305,8 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);
 */
 
-        regs.gprs[18] = (unsigned long)fn;
-        regs.gprs[20] = (unsigned long)arg;
+        regs.gpr[20] = (unsigned long)fn;
+        regs.gpr[22] = (unsigned long)arg;
         regs.sr = mfspr(SPR_SR);
         regs.pc = (unsigned long)_kernel_thread_helper;
 

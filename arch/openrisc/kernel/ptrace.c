@@ -284,8 +284,8 @@ do_syscall_trace_enter(struct pt_regs *regs)
 	/* Are these regs right??? */
 	if (unlikely(current->audit_context))
 		audit_syscall_entry(audit_arch(), regs->syscallno,
-				    regs->gprs[1], regs->gprs[2],
-				    regs->gprs[3], regs->gprs[4]);
+				    regs->gpr[3], regs->gpr[4],
+				    regs->gpr[5], regs->gpr[6]);
 
 	return ret ?: regs->syscallno;
 
@@ -319,8 +319,8 @@ do_syscall_trace_leave(struct pt_regs* regs)
 	int step;
 
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(AUDITSC_RESULT(regs->gprs[9]), 
-				   regs->gprs[9]);
+		audit_syscall_exit(AUDITSC_RESULT(regs->gpr[11]), 
+				   regs->gpr[11]);
 
 /*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
 		trace_sys_exit(regs, regs->gprs[9]);
