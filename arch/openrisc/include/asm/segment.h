@@ -1,1 +1,1 @@
-#include <asm/uaccess.h>
+#include <asm-generic/segment.h>

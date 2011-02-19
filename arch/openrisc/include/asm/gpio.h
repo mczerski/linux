@@ -1,5 +1,5 @@
 /*
- * Generic GPIO API implementation for OR32
+ * Generic GPIO API implementation for OpenRISC
  *
  * Copyright (c) 2010 Jonas Bonn
  *

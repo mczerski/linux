@@ -2,7 +2,7 @@
 #define __ASM_OPENRISC_MSGBUF_H
 
 /* 
- * The msqid64_ds structure for the or32 architecture.
+ * The msqid64_ds structure for the OpenRISC architecture.
  */
 
 struct msqid64_ds {
