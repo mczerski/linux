@@ -266,19 +266,14 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (err)
 		goto give_sigsegv;
 
-	if (ka->sa.sa_flags & SA_RESTORER) {
-		return_ip = (unsigned long)ka->sa.sa_restorer;
-		phx_signal("SA_RESTORER: return_ip 0x%lx", return_ip);
-	} else {
-		/* trampoline - the desired return ip is the retcode itself */
-		return_ip = (unsigned long)&frame->retcode;
-		phx_signal("ktrampoline: return_ip 0x%lx", return_ip);
-		/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
-		err |= __put_user(0xa960        , (short *)(frame->retcode+0));
-		err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
-		err |= __put_user(0x20000001, (unsigned long *)(frame->retcode+4));
-		err |= __put_user(0x15000000, (unsigned long *)(frame->retcode+8));
-	}
+	/* trampoline - the desired return ip is the retcode itself */
+	return_ip = (unsigned long)&frame->retcode;
+	phx_signal("ktrampoline: return_ip 0x%lx", return_ip);
+	/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
+	err |= __put_user(0xa960        , (short *)(frame->retcode+0));
+	err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
+	err |= __put_user(0x20000001, (unsigned long *)(frame->retcode+4));
+	err |= __put_user(0x15000000, (unsigned long *)(frame->retcode+8));
 
 	if (err)
 		goto give_sigsegv;
