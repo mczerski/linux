@@ -27,6 +27,7 @@ static inline int irq_canonicalize(int irq)
 /*
  * "Generic" interrupt sources
  */
+#define NO_IRQ		(-1)
 
 //#define IRQ_UART_0            (2)       /* interrupt source for UART dvice 0 */
 //#define IRQ_ETH_0             (4)       /* interrupt source for Ethernet dvice 0 */

@@ -102,7 +102,7 @@ static inline int pic_get_irq(void)
 
 	irq = ffs(mfspr(SPR_PICSR));
 
-	return irq ? irq - 1 : -1;
+	return irq ? irq - 1 : NO_IRQ;
 }
 
 /**
