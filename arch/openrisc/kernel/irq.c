@@ -1,20 +1,7 @@
-/*
- *  linux/arch/or32/kernel/irq.c
- *
- *  or32 version
- *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
- *               Jonas Bonn (jonas@southpole.se)
- *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
- *
- *  derived from cris, i386, m68k, ppc, sh ports.
- *
- *  changes:
- *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
- *    initial port to or32 architecture
- *
+/* OpenRISC IRQ
+ * 
+ * Copyright:
+ *  Jonas Bonn (jonas@southpole.se)
  */
 
 #include <linux/ptrace.h>
@@ -105,34 +92,6 @@ static inline int pic_get_irq(void)
 	return irq ? irq - 1 : NO_IRQ;
 }
 
-/**
- * struct irq_chip - hardware interrupt chip descriptor
- *
- * @name:               name for /proc/interrupts
- * @startup:            start up the interrupt (defaults to ->enable if NULL)
- * @shutdown:           shut down the interrupt (defaults to ->disable if NULL)
- * @enable:             enable the interrupt (defaults to chip->unmask if NULL)
- * @disable:            disable the interrupt
- * @ack:                start of a new interrupt
- * @mask:               mask an interrupt source
- * @mask_ack:           ack and mask an interrupt source
- * @unmask:             unmask an interrupt source
- * @eoi:                end of interrupt - chip level
- * @end:                end of interrupt - flow level
- * @set_affinity:       set the CPU affinity on SMP machines
- * @retrigger:          resend an IRQ to the CPU
- * @set_type:           set the flow type (IRQ_TYPE_LEVEL/etc.) of an IRQ
- * @set_wake:           enable/disable power-management wake-on of an IRQ
- *
- * @bus_lock:           function to lock access to slow bus (i2c) chips
- * @bus_sync_unlock:    function to sync and unlock slow bus (i2c) chips
- *
- * @release:            release function solely used by UML
- * @typename:           obsoleted by name, kept as migration helper
- */
-
-/* This is the optional PIC for the OR*/
-
 static struct irq_chip or1k_pic = {
 	.name = "or1k-PIC",
 	.irq_unmask = pic_unmask,
@@ -208,200 +167,16 @@ void __irq_entry do_IRQ(struct pt_regs *regs)
 
 	irq_enter();
 
-	while ((irq = pic_get_irq()) >= 0) {
+	/* FIXME: This loop always handles the lowest interrupt
+	 * first and seems to be able to lead to starvation for
+	 * handlers with higher numbered IRQ's */
+	while ((irq = pic_get_irq()) != NO_IRQ) {
 		generic_handle_irq(irq);
 	}
 
         irq_exit();
         set_irq_regs(old_regs);
 }
-
-#if 0
-int request_irq(unsigned int irq,
-		irqreturn_t (*handler)(int, void *), /*RGD removed pt_reg*/
-		unsigned long flags, const char *devname, void *dev_id)
-{
-	if (irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d from %s\n", __FUNCTION__, irq, devname);
-		return -ENXIO;
-	}
-
-	if (!(irq_list[irq].flags & IRQ_FLG_STD)) {
-		if (irq_list[irq].flags & IRQ_FLG_LOCK) {
-			printk("%s: IRQ %d from %s is not replaceable\n",
-			       __FUNCTION__, irq, irq_list[irq].devname);
-			return -EBUSY;
-		}
-		if (flags & IRQ_FLG_REPLACE) {
-			printk("%s: %s can't replace IRQ %d from %s\n",
-			       __FUNCTION__, devname, irq, irq_list[irq].devname);
-			return -EBUSY;
-		}
-	}
-	irq_list[irq].handler = handler;
-	irq_list[irq].flags   = flags;
-	irq_list[irq].dev_id  = dev_id;
-	irq_list[irq].devname = devname;
-
-	pic_enable_irq(irq);
-	
-	return 0;
-}
-
-void free_irq(unsigned int irq, void *dev_id)
-{
-	if (irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
-		return;
-	}
-
-	pic_disable_irq(irq);
-
-	irq_list[irq].handler = NULL;
-	irq_list[irq].flags   = IRQ_FLG_STD;
-	irq_list[irq].dev_id  = NULL;
-	irq_list[irq].devname = default_names[irq];
-}
-
-unsigned long probe_irq_on (void)
-{
-	return 0;
-}
-
-int probe_irq_off (unsigned long irqs)
-{
-	return 0;
-}
-
-void enable_irq(unsigned int irq)
-{
-	if (irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
-		return;
-	}
-	pic_enable_irq(irq);
-}
-
-void disable_irq(unsigned int irq)
-{
-	if (irq >= NR_IRQS) {
-		printk("%s: Incorrect IRQ %d\n", __FUNCTION__, irq);
-		return;
-	}
-	pic_disable_irq(irq);
-}
-
-void disable_irq_nosync(unsigned int irq)
-{
-        disable_irq(irq);
-}
-#endif
-#if 0
-int get_irq_list(char *buf)
-{
-	int i, len = 0;
-
-	/* autovector interrupts */
-	for (i = 0; i < NR_IRQS; i++) {
-		if (irq_list[i].handler) {
-			if (irq_list[i].flags & IRQ_FLG_LOCK)
-				len += sprintf(buf+len, "L ");
-			else
-				len += sprintf(buf+len, "  ");
-			if (irq_list[i].flags & IRQ_FLG_PRI_HI)
-				len += sprintf(buf+len, "H ");
-			else
-				len += sprintf(buf+len, "L ");
-			len += sprintf(buf+len, "%s\n", irq_list[i].devname);
-		}
-	}
-
-	return len;
-}
-#endif
-#if 0
-void dump(struct pt_regs *fp)
-{
-	unsigned long	*sp;
-	unsigned char	*tp;
-	int		i;
-
-	printk("\nCURRENT PROCESS:\n\n");
-	printk("COMM=%s PID=%d\n", current->comm, current->pid);
-	if (current->mm) {
-		printk("TEXT=%08x-%08x DATA=%08x-%08x BSS=%08x-%08x\n",
-			(int) current->mm->start_code,
-			(int) current->mm->end_code,
-			(int) current->mm->start_data,
-			(int) current->mm->end_data,
-			(int) current->mm->end_data,
-			(int) current->mm->brk);
-		printk("USER-STACK=%08x  KERNEL-STACK=%08x\n\n",
-			(int) current->mm->start_stack,
-			(int) current->kernel_stack_page);
-	}
-	printk("PC: %08lx  Status: %08lx\n",
-	       fp->pc, fp->sr);
-	printk("R0 : %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx\n",
-	       	0L,             fp->sp,      fp->gprs[0], fp->gprs[1], 
-		fp->gprs[2], fp->gprs[3], fp->gprs[4], fp->gprs[5]);
-	printk("R8 : %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx\n",
-	       	fp->gprs[6], fp->gprs[7], fp->gprs[8], fp->gprs[9], 
-		fp->gprs[10], fp->gprs[11], fp->gprs[12], fp->gprs[13]);
-	printk("R16: %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx\n",
-	       	fp->gprs[14], fp->gprs[15], fp->gprs[16], fp->gprs[17], 
-		fp->gprs[18], fp->gprs[19], fp->gprs[20], fp->gprs[21]);
-	printk("R24: %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx  %08lx\n",
-	       	fp->gprs[22], fp->gprs[23], fp->gprs[24], fp->gprs[25], 
-		fp->gprs[26], fp->gprs[27], fp->gprs[28], fp->gprs[29]);
-
-	printk("\nUSP: %08lx   TRAPFRAME: %08x\n",
-		fp->sp, (unsigned int) fp);
-
-	printk("\nCODE:");
-	tp = ((unsigned char *) fp->pc) - 0x20;
-	for (sp = (unsigned long *) tp, i = 0; (i < 0x40);  i += 4) {
-		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
-	}
-	printk("\n");
-
-	printk("\nKERNEL STACK:");
-	tp = ((unsigned char *) fp) - 0x40;
-	for (sp = (unsigned long *) tp, i = 0; (i < 0xc0); i += 4) {
-		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
-	}
-	printk("\n");
-	if (STACK_MAGIC != *(unsigned long *)current->kernel_stack_page)
-                printk("(Possibly corrupted stack page??)\n");
-	printk("\n");
-
-	printk("\nUSER STACK:");
-	tp = (unsigned char *) (fp->sp - 0x10);
-	for (sp = (unsigned long *) tp, i = 0; (i < 0x80); i += 4) {
-		if ((i % 0x10) == 0)
-			printk("\n%08x: ", (int) (tp + i));
-		printk("%08x ", (int) *sp++);
-	}
-	printk("\n\n");
-}
-#endif /* 0 */
-/*
-void init_irq_proc(void)
-{
-	phx_warn("TODO");
-}
-*/
-/*
-unsigned int irq_create_mapping(struct irq_host *host, irq_hw_number_t hwirq)
-{
-        return hwirq;
-}
-EXPORT_SYMBOL_GPL(irq_create_mapping);
-*/
 
 unsigned int irq_create_of_mapping(struct device_node *controller,
                                    const u32 *intspec, unsigned int intsize)
