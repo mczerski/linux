@@ -1,4 +1,0 @@
-#ifndef __ASM_OPENRISC_NUMNODES_H
-#define __ASM_OPENRISC_NUMNODES_H
-
-#endif
