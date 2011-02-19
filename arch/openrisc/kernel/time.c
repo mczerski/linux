@@ -8,17 +8,13 @@
 */
 
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/param.h>
-#include <linux/string.h>
-#include <linux/profile.h>
-#include <linux/mm.h>
 #include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/interrupt.h>
+#include <linux/ftrace.h>
 
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
@@ -103,13 +99,9 @@ static inline void timer_ack(void)
  *
  * This function needs to be called by the timer exception handler and that's
  * all the exception handler needs to do.
- *
- * FIXME: Check how to get this into a threaded interrupt handler or something.
- * FIXME: what's with the pt_regs parameter here... really needed?
- * FIXME; should this really be marked __irq_entry
  */
 
-irqreturn_t timer_interrupt(struct pt_regs * regs)
+irqreturn_t __irq_entry timer_interrupt(struct pt_regs * regs)
 {
         struct pt_regs *old_regs = set_irq_regs(regs);
         struct clock_event_device *evt = &clockevent_openrisc_timer;
