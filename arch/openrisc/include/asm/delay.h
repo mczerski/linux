@@ -2,8 +2,7 @@
 #define __ASM_OPENRISC_DELAY_H
 
 #include <linux/linkage.h>
-#include <asm/param.h>			/* Added by JPB: for HZ */
-
+#include <asm/param.h>
 
 extern inline void __delay(int loops)
 {
@@ -15,15 +14,13 @@ extern inline void __delay(int loops)
 			      : "=r" (loops): "0" (loops));
 }
 
-
 /* Use only for very small delays ( < 1 msec).  */
 
 extern unsigned long loops_per_jiffy;
 
 extern inline void udelay(unsigned long usecs)
 {
-  /*	__delay(usecs * loops_per_usec);  Removed by JPB */
-	__delay( usecs * loops_per_jiffy * HZ / 1000000 );	/* JPB */
+	__delay( usecs * loops_per_jiffy * HZ / 1000000 );
 }
 
 #endif 

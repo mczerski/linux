@@ -3,10 +3,9 @@
  *
  * Copyright (c) 2010 Jonas Bonn
  *
- * Based on arch/microblaze/include/asm/gpio.h
- * Copyright (c) 2007-2008  MontaVista Software, Inc.
- *
- * Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+ * Derived from arch/microblaze/include/asm/gpio.h
+ *   Copyright (c) 2007-2008  MontaVista Software, Inc.
+ *   Author: Anton Vorontsov <avorontsov@ru.mvista.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

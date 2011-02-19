@@ -1,7 +1,7 @@
 #ifndef __ASM_OPENRISC_MEMBLOCK_H
 #define __ASM_OPENRISC_MEMBLOCK_H
 
-#define MEMBLOCK_REAL_LIMIT	0xFFFFFFFF
+/* empty */
 
 #endif /* __ASM_OPENRISC_MEMBLOCK_H */
 
