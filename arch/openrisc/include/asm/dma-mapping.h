@@ -1,8 +1,9 @@
 /*
- * Implements the generic device dma API for microblaze and the pci
+ * Implements the generic device dma API for OpenRISC
  *
- * Copyright (C) 2009-2010 Michal Simek <monstr@monstr.eu>
- * Copyright (C) 2009-2010 PetaLogix
+ * Derived from MicroBlaze version:
+ *  Copyright (C) 2009-2010 Michal Simek <monstr@monstr.eu>
+ *  Copyright (C) 2009-2010 PetaLogix
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License. See the file COPYING in the main directory of this
