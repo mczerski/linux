@@ -30,7 +30,6 @@
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
-#include <linux/user.h>
 #include <linux/elfcore.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>

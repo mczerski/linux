@@ -39,7 +39,6 @@
 #include <linux/smp_lock.h>
 #include <linux/errno.h>
 #include <linux/ptrace.h>
-#include <linux/user.h>
 #include <linux/audit.h>
 #include <linux/tracehook.h>
 
@@ -62,6 +61,7 @@ static inline long get_reg(struct task_struct *task, int regno)
 {
 	if(regno < sizeof(struct pt_regs))
 		return *((unsigned long *)user_regs(task->stack) + (regno >> 2));
+#if 0
 	switch(regno) {
 	case offsetof(struct user, start_code):
 		return task->mm->start_code;
@@ -73,6 +73,7 @@ static inline long get_reg(struct task_struct *task, int regno)
 		printk("Don't know how to get offset %i of struct user\n",
 		       regno);
 	}
+#endif
 	return 0;
 }
 
@@ -171,9 +172,10 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 	/* read the word at location addr in the USER area. */
 	case PTRACE_PEEKUSR:
 		ret = -EIO;
+#if 0
 		if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
 			break;
-
+#endif
 		ret = put_user(get_reg(child, addr), datap);
 		break;
 
@@ -188,8 +190,10 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 
 	case PTRACE_POKEUSR: /* write the word at location addr in the USER area */
 		ret = -EIO;
+#if 0
 		if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
 			break;
+#endif
 
 		ret = put_reg(child, addr, data);	    
 		break;

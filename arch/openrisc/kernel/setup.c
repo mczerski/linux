@@ -28,7 +28,6 @@
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
-#include <linux/user.h>
 #include <linux/tty.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
