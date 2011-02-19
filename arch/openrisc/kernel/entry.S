@@ -27,13 +27,12 @@
  */
 
 #include <linux/linkage.h>
-#include <linux/sys.h>
+
 #include <asm/processor.h>
-#include <asm/thread_info.h>
 #include <asm/unistd.h>
+#include <asm/thread_info.h>
 #include <asm/errno.h>
 #include <asm/spr_defs.h>
-
 #include <asm/page.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
