@@ -43,7 +43,7 @@
 #include <linux/audit.h>
 #include <linux/tracehook.h>
 
-#include <asm/segment.h>
+#include <asm/uaccess.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
