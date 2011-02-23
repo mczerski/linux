@@ -6,18 +6,19 @@
  * for more details.
  *
  * Copyright (C) 1998 Ingo Molnar
+ * Copyright (C) 2010 Jonas Bonn
  *
  */
 
 #ifndef __ASM_OPENRISC_FIXMAP_H
 #define __ASM_OPENRISC_FIXMAP_H
 
-/* used by vmalloc.c, vsyscall.lds.S.
- *
- * Leave one empty page between vmalloc'ed areas and
- * the start of the fixmap.
+/* Why exactly do we need 2 empty pages between the top of the fixed
+ * addresses and the top of virtual memory?  Something is using that
+ * memory space but not sure what right now... If you find it, leave
+ * a comment here.
  */
-#define __FIXADDR_TOP	0xffffe000
+#define FIXADDR_TOP	((unsigned long) (-2*PAGE_SIZE))
 
 #include <linux/kernel.h>
 #include <linux/threads.h>
@@ -28,7 +29,7 @@
  * addresses. The point is to have a constant address at
  * compile time, but to set the physical address only
  * in the boot process. We allocate these special addresses
- * from the end of virtual memory (0xffffe000) backwards.
+ * from the end of virtual memory (0xffffb000) backwards.
  * 
  * Also this would let us do fail-safe vmalloc(), we
  * can guarantee that these special addresses and
@@ -51,7 +52,7 @@ enum fixed_addresses {
 	 */
 #define FIX_N_IOREMAPS  32
 	FIX_IOREMAP_BEGIN,
-	FIX_IOREMAP_END = FIX_IOREMAP_BEGIN + FIX_N_IOREMAPS,
+	FIX_IOREMAP_END = FIX_IOREMAP_BEGIN + FIX_N_IOREMAPS - 1,
 	__end_of_fixed_addresses
 };
 
@@ -68,8 +69,6 @@ extern void __set_fixmap(enum fixed_addresses idx,
 
 #define clear_fixmap(idx) \
 		__set_fixmap(idx, 0, __pgprot(0))
-
-#define FIXADDR_TOP	((unsigned long)__FIXADDR_TOP-PAGE_SIZE)
 
 #define FIXADDR_SIZE		(__end_of_fixed_addresses << PAGE_SHIFT)
 #define FIXADDR_START		(FIXADDR_TOP - FIXADDR_SIZE)
