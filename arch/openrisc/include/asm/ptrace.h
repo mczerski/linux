@@ -90,6 +90,6 @@ struct pt_regs {
 #define PT_GPR31      124
 #define PT_PC	      128
 #define PT_ORIG_GPR11 132
-#define PT_SYSCALLNO  140
+#define PT_SYSCALLNO  136
 
 #endif /* __ASM_OPENRISC_PTRACE_H */
