@@ -115,9 +115,7 @@ static unsigned long __init setup_memory(void)
 	free_ram_start_pfn = PFN_UP(__pa(&_end));
 	ram_end_pfn = PFN_DOWN(memblock_end_of_DRAM());
 
-#ifndef CONFIG_HIGHMEM
 	max_pfn = ram_end_pfn;
-#endif
 
 	/* 
 	 * initialize the boot-time allocator (with low memory only).

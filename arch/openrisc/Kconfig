@@ -118,9 +118,6 @@ config OPENRISC_FLASH_BOOT
           in the kernel. It will just copy kernel image from FLASH to RAM and
 	  start executing it.
 
-config HIGHMEM
-        bool "High memory support"
-
 source "kernel/time/Kconfig"
 source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
