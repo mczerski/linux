@@ -7,6 +7,18 @@
 #include <asm/types.h>
 #include <asm/ptrace.h>
 
+
+/* The OR1K relocation types... not all relevant for module loader */
+#define R_OR32_NONE	0
+#define R_OR32_32	1
+#define R_OR32_16	2
+#define R_OR32_8	3
+#define R_OR32_CONST	4
+#define R_OR32_CONSTH	5
+#define R_OR32_JUMPTARG	6
+#define R_OR32_VTINHERIT 7
+#define R_OR32_VTENTRY	8
+
 typedef unsigned long elf_greg_t;
 
 /* Note that NGREG is defined to ELF_NGREG in include/linux/elfcore.h, and is

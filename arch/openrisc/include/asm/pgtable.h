@@ -12,6 +12,7 @@
 
 #ifndef __ASSEMBLY__
 #include <asm/mmu.h>
+#include <asm/fixmap.h>
 
 /*
  * The Linux memory management assumes a three-level page table setup. On
@@ -65,9 +66,19 @@ extern void paging_init(void);
  * Kernels own virtual memory area. 
  */
 
-#define VMALLOC_START     0xd0000000
+/*
+ * The size and location of the vmalloc area are chosen so that modules
+ * placed in this area aren't more than a 28-bit signed offset from any
+ * kernel functions that they may need.  This greatly simplifies handling
+ * of the relocations for l.j and l.jal instructions as we don't need to
+ * introduce any trampolines for reaching "distant" code.
+ *
+ * 64 MB of vmalloc area is comparable to what's available on other arches.
+ */
+
+#define VMALLOC_START	(PAGE_OFFSET-0x04000000)
+#define VMALLOC_END	(PAGE_OFFSET)
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END       0xe0000000
 
 /* Define some higher level generic page attributes.
  *
