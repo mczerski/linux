@@ -20,6 +20,7 @@
 #include <linux/linkage.h>
 #include <linux/threads.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/mmu.h>
@@ -637,7 +638,12 @@ _dispatch_do_ipage_fault:
     .org 0x2000
 /* ===================================================[ kernel start ]=== */
 	
-    .text
+/*    .text*/
+
+/* This early stuff belongs in HEAD, but some of the function belows definitely
+ * don't... */
+
+/*     __HEAD*/
     .global _stext
 _stext:
 
@@ -2178,9 +2184,7 @@ _string_esr_irq_bug:
  * .data section should be page aligned 
  *	(look into arch/or32/kernel/vmlinux.lds)
  */
-        .data
-	.global  _sdata
-_sdata:
+        .section .data,"aw"
 	.align	8192
         .global  empty_zero_page
 empty_zero_page:
