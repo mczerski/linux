@@ -239,8 +239,7 @@ void iounmap(void *addr)
 		return;
 	}
 		
-	if (addr > high_memory)
-		return vfree((void *) (PAGE_MASK & (unsigned long) addr));
+	return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
 
 
