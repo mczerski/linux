@@ -20,6 +20,14 @@ static inline unsigned long mfspr(unsigned long add)
 	return ret;
 }
 
+static inline unsigned long mfspr_off(unsigned long add, unsigned long offset)
+{
+	unsigned long ret;
+	__asm__ __volatile__ ("l.mfspr %0,%1,%2" : "=r" (ret)
+						 : "r" (offset), "K" (add));
+	return ret;
+}
+
 /* We probably need this definition, but the generic system.h provides it
  * and it's not used on our arch anyway...
  */
