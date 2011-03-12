@@ -33,11 +33,6 @@
 #define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_SM)
 #define SYSCALL_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_IEE | SPR_SR_TEE | SPR_SR_SM)
 
-#undef  CONFIG_DMMU_WORKS
-#define CONFIG_DMMU_WORKS 1
-#undef  CONFIG_IMMU_WORKS
-#define CONFIG_IMMU_WORKS 1
-
 #undef	CONFIG_OPENRISC_EXCEPTION_REGENERATE
 //#define	CONFIG_OPENRISC_EXCEPTION_REGENERATE 1
 #undef	CONFIG_OPENRISC_EXCEPTION_DEBUG
@@ -1102,14 +1097,6 @@ d_pmd_good:
 	l.ori	r4,r4,0x1		// set hardware valid bit: DTBL_MR entry
 	l.mtspr	r5,r4,SPR_DTLBMR_BASE(0)
 
-#ifndef CONFIG_DMMU_WORKS
-	l.addi	r5,r5,1
-	l.andi	r5,r5,0x3f
-	l.mtspr r5,r0,SPR_DTLBMR_BASE(0)
-	l.addi	r5,r5,-2
-	l.andi	r5,r5,0x3f
-	l.mtspr r5,r0,SPR_DTLBMR_BASE(0)
-#endif
 	EXCEPTION_LOAD_GPR2
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
@@ -1150,50 +1137,6 @@ itlb_miss_handler:
 	 * get EA of the miss
 	 */
 	l.mfspr	r2,r0,SPR_EEAR_BASE
-
-#ifndef CONFIG_IMMU_WORKS
-	// check for exception in delay slot and on page boundry
-	l.andi	r3,r2,0x1fff		// PAGE_SIZE - 1
-	l.sfeqi	r3,0
-	l.bnf	1f
-	l.nop				// we are on page boundry
-	l.mfspr	r4,r0,SPR_EPCR_BASE
-	l.sfeq	r4,r2
-	l.bf	1f			// EPC and EEA are equal -> not in delay slot
-	l.nop
-
-	l.mfspr	r5,r0,SPR_ESR_BASE	// are we in user mode
-	l.andi	r5,r5,SPR_SR_SM
-	l.sfeqi	r5,0
-	l.bnf	2f			// kernel mode
-	l.nop
-
-	// user mode: no fixup
-	EXCEPTION_STORE_GPR9
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_pbjds)	// page boundry, jump, delay slot
-	l.nop	0x1
-	l.j	1f
-	EXCEPTION_LOAD_GPR9
-
-2:
-	EXCEPTION_STORE_GPR6
-	EXCEPTION_STORE_GPR9
-
-	// ok, we are in trouble...
-	l.jal	_immu_trampoline_workaround
-	l.nop
-
-	EXCEPTION_LOAD_GPR2
-	EXCEPTION_LOAD_GPR3
-	EXCEPTION_LOAD_GPR4
-	EXCEPTION_LOAD_GPR5
-	EXCEPTION_LOAD_GPR6
-	EXCEPTION_LOAD_GPR9
-	l.rfe
-
-1:	// this is not delay slot exception of the page boundry
-#endif
 
 	/*
 	 * pmd = (pmd_t *)(current_pgd + pgd_index(daddr));
@@ -1281,14 +1224,6 @@ itlb_tr_fill:
 	l.ori	r4,r4,0x1		// set hardware valid bit: DTBL_MR entry
 	l.mtspr	r5,r4,SPR_ITLBMR_BASE(0)
 
-#ifndef CONFIG_IMMU_WORKS
-	l.addi	r5,r5,1
-	l.andi	r5,r5,0x3f
-	l.mtspr r5,r0,SPR_ITLBMR_BASE(0)
-	l.addi	r5,r5,-2
-	l.andi	r5,r5,0x3f
-	l.mtspr r5,r0,SPR_ITLBMR_BASE(0)
-#endif
 	EXCEPTION_LOAD_GPR2
 	EXCEPTION_LOAD_GPR3
 	EXCEPTION_LOAD_GPR4
@@ -1394,15 +1329,6 @@ immediate_translation:
 	l.and   r5,r5,r3                   // r5 <- PPN :PPN .x330 - we have DTLBTR entry
 	l.mtspr r2,r5,SPR_DTLBTR_BASE(0)   // set DTLBTR
 
-#ifndef CONFIG_DMMU_WORKS
-	l.addi	r2,r2,1
-	l.andi	r2,r2,0x3f
-	l.mtspr r2,r0,SPR_DTLBMR_BASE(0)
-	l.addi	r2,r2,-2
-	l.andi	r2,r2,0x3f
-	l.mtspr r2,r0,SPR_DTLBMR_BASE(0)
-#endif
-
 	EXCEPTION_LOAD_GPR6
 	EXCEPTION_LOAD_GPR5
 	EXCEPTION_LOAD_GPR4
@@ -1450,35 +1376,6 @@ boot_itlb_miss_handler:
 	l.sfeqi r6,0                       // r6 == 0x1 --> SM
 	l.bf    exit_with_no_itranslation
 	l.nop
-
-#ifndef CONFIG_IMMU_WORKS
-	l.mfspr r2,r0,SPR_EEAR_BASE
-
-	// check for exception in delay slot and on page boundry
-	l.andi	r3,r2,0x1fff		// PAGE_SIZE - 1
-	l.sfeqi	r3,0
-	l.bnf	1f
-	l.nop				// we are on page boundry
-	l.mfspr	r4,r0,SPR_EPCR_BASE
-	l.sfeq	r4,r2
-	l.bf	1f			// EPC and EEA are equal -> not in delay slot
-	l.nop
-
-	EXCEPTION_STORE_GPR6
-	EXCEPTION_STORE_GPR9
-	// ok, we are in trouble...
-	l.jal	_immu_trampoline_workaround
-	l.nop
-
-	EXCEPTION_LOAD_GPR2
-	EXCEPTION_LOAD_GPR3
-	EXCEPTION_LOAD_GPR4
-	EXCEPTION_LOAD_GPR5
-	EXCEPTION_LOAD_GPR6
-	EXCEPTION_LOAD_GPR9
-	l.rfe
-
-1:	// this is not delay slot exception of the page boundry
 #endif
 
 
@@ -1523,15 +1420,6 @@ earlyearly:
 	l.ori   r5,r5,lo(ITLB_TR_MASK)     // r5 <- ffff:1111.x050 - apply ITLB_MR_MASK
 	l.and   r5,r5,r3                   // r5 <- PPN :PPN .x050 - we have ITLBTR entry
 	l.mtspr r2,r5,SPR_ITLBTR_BASE(0)   // set ITLBTR
-
-#ifndef CONFIG_IMMU_WORKS
-	l.addi	r2,r2,1
-	l.andi	r2,r2,0x3f
-	l.mtspr r2,r0,SPR_ITLBMR_BASE(0)
-	l.addi	r2,r2,-2
-	l.andi	r2,r2,0x3f
-	l.mtspr r2,r0,SPR_ITLBMR_BASE(0)
-#endif
 
 	EXCEPTION_LOAD_GPR6
 	EXCEPTION_LOAD_GPR5
