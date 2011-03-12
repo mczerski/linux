@@ -33,6 +33,9 @@ SECTIONS
         /* Read-only sections, merged into text segment: */
         . = LOAD_BASE ; 
 
+	/* _s_kernel_ro must be page aligned */
+	. = ALIGN(8192);
+	_s_kernel_ro = .;
 	
         .text                   : AT(ADDR(.text) - LOAD_OFFSET)
 	{
@@ -49,33 +52,22 @@ SECTIONS
 	/* TODO: Check if fixup and text.__* are really necessary
 	 * fixup is definitely necessary
 	 */
-	
-	/* FIXME: This should include the above .text bits but that currently
-	 * doesn't work... something's writing in there...
-	 */
-	_s_kernel_ro = .;
-
-#if 1
-	. = ALIGN (4) ;
-        _fdt_blobbyx : AT(ADDR(_fdt_blobbyx) - LOAD_OFFSET) {
-                *(_fdt_blobby) ;                 /* Any link-placed DTB */
-        }
-#endif
-
-	EXCEPTION_TABLE(4)
 
 	_sdata = .;
 
-	/* Jonas --> I'm making this page aligned, was 4096 */
-	/* TODO: NOTE THAT RODATA was inside e_protected_core before... is this necessary? */
+	/* Page alignment required for RO_DATA_SECTION */
 	RO_DATA_SECTION(8192)
-
 	_e_kernel_ro = .;
+
+	/* Whatever comes after _e_kernel_ro had better be page-aligend, too */
 
 	/* 32 here is cacheline size... recheck this <-- Jonas */
 	RW_DATA_SECTION(32, 8192, 8192)
 
         _edata  =  .;
+
+	EXCEPTION_TABLE(4)
+	NOTES
 
 	/* Init code and data */
 	. = ALIGN(8192);

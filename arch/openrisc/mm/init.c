@@ -47,6 +47,7 @@
 #include <asm/or32-hf.h>
 #include <asm/kmap_types.h>
 #include <asm/fixmap.h>
+#include <asm/tlbflush.h>
 
 int mem_init_done = 0;
 
@@ -174,6 +175,9 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
         return err;
 }
 #endif
+
+extern const char _s_kernel_ro[], _e_kernel_ro[];
+
 /*
  * Map all physical memory into kernel's address space.
  *
@@ -192,7 +196,6 @@ static void __init map_ram(void)
 	/* These mark extents of read-only kernel pages...
 	 * ...from vmlinux.lds.S
  	 */
-	extern const unsigned long _s_kernel_ro, _e_kernel_ro;
 	struct memblock_region* region;
 
 	v = PAGE_OFFSET;
@@ -220,8 +223,8 @@ static void __init map_ram(void)
 			/* Fill the newly allocated page with PTE'S */
 			for (j = 0; p < e && j < PTRS_PER_PGD; 
 			     v += PAGE_SIZE, p += PAGE_SIZE, j++, pte++) {
-				if (v > _e_kernel_ro || 
-				    v < ((_s_kernel_ro >> PAGE_SHIFT) << PAGE_SHIFT))
+				if (v >= _e_kernel_ro ||
+				    v < _s_kernel_ro)
 					prot = PAGE_KERNEL;
 				else
 					prot = PAGE_KERNEL_RO;
@@ -284,7 +287,12 @@ void __init paging_init(void)
 	 * enable EA translations via PT mechanism
 	 */
 	
-	/* self modifing code ;) */
+	/* self modifying code ;) */
+	/* Since the old TLB miss handler has been running up until now,
+	 * the kernel pages are still all RW, so we can still modify the
+	 * text directly... after this change and a TLB flush, the kernel
+	 * pages will become RO.
+	 */
 	{
 	  extern unsigned long dtlb_miss_handler;
 	  extern unsigned long itlb_miss_handler;
@@ -304,6 +312,13 @@ void __init paging_init(void)
 	/* Invalidate instruction caches after code modification */
 	mtspr(SPR_ICBIR, 0x900);
 	mtspr(SPR_ICBIR, 0xa00);
+
+	/* New TLB miss handlers and kernel page tables are in now place.
+	 * Make sure that page flags get updated for all pages in TLB by
+	 * flushing the TLB and forcing all TLB entries to be recreated
+	 * from their page table flags.
+	 */
+	flush_tlb_all();
 
 //	kmap_init();
 }
