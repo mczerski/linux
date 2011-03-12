@@ -82,6 +82,10 @@ config OPENRISC_GENERIC
 
 endchoice
 
+config OPENRISC_BUILTIN_DTB
+        string "Builtin DTB"
+        default ""
+
 menu "Class II Instructions"
 
 config OPENRISC_HAVE_INST_FF1

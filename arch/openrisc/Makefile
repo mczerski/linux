@@ -57,7 +57,11 @@ core-y		+= arch/openrisc/lib/ \
 		   arch/openrisc/board/ 
 libs-y		+= $(LIBGCC)
 
-
-core-y		+= arch/openrisc/boot/
+ifneq '$(CONFIG_OPENRISC_BUILTIN_DTB)' '""'
+BUILTIN_DTB := y
+else
+BUILTIN_DTB := n
+endif
+core-$(BUILTIN_DTB) += arch/openrisc/boot/
 
 all: vmlinux

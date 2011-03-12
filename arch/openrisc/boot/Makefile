@@ -1,9 +1,11 @@
 
 
-obj-y += linked_dtb.o
-
-obj-y += system.dtb.o
-#obj-y += aac.dtb.o
+ifneq '$(CONFIG_OPENRISC_BUILTIN_DTB)' '""'
+BUILTIN_DTB := $(patsubst "%",%,$(CONFIG_OPENRISC_BUILTIN_DTB)).dtb.o
+else
+BUILTIN_DTB :=
+endif
+obj-y += $(BUILTIN_DTB)
 
 clean-files := *.dtb.S
 
