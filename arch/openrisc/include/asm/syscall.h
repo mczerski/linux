@@ -15,25 +15,25 @@
 static inline int
 syscall_get_nr(struct task_struct *task, struct pt_regs *regs)
 {
-	return regs->syscallno;
+	return (regs->syscallno ? regs->syscallno : -1);
 }
 
 static inline void
 syscall_rollback(struct task_struct *task, struct pt_regs *regs)
 {
-	regs->gprs[9] = regs->orig_gpr11;
+	regs->gpr[11] = regs->orig_gpr11;
 }
 
 static inline long
 syscall_get_error(struct task_struct *task, struct pt_regs *regs)
 {
-	return IS_ERR_VALUE(regs->gprs[9]) ? regs->gprs[9] : 0;
+	return IS_ERR_VALUE(regs->gpr[11]) ? regs->gpr[11] : 0;
 }
 
 static inline long
 syscall_get_return_value(struct task_struct *task, struct pt_regs *regs)
 {
-	return regs->gprs[9];
+	return regs->gpr[11];
 }
 
 static inline void
@@ -41,9 +41,9 @@ syscall_set_return_value(struct task_struct *task, struct pt_regs *regs,
                          int error, long val)
 {
 	if (error) {
-		regs->gprs[9] = -error;
+		regs->gpr[11] = -error;
 	} else {
-		regs->gprs[9] = val;
+		regs->gpr[11] = val;
 	}
 }
 
@@ -53,7 +53,7 @@ syscall_get_arguments(struct task_struct *task, struct pt_regs *regs,
 {
 	BUG_ON(i + n > 6);
 
-	memcpy(args, &regs->gprs[1 + i], n * sizeof(args[0]));
+	memcpy(args, &regs->gpr[3 + i], n * sizeof(args[0]));
 }
 
 static inline void
@@ -62,7 +62,7 @@ syscall_set_arguments(struct task_struct *task, struct pt_regs *regs,
 {
 	BUG_ON(i + n > 6);
 
-	memcpy(&regs->gprs[1 + i], args, n * sizeof(args[0]));
+	memcpy(&regs->gpr[3 + i], args, n * sizeof(args[0]));
 }
 
 #endif
