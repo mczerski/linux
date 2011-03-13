@@ -265,8 +265,6 @@ void __init paging_init(void)
 	 */
          current_pgd = init_mm.pgd;
  
-         /* initialise the TLB (tlb.c) */
-         tlb_init();
 
 	end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
 

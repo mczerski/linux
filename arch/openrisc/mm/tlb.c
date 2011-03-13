@@ -195,6 +195,7 @@ void destroy_context(struct mm_struct *mm)
 
 void __init tlb_init(void)
 {
+	/* Do nothing... */
 	/* invalidate the entire TLB */
-	flush_tlb_all();
+//	flush_tlb_all();
 }
