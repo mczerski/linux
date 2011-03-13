@@ -32,6 +32,9 @@
  * - if the contents of this structure are changed, the assembly constants must also be changed
  */
 #ifndef __ASSEMBLY__
+
+typedef unsigned long mm_segment_t;
+
 struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */

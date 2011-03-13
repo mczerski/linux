@@ -40,10 +40,6 @@
 
 struct task_struct;
 
-typedef struct {
-        unsigned long seg;
-} mm_segment_t;
-
 struct thread_struct {
 #if 0
 	unsigned long  usp;     /* user space pointer */

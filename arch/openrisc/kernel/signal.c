@@ -120,7 +120,7 @@ _sys_rt_sigreturn(struct pt_regs *regs)
         if (((long)frame) & 3)
                 goto badframe;
 
-	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
+	if (!access_ok(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
