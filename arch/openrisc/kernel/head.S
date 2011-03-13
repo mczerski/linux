@@ -1358,8 +1358,10 @@ boot_itlb_miss_handler:
  */
 #define ITLB_TR_MASK 0xfffff050
 
+/*
 #define VPN_MASK 0xffffe000
 #define PPN_MASK 0xffffe000
+*/
 
 
 

@@ -62,7 +62,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 	unsigned int i;
 	Elf32_Rela *rel = (void *)sechdrs[relsec].sh_addr;
 	Elf32_Sym *sym;
-	Elf32_Addr relocation;
+//	Elf32_Addr relocation;
 	uint32_t *location;
 	uint32_t value;
 
@@ -100,7 +100,7 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			break;
 		default:
 			pr_err("module %s: Unknown relocation: %u\n",
-			       me->name);
+			       me->name, ELF32_R_TYPE(rel[i].r_info));
 			break;
 		}
 	}

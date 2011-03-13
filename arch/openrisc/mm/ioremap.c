@@ -28,7 +28,6 @@
 
 extern int mem_init_done;
 
-static unsigned long ioremap_bot = 0xffff0000L;
 static unsigned int fixmaps_used __initdata = 0;
 
 #if 0
@@ -75,7 +74,7 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 	}
 /* Is this flush necessary??  Can we get flush_cache_vmap to cover it??? */
 //	flush_tlb_all();
-	return addr;
+	return (void*) addr;
 }
 
 #if 0
@@ -234,7 +233,7 @@ void iounmap(void *addr)
 	/* FIXME: How does this account for ioremap_bot */
 
 	/* If the page is from the fixmap pool then we just leave it. */ 
-	if (unlikely(addr > FIXADDR_START)) {
+	if (unlikely((unsigned long)addr > FIXADDR_START)) {
 		clear_fixmap(virt_to_fix((unsigned long) addr));
 		return;
 	}

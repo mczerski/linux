@@ -95,7 +95,7 @@ void __init early_init_devtree(void *params)
 
 	memcpy(alloc, initial_boot_params, initial_boot_params->totalsize);
 
-	initial_boot_params = alloc;
+	initial_boot_params = (void*) alloc;
 
 	printk("Set initial_boot_params to %lx\n", initial_boot_params);
 }
