@@ -26,7 +26,6 @@
  *
  */
 
-
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -54,15 +53,13 @@ int kstack_depth_to_print = 0x180;
 
 static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 {
-	return	p > (void *)tinfo &&
-		p < (void *)tinfo + THREAD_SIZE - 3;
+	return p > (void *)tinfo && p < (void *)tinfo + THREAD_SIZE - 3;
 }
 
-void show_trace(struct task_struct *task, unsigned long * stack)
+void show_trace(struct task_struct *task, unsigned long *stack)
 {
 	struct thread_info *context;
 	unsigned long addr;
-
 
 	context = (struct thread_info *)
 		((unsigned long)stack & (~(THREAD_SIZE - 1)));
@@ -87,20 +84,20 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 	// debugging aid: "show_stack(NULL);" prints the
 	// back trace for this cpu.
 
-	if(esp==NULL)
-		esp=(unsigned long*)&esp;
+	if (esp == NULL)
+		esp = (unsigned long*) &esp;
 
 	stack = esp;
 
 	printk("Stack dump [0x%08lx]:\n", (unsigned long)esp);
-	for(i = 0; i < kstack_depth_to_print; i++) {
+	for (i = 0; i < kstack_depth_to_print; i++) {
 		if (kstack_end(stack))
 			break;
-		if (__get_user (addr, stack)) {
+		if (__get_user(addr, stack)) {
 			/* This message matches "failing address" marked
 			   s390 in ksymoops, so lines containing it will
 			   not be filtered out by ksymoops.  */
-			printk ("Failing address 0x%lx\n", (unsigned long)stack);
+			printk("Failing address 0x%lx\n", (unsigned long)stack);
 			break;
 		}
 		stack++;
@@ -137,7 +134,7 @@ void show_registers(struct pt_regs *regs)
 	int in_kernel = 1;
 	unsigned long esp;
 
-	esp = (unsigned long) (&regs->sp);
+	esp = (unsigned long)(&regs->sp);
 	if (user_mode(regs))
 		in_kernel = 0;
 
@@ -172,38 +169,36 @@ void show_registers(struct pt_regs *regs)
 	if (in_kernel) {
 
 		printk("\nStack: ");
-		show_stack(NULL, (unsigned long*)esp);
+		show_stack(NULL, (unsigned long *)esp);
 
 		printk("\nCode: ");
-		if(regs->pc < PAGE_OFFSET)
+		if (regs->pc < PAGE_OFFSET)
 			goto bad;
 
-		for(i=-24;i<24;i++)
-		{
+		for (i = -24; i < 24; i++) {
 			unsigned char c;
-			if(__get_user(c, &((unsigned char*)regs->pc)[i])) {
+			if (__get_user(c, &((unsigned char *)regs->pc)[i])) {
 bad:
 				printk(" Bad PC value.");
 				break;
 			}
 
 			if (i == 0)
-			  printk("(%02x) ", c);
+				printk("(%02x) ", c);
 			else
-			  printk("%02x ", c);
- 		}
+				printk("%02x ", c);
+		}
 	}
 	printk("\n");
-}	
+}
 
-void nommu_dump_state(struct pt_regs *regs, 
+void nommu_dump_state(struct pt_regs *regs,
 		      unsigned long ea, unsigned long vector)
 {
 	int i;
 	unsigned long addr, stack = regs->sp;
 
-	printk("\n\r[nommu_dump_state] :: ea %lx, vector %lx\n\r",
-	       ea, vector);
+	printk("\n\r[nommu_dump_state] :: ea %lx, vector %lx\n\r", ea, vector);
 
 	printk("CPU #: %d\n"
 	       "   PC: %08lx    SR: %08lx    SP: %08lx\n",
@@ -231,11 +226,11 @@ void nommu_dump_state(struct pt_regs *regs,
 	       ((struct task_struct*)(__pa(current)))->comm, 
 	       ((struct task_struct*)(__pa(current)))->pid,
 	       (unsigned long)current);
-	
+
 	printk("\nStack: ");
 	printk("Stack dump [0x%08lx]:\n", (unsigned long)stack);
-	for(i = 0; i < kstack_depth_to_print; i++) {
-		if (((long) stack & (THREAD_SIZE-1)) == 0)
+	for (i = 0; i < kstack_depth_to_print; i++) {
+		if (((long)stack & (THREAD_SIZE - 1)) == 0)
 			break;
 		stack++;
 
@@ -246,8 +241,8 @@ void nommu_dump_state(struct pt_regs *regs,
 
 	printk("Call Trace:   ");
 	i = 1;
-	while (((long) stack & (THREAD_SIZE-1)) != 0) {
-		addr = *((unsigned long*)__pa(stack));
+	while (((long)stack & (THREAD_SIZE - 1)) != 0) {
+		addr = *((unsigned long *)__pa(stack));
 		stack++;
 
 		if (kernel_text_address(addr)) {
@@ -258,14 +253,13 @@ void nommu_dump_state(struct pt_regs *regs,
 		}
 	}
 	printk("\n");
-	
+
 	printk("\nCode: ");
 
-	for(i=-24;i<24;i++)
-	{
+	for (i = -24; i < 24; i++) {
 		unsigned char c;
-		c = ((unsigned char*)(__pa(regs->pc)))[i];
-		
+		c = ((unsigned char *)(__pa(regs->pc)))[i];
+
 		if (i == 0)
 			printk("(%02x) ", c);
 		else
@@ -274,9 +268,8 @@ void nommu_dump_state(struct pt_regs *regs,
 	printk("\n");
 }
 
-
 /* This is normally the 'Oops' routine */
-void die(const char * str, struct pt_regs * regs, long err)
+void die(const char *str, struct pt_regs *regs, long err)
 {
 
 	console_verbose();
@@ -284,7 +277,7 @@ void die(const char * str, struct pt_regs * regs, long err)
 	show_registers(regs);
 #ifdef CONFIG_JUMP_UPON_UNHANDLED_EXCEPTION
 	printk("\n\nUNHANDLED_EXCEPTION: entering infinite loop\n");
-	
+
 	/* shut down interrupts */
 	local_irq_disable();
 
@@ -307,19 +300,17 @@ void die(const char * str, struct pt_regs * regs, long err)
 		"l.nop   1                     ;"
                 "l.rfe");
 #endif
-	
-	__asm__ __volatile__(
-		"l.nop   1");
-	for (;;)
-		;
+
+	__asm__ __volatile__("l.nop   1");
+	for (;;) ;
 #endif
 	do_exit(SIGSEGV);
 }
 
 /* This is normally the 'Oops' routine */
-void die_if_kernel(const char * str, struct pt_regs * regs, long err)
+void die_if_kernel(const char *str, struct pt_regs *regs, long err)
 {
-	if(user_mode(regs))
+	if (user_mode(regs))
 		return;
 
 	die(str, regs, err);
@@ -328,7 +319,7 @@ void die_if_kernel(const char * str, struct pt_regs * regs, long err)
 void unhandled_exception(struct pt_regs *regs, int ea, int vector)
 {
 	printk("Unable to handle exception at EA =0x%x, vector 0x%x",
-	       	ea, vector);
+	       ea, vector);
 	die("Oops", regs, 9);
 }
 

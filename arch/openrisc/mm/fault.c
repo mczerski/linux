@@ -37,18 +37,6 @@
 #include <asm/uaccess.h>
 #include <asm/or32-hf.h>
 
-/* debug of low-level TLB reload */
-#undef DEBUG
-
-#ifdef DEBUG
-#define D(x) x
-#else
-#define D(x)
-#endif
-
-/* debug of higher-level faults */
-#define DPG(x) x
-
 #define NUM_TLB_ENTRIES 64
 #define TLB_OFFSET(add) (((add) >> PAGE_SHIFT) & (NUM_TLB_ENTRIES-1))
 
@@ -76,7 +64,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 {
 	struct task_struct *tsk;
 	struct mm_struct *mm;
-	struct vm_area_struct * vma;
+	struct vm_area_struct *vma;
 	siginfo_t info;
 	int fault;
 	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
@@ -101,9 +89,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * This verifies that the fault happens in kernel space
 	 * and that the fault was not a protection error.
 	 */
-
-	D(phx_mmu("dpf :: addr %x, vect %x, write %x, regs %x, user %x\n",
-	       address, vector, write_acc, regs, user_mode(regs)));
 
 	if (address >= VMALLOC_START &&
 	    (vector != 0x300 && vector != 0x400) &&
@@ -164,7 +149,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * we can handle it..
 	 */
 
- good_area:
+good_area:
 	info.si_code = SEGV_ACCERR;
 
 	/* first do some preliminary protection checks */
@@ -179,7 +164,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	}
 
 	/* are we trying to execute nonexecutable area */
-	if ((vector == 0x400) && !(vma->vm_page_prot.pgprot & _PAGE_EXEC))  
+	if ((vector == 0x400) && !(vma->vm_page_prot.pgprot & _PAGE_EXEC))
 		goto bad_area;
 
 	/*
@@ -190,18 +175,18 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 
 	fault = handle_mm_fault(mm, vma, address, write_acc);
 	if (unlikely(fault & VM_FAULT_ERROR)) {
-	  if (fault & VM_FAULT_OOM)
-            goto out_of_memory;
-	  else if (fault & VM_FAULT_SIGBUS)
-            goto do_sigbus;
-	  BUG();
-	}/*RGD modeled on Cris*/
-
+		if (fault & VM_FAULT_OOM)
+			goto out_of_memory;
+		else if (fault & VM_FAULT_SIGBUS)
+			goto do_sigbus;
+		BUG();
+	}
+	/*RGD modeled on Cris */
 	if (fault & VM_FAULT_MAJOR)
-	  tsk->maj_flt++;
+		tsk->maj_flt++;
 	else
-	  tsk->min_flt++;
-	
+		tsk->min_flt++;
+
 	up_read(&mm->mmap_sem);
 	return;
 
@@ -210,27 +195,23 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * Fix it, but check if it's kernel or user first..
 	 */
 
- bad_area:
+bad_area:
 	up_read(&mm->mmap_sem);
 
- bad_area_nosemaphore:
+bad_area_nosemaphore:
 
 	/* User mode accesses just cause a SIGSEGV */
 
 	if (user_mode(regs)) {
-	        printk("USERSPACE: SIGSEGV (current %p, pid %d)\n", 
-	               current, current->pid);
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		/* info.si_code has been set above */
 		info.si_addr = (void *)address;
 		force_sig_info(SIGSEGV, &info, tsk);
-		DPG(show_regs(regs));
 		return;
 	}
-//	DPG(show_regs(regs));
 
- no_context:
+no_context:
 
 	/* Are we prepared to handle this kernel fault?
 	 *
@@ -240,7 +221,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 *  to some fixup code that loads an appropriate error
 	 *  code)
 	 */
-	
+
 	{
 		const struct exception_table_entry *entry;
 
@@ -260,11 +241,12 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * terminate things with extreme prejudice.
 	 */
 
-	if ((unsigned long) (address) < PAGE_SIZE)
-		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
+	if ((unsigned long)(address) < PAGE_SIZE)
+		printk(KERN_ALERT
+		       "Unable to handle kernel NULL pointer dereference");
 	else
 		printk(KERN_ALERT "Unable to handle kernel access");
-	printk(" at virtual address 0x%08lx\n",address);
+	printk(" at virtual address 0x%08lx\n", address);
 
 	die("Oops", regs, write_acc);
 
@@ -275,7 +257,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	 * us unable to handle the page fault gracefully.
 	 */
 
- out_of_memory:
+out_of_memory:
 	__asm__ __volatile__("l.nop 42");
 	__asm__ __volatile__("l.nop 1");
 
@@ -285,7 +267,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 		do_exit(SIGKILL);
 	goto no_context;
 
- do_sigbus:
+do_sigbus:
 	up_read(&mm->mmap_sem);
 
 	/*
@@ -322,7 +304,7 @@ vmalloc_fault:
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-	        phx_warn("do_page_fault(): vmalloc_fault will not work, "
+		phx_warn("do_page_fault(): vmalloc_fault will not work, "
 			 "since current_pgd assign a proper value somewhere\n"
 			 "anyhow we don't need this at the moment\n");
 
@@ -361,7 +343,6 @@ vmalloc_fault:
 		 * addresses. If we don't do this, this will just
 		 * silently loop forever.
 		 */
-
 
 		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
