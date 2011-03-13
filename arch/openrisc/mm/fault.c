@@ -110,8 +110,18 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	    !user_mode(regs))
 		goto vmalloc_fault;
 
-	/* we can and should enable interrupts at this point */
-	local_irq_enable();
+	/* If exceptions were enabled, we can reenable them here */
+	if (user_mode(regs)) {
+		/* Exception was in userspace: reenable interrupts */
+		local_irq_enable();
+	} else {
+		/* If exception was in a syscall, then IRQ's may have
+		 * been enabled or disabled.  If they were enabled,
+		 * reenable them.
+		 */
+		if (regs->sr && (SPR_SR_IEE | SPR_SR_TEE))
+			local_irq_enable();
+	}
 
 	mm = tsk->mm;
 	info.si_code = SEGV_MAPERR;
