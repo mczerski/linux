@@ -341,7 +341,7 @@ void __init setup_arch(char **cmdline_p)
 //	printk("Starting 8051...\n");
 //	oc8051_init();
 
-	printk("Linux OpenRISC -- http://opencores.org/openrisc\n");
+	printk("OpenRISC Linux -- http://openrisc.net\n");
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)
