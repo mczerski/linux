@@ -186,9 +186,8 @@ extern const char _s_kernel_ro[], _e_kernel_ro[];
  */
 static void __init map_ram(void)
 {
-        unsigned long v, p, s, e;
+        unsigned long v, p, e;
 	pgprot_t prot;
-	int i;
         pgd_t *pge;
         pud_t *pue;
         pmd_t *pme;
@@ -212,7 +211,7 @@ static void __init map_ram(void)
 			pue = pud_offset(pge,v);
 			pme = pmd_offset(pue,v);
 
-			if (pue != pge || pme != pge) {
+			if ((u32)pue != (u32)pge || (u32)pme != (u32)pge) {
 				panic("%s: OR1K kernel hardcoded for two-level page tables", __func__);
 			}
 
@@ -223,8 +222,8 @@ static void __init map_ram(void)
 			/* Fill the newly allocated page with PTE'S */
 			for (j = 0; p < e && j < PTRS_PER_PGD; 
 			     v += PAGE_SIZE, p += PAGE_SIZE, j++, pte++) {
-				if (v >= _e_kernel_ro ||
-				    v < _s_kernel_ro)
+				if (v >= (u32) _e_kernel_ro ||
+				    v < (u32) _s_kernel_ro)
 					prot = PAGE_KERNEL;
 				else
 					prot = PAGE_KERNEL_RO;
@@ -246,11 +245,8 @@ void __init paging_init(void)
 {
 	extern void tlb_init(void);
 
-	unsigned long vaddr, end;
-	pgd_t *pgd, *pgd_base;
-	int i, j, k;
-	pmd_t *pmd;
-	pte_t *pte, *pte_base;
+	unsigned long end;
+	int i;
 
 	printk("Setting up paging and PTEs.\n");
 
@@ -263,8 +259,7 @@ void __init paging_init(void)
 	 * (even if it is most probably not used until the next 
 	 *  switch_mm)
 	 */
-         current_pgd = init_mm.pgd;
- 
+	current_pgd = init_mm.pgd;
 
 	end = (unsigned long)__va(max_low_pfn*PAGE_SIZE);
 
