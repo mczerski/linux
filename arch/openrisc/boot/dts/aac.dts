@@ -103,7 +103,7 @@
 			interrupts = <10>;
 
 			regstep = <1>;
-			clock_khz = <20000>;
+			clock-frequency = <20000000>;
 
 			/* Devices connected on this I2C bus get 
 			 * defined here; address- and size-cells
@@ -125,7 +125,7 @@
 			interrupts = <11>;
 
 			regstep = <1>;
-			clock_khz = <20000>;
+			clock-frequency = <20000000>;
 
 			/* Devices connected on this I2C bus get 
 			 * defined here; address- and size-cells
@@ -152,7 +152,7 @@
 			interrupts = <12>;
 
 			regstep = <1>;
-			clock_khz = <20000>;
+			clock-frequency = <20000000>;
 
 			/* Devices connected on this I2C bus get 
 			 * defined here; address- and size-cells
@@ -169,7 +169,7 @@
 			interrupts = <13>;
 
 			regstep = <1>;
-			clock_khz = <20000>;
+			clock-frequecy = <20000000>;
 
 			/* Devices connected on this I2C bus get 
 			 * defined here; address- and size-cells
