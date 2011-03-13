@@ -89,7 +89,7 @@ void __init early_init_devtree(void *params)
 	 */
 
 	alloc = __va(memblock_alloc(initial_boot_params->totalsize, PAGE_SIZE));
-	printk("alloced: %lx\n", alloc);
+//	printk("alloced: %lx\n", alloc);
 //	if (!alloc)
 //		kernel_panic();
 
@@ -97,7 +97,7 @@ void __init early_init_devtree(void *params)
 
 	initial_boot_params = (void*) alloc;
 
-	printk("Set initial_boot_params to %lx\n", initial_boot_params);
+//	printk("Set initial_boot_params to %lx\n", initial_boot_params);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD

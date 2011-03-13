@@ -253,7 +253,7 @@ void __init or32_early_setup(/*unsigned long fdt*/ void) {
 		printk("Compiled-in FDT at 0x%08x\n",
 		       (unsigned int)__dtb_start);
 
-	printk("FDT: size %lx\n", ((struct boot_param_header*) __dtb_start)->totalsize);
+//	printk("FDT: size %lx\n", ((struct boot_param_header*) __dtb_start)->totalsize);
 
 }
 

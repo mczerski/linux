@@ -51,7 +51,7 @@ void *ioremap_core(unsigned long phys_addr, unsigned long size,
 			return NULL;
 		addr = (unsigned long) area->addr;
 	} else {
-		printk("JONAS IOREMAP %lx\n", size);
+//		printk("JONAS IOREMAP %lx\n", size);
 		if ((fixmaps_used + (size >> PAGE_SHIFT)) > FIX_N_IOREMAPS)
 			return NULL;
 		addr = fix_to_virt(FIX_IOREMAP_BEGIN+fixmaps_used);
@@ -209,7 +209,7 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 	if(mem_init_done) {
 		addr = ioremap_core(phys_addr, size, flags);
 	} else {
-		printk("JONAS JONAS: bt_iorempa_core\n");
+//		printk("JONAS JONAS: bt_iorempa_core\n");
 		addr = ioremap_core(phys_addr, size, flags);
 		//addr = bt_ioremap_core(phys_addr, size, flags);
 	}
