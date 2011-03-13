@@ -9,6 +9,41 @@
  * kind, whether express or implied.
  */
 
+/*
+ * Device tree configuration:
+ *
+ * Required properties:
+ * - compatible      : "opencores,i2c-ocores"
+ * - reg             : bus address start and address range size of device
+ * - interrupts      : interrupt number
+ * - regstep         : size of device registers in bytes
+ * - clock-frequency : frequency of bus clock in Hz
+ * 
+ * Example:
+ *
+ *  i2c0: ocores@a0000000 {
+ *              compatible = "opencores,i2c-ocores";
+ *              reg = <0xa0000000 0x8>;
+ *              interrupts = <10>;
+ *
+ *              regstep = <1>;
+ *              clock-frequency = <20000000>;
+ *
+ * -- Devices connected on this I2C bus get
+ * -- defined here; address- and size-cells
+ * -- apply to these child devices
+ *
+ *              #address-cells = <1>;
+ *              #size-cells = <0>;
+ *
+ *              dummy@60 {
+ *                     compatible = "dummy";
+ *                     reg = <60>;
+ *              };
+ *  };
+ *
+ */
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -210,6 +245,32 @@ static struct i2c_adapter ocores_adapter = {
 	.algo		= &ocores_algorithm,
 };
 
+#ifdef CONFIG_OF
+static int ocores_i2c_of_probe(struct platform_device* pdev,
+				struct ocores_i2c* i2c)
+{
+	__be32* val;
+
+	val = of_get_property(pdev->dev.of_node, "regstep", NULL);
+	if (!val) {
+		dev_err(&pdev->dev, "Missing required parameter 'regstep'");
+		return -ENODEV;
+	}
+	i2c->regstep = be32_to_cpup(val);
+
+	val = of_get_property(pdev->dev.of_node, "clock-frequency", NULL);
+	if (!val) {
+		dev_err(&pdev->dev,
+			"Missing required parameter 'clock-frequency'");
+		return -ENODEV;
+	}
+	i2c->clock_khz = be32_to_cpup(val) / 1000;
+
+	return 0;
+}
+#else
+#define ocores_i2c_of_probe(pdev,i2c) -ENODEV
+#endif
 
 static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 {
@@ -244,24 +305,14 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 		return -EIO;
 	}
 
-	pdata = (struct ocores_i2c_platform_data*) pdev->dev.platform_data;
+	pdata = pdev->dev.platform_data;
 	if (pdata) {
 		i2c->regstep = pdata->regstep;
 		i2c->clock_khz = pdata->clock_khz;
 	} else {
-		int* val;
-		val = (int*) of_get_property(pdev->dev.of_node, "regstep", NULL);
-		if (!val) {
-			dev_err(&pdev->dev, "Missing required paramter 'regstep'");
-			return -ENODEV;
-		}
-		i2c->regstep = *val;
-		val = (int*) of_get_property(pdev->dev.of_node, "clock_khz", NULL);
-		if (!val) {
-			dev_err(&pdev->dev, "Missing required paramter 'clock_khz'");
-			return -ENODEV;
-		}
-		i2c->clock_khz = *val;
+		ret = ocores_i2c_of_probe(pdev, i2c);
+		if (ret)
+			return ret;
 	}
 
 	ocores_init(i2c);
@@ -279,7 +330,9 @@ static int __devinit ocores_i2c_probe(struct platform_device *pdev)
 	i2c->adap = ocores_adapter;
 	i2c_set_adapdata(&i2c->adap, i2c);
 	i2c->adap.dev.parent = &pdev->dev;
+#ifdef CONFIG_OF
 	i2c->adap.dev.of_node = pdev->dev.of_node;
+#endif
 
 	/* add i2c adapter to i2c tree */
 	ret = i2c_add_adapter(&i2c->adap);
@@ -337,6 +390,7 @@ static int ocores_i2c_resume(struct platform_device *pdev)
 #define ocores_i2c_resume	NULL
 #endif
 
+#ifdef CONFIG_OF
 static struct of_device_id ocores_i2c_match[] = {
         {
                 .compatible = "opencores,i2c-ocores",
@@ -344,6 +398,7 @@ static struct of_device_id ocores_i2c_match[] = {
         {},
 };
 MODULE_DEVICE_TABLE(of, ocores_i2c_match);
+#endif
 
 /* work with hotplug and coldplug */
 MODULE_ALIAS("platform:ocores-i2c");
@@ -356,7 +411,9 @@ static struct platform_driver ocores_i2c_driver = {
 	.driver  = {
 		.owner = THIS_MODULE,
 		.name = "ocores-i2c",
+#ifdef CONFIG_OF
                 .of_match_table = ocores_i2c_match,
+#endif
 	},
 };
 

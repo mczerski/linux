@@ -4,7 +4,7 @@
 #include <linux/of.h>
 #include <linux/errno.h>
 
-extern u64 of_translate_address(struct device_node *np, const u32 *addr);
+extern u64 of_translate_address(struct device_node *np, const __be32 *addr);
 extern int of_address_to_resource(struct device_node *dev, int index,
 				  struct resource *r);
 extern void __iomem *of_iomap(struct device_node *device, int index);
@@ -22,7 +22,7 @@ static inline unsigned long pci_address_to_pio(phys_addr_t addr) { return -1; }
 #endif
 
 #ifdef CONFIG_PCI
-extern const u32 *of_get_pci_address(struct device_node *dev, int bar_no,
+extern const __be32 *of_get_pci_address(struct device_node *dev, int bar_no,
 			       u64 *size, unsigned int *flags);
 extern int of_pci_address_to_resource(struct device_node *dev, int bar,
 				      struct resource *r);
@@ -33,7 +33,7 @@ static inline int of_pci_address_to_resource(struct device_node *dev, int bar,
 	return -ENOSYS;
 }
 
-static inline const u32 *of_get_pci_address(struct device_node *dev,
+static inline const __be32 *of_get_pci_address(struct device_node *dev,
 		int bar_no, u64 *size, unsigned int *flags)
 {
 	return NULL;
