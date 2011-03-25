@@ -356,9 +356,9 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	return seq_printf(m,
 		"cpu\t\t: OpenRISC-%d\n"
 		"revision\t: %d\n"
-		"dcache size\t: %d kB\n"
+		"dcache size\t: %d bytes\n"
 		"dcache block size\t: %d bytes\n"
-		"icache size\t: %d kB\n"
+		"icache size\t: %d bytes\n"
 		"icache block size\t: %d bytes\n"
 		"immu\t\t: %d entries, %lu ways\n"
 		"dmmu\t\t: %d entries, %lu ways\n"
