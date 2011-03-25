@@ -150,13 +150,19 @@ static inline void iowrite32_rep(void __iomem *port, void *buf, unsigned long co
 extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
 extern void ioport_unmap(void __iomem *);
 
+/* ioread/iowrite are defined with the __raw_* variants here because we
+ * haven't gotten the device/bus endianess bits straightened out for 
+ * "native" endianess yet... these should be changed to the non-raw
+ * variants when that work's done
+ */
+
 #define ioread8(addr)           readb(addr)
-#define ioread16(addr)          readw(addr)
-#define ioread32(addr)          readl(addr)
+#define ioread16(addr)          __raw_readw(addr)
+#define ioread32(addr)          __raw_readl(addr)
 
 #define iowrite8(v, addr)       writeb((v), (addr))
-#define iowrite16(v, addr)      writew((v), (addr))
-#define iowrite32(v, addr)      writel((v), (addr))
+#define iowrite16(v, addr)      __raw_writew((v), (addr))
+#define iowrite32(v, addr)      __raw_writel((v), (addr))
 
 
 #endif
