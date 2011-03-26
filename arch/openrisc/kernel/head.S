@@ -584,62 +584,6 @@ enable_mmu:
 	l.jalr r24
 	l.nop
 
-hw_breakpoint:
-#if 0
-	/* set effective address */
-	LOAD_SYMBOL_2_GPR(r3,SPR_DVR(0))
-	LOAD_SYMBOL_2_GPR(r4,start_kernel)
-	l.mtspr	r3,r4,0x0
-
-	/* control register: present, equal to, instruction fetch EA */
-	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
-	LOAD_SYMBOL_2_GPR(r4,0x23)
-	l.mtspr	r3,r4,0x0
-
-	/* control register: present, equal to, store/load EA */
-//	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
-//	LOAD_SYMBOL_2_GPR(r4,0xc3)
-//	l.mtspr	r3,r4,0x0
-
-	/* ext watchpoint | watchpoint 0 */
-       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
-	LOAD_SYMBOL_2_GPR(r4,0x2)
-	l.mtspr	r3,r4,0x0
-
-	/* watchpoint 0 triggers trap instruction, enable counter 0 */
-       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR2)
-	LOAD_SYMBOL_2_GPR(r4,0x1001)
-	l.mtspr	r3,r4,0x0
-#endif
-
-#if 0
-	// this will not work due to trap handler jumping
-	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
-	LOAD_SYMBOL_2_GPR(r4,0x800000)
-	l.mtspr	r3,r4,0x0
-#endif
-
-#if 0
-	/* set effective address */
-	LOAD_SYMBOL_2_GPR(r3,SPR_DVR(0))
-	LOAD_SYMBOL_2_GPR(r4,0x100)
-	l.mtspr	r3,r4,0x0
-
-	/* control register: present, not equal to, store/load EA */
-	LOAD_SYMBOL_2_GPR(r3,SPR_DCR(0))
-	LOAD_SYMBOL_2_GPR(r4,0xcd)
-	l.mtspr	r3,r4,0x0
-
-	/* ext watchpoint | watchpoint 0 */
-       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR1)
-	LOAD_SYMBOL_2_GPR(r4,0x2)
-	l.mtspr	r3,r4,0x0
-
-	/* watchpoint 0 triggers trap instruction, enable counter 0 */
-       	LOAD_SYMBOL_2_GPR(r3,SPR_DMR2)
-	LOAD_SYMBOL_2_GPR(r4,0x1001)
-	l.mtspr	r3,r4,0x0
-#endif
 
 clear_regs:
 	/*
