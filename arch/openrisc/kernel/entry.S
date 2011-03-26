@@ -38,8 +38,17 @@
 #include <asm/pgtable.h>
 #include <asm/asm-offsets.h>
 
-/* some defines to ease or32 assembly programming */
-#include "or32_funcs.S"
+#define DISABLE_INTERRUPTS(t1,t2)			\
+	l.mfspr t2,r0,SPR_SR				;\
+	l.movhi	t1,hi(~(SPR_SR_IEE|SPR_SR_TEE))		;\
+	l.ori	t1,t1,lo(~(SPR_SR_IEE|SPR_SR_TEE))	;\
+	l.and   t2,t2,t1				;\
+	l.mtspr r0,t2,SPR_SR
+
+#define ENABLE_INTERRUPTS(t1)				\
+	l.mfspr	t1,r0,SPR_SR				;\
+	l.ori	t1,t1,lo(SPR_SR_IEE|SPR_SR_TEE)		;\
+	l.mtspr	r0,t1,SPR_SR
 
 /* =========================================================[ macros ]=== */
 
@@ -481,7 +490,8 @@ EXCEPTION_ENTRY(_external_irq_handler)
 	l.nop
 
 	l.addi  r1,r1,-0x8
-	LOAD_SYMBOL_2_GPR(r3,42f)
+	l.movhi r3,hi(42f)
+	l.ori	r3,r3,lo(42f)
 	l.sw    0x0(r1),r3
 	l.jal   printk
 	l.sw    0x4(r1),r4
@@ -497,8 +507,9 @@ EXCEPTION_ENTRY(_external_irq_handler)
 //	l.sw	PT_SR(r1),r4
 1:
 #endif
-	l.addi r3,r1,0
-	LOAD_SYMBOL_2_GPR(r8,do_IRQ)
+	l.addi	r3,r1,0
+	l.movhi	r8,hi(do_IRQ)
+	l.ori	r8,r8,lo(do_IRQ)
 	l.jalr r8
 	l.nop
 	l.j    _ret_from_intr

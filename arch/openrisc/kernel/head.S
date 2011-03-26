@@ -25,8 +25,13 @@
 #include <asm/spr_defs.h>
 #include <asm/asm-offsets.h>
 
-/* some defines to ease or32 assembly programming */
-#include "or32_funcs.S"
+#define CLEAR_GPR(gpr)			\
+	l.or    gpr,r0,r0
+
+#define LOAD_SYMBOL_2_GPR(gpr,symbol)	\
+	l.movhi gpr,hi(symbol)		;\
+	l.ori   gpr,gpr,lo(symbol)
+
 
 #define UART_BASE_ADD      0x90000000
 
@@ -550,7 +555,11 @@ enable_mmu:
 	 * enable dmmu & immu
 	 * SR[5] = 0, SR[6] = 0, 6th and 7th bit of SR set to 0
 	 */
-	SR_ENABLE_BITS((SPR_SR_DME | SPR_SR_IME),r28,r30)
+	l.mfspr	r30,r0,SPR_SR
+	l.movhi	r28,hi(SPR_SR_DME | SPR_SR_IME)
+	l.ori	r28,r28,lo(SPR_SR_DME | SPR_SR_IME)
+	l.or	r30,r30,r28
+	l.mtspr	r0,r30,SPR_SR
 	l.nop
 	l.nop
 	l.nop
