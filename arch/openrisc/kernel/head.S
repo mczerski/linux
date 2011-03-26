@@ -284,23 +284,13 @@
 
 /* ---[ 0x100: RESET exception ]----------------------------------------- */
     .org 0x100
-
-	l.ori	r3,r0,0x1
-	l.mtspr	r0,r3,SPR_SR
-
-//	l.jal	_early_uart_init
-	l.nop
-
-#if 1
-	LOAD_SYMBOL_2_GPR(r4,_string_ok_booting)
-	tophys	(r3,r4)
-	l.jal	_emergency_print
-	l.nop
-#endif
+	/* Jump to .init code at _start which lives in the .head section
+	 * and will be discarded after boot.
+	 */
 	LOAD_SYMBOL_2_GPR(r4, _start)
-	tophys	(r3,r4)				// physical address
+	tophys	(r3,r4)			/* MMU disabled */
 	l.jr	r3
-	l.nop
+	 l.nop
 
 /* ---[ 0x200: BUS exception ]------------------------------------------- */
     .org 0x200
