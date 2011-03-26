@@ -524,11 +524,11 @@ clear_bss:
 
 enable_ic:
 	l.jal	_ic_enable
-	l.nop
+	 l.nop
 
 enable_dc:
 	l.jal	_dc_enable
- 	l.nop
+ 	 l.nop
 
 flush_tlb:
 	/*
@@ -690,7 +690,7 @@ jump_start_kernel:
 	 */
 	.align 0x2000
 
-ENTRY(_ic_enable)
+_ic_enable:
 	/* Check if IC present and skip enabling otherwise */
 	l.mfspr r24,r0,SPR_UPR
 	l.andi  r26,r24,SPR_UPR_ICP
@@ -756,7 +756,7 @@ ENTRY(_ic_enable)
 	l.jr    r9
 	l.nop
 
-ENTRY(_dc_enable)
+_dc_enable:
 	/* Check if DC present and skip enabling otherwise */
 	l.mfspr r24,r0,SPR_UPR
 	l.andi  r26,r24,SPR_UPR_DCP
