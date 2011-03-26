@@ -21,9 +21,12 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/cache.h>
-#include <asm/or32_asm.h>
 #include <asm/spr_defs.h>
 #include <asm/asm-offsets.h>
+
+#define tophys(rd,rs)				\
+	l.movhi	rd,hi(-KERNELBASE);		\
+	l.add	rd,rd,rs;
 
 #define CLEAR_GPR(gpr)			\
 	l.or    gpr,r0,r0
