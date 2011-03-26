@@ -1277,11 +1277,13 @@ boot_dtlb_miss_handler:
 	EXCEPTION_DEBUG_VALUE_ER(0x9b0)
 	EXCEPTION_STORE_GPR6
 
+#if 0
 	l.mfspr r6,r0,SPR_ESR_BASE	   //
 	l.andi  r6,r6,SPR_SR_SM            // are we in kernel mode ?
 	l.sfeqi r6,0                       // r6 == 0x1 --> SM
 	l.bf    exit_with_no_dtranslation  //
 	l.nop
+#endif
 
 	/* this could be optimized by moving storing of
 	 * non r6 registers here, and jumping r6 restore
