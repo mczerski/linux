@@ -12,13 +12,8 @@
  *		- recheck if all aligments are really needed
  */
 
-#ifdef CONFIG_OPENRISC_FLASH_BOOT
-#  define LOAD_OFFSET -0x30000000
-#  define LOAD_BASE    0xc0000000
-#else
 #  define LOAD_OFFSET  PAGE_OFFSET
 #  define LOAD_BASE    PAGE_OFFSET
-#endif
 
 #include <asm/page.h>
 #include <asm-generic/vmlinux.lds.h>

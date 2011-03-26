@@ -280,48 +280,9 @@
 	l.ori	r3,r0,0x1
 	l.mtspr	r0,r3,SPR_SR
 
-#ifdef CONFIG_OPENRISC_FLASH_BOOT
-	LOAD_SYMBOL_2_GPR(r3,0xf0000118)	// jumps to the 'reset_start'
-	l.jr	r3
-	l.nop
-
-reset_start:
-	l.jal	_early_uart_init
-	l.nop
-
-	LOAD_SYMBOL_2_GPR(r4,_string_copying_linux)
-	l.movhi	r3,hi(0x30000000)
-	l.add	r3,r3,r4
-	l.jal	_emergency_print
-	l.nop
-
-	/*
-	 * copy linux kernel image from flash to sdram
-	 */
-	LOAD_SYMBOL_2_GPR(r3,0xf0000000)	// source
-	LOAD_SYMBOL_2_GPR(r4,0x0)		// destination
-	LOAD_SYMBOL_2_GPR(r6,_end)		// last destination
-	tophys	(r5,r6)				// last destination
-
-	/*
-	 * copy %r3 to %r4 until %r4 == %r5
-	 */
-2:
-	l.sfgeu r4,r5
-	l.bf    1f
-	l.nop
-	l.lwz   r8,0(r3)
-	l.sw    0(r4),r8
-	l.addi  r3,r3,4
-	l.j     2b
-	l.addi  r4,r4,4
-1:
-
-#else /* CONFIG_OPENRISC_FLASH_BOOT */
 //	l.jal	_early_uart_init
 	l.nop
 
-#endif /* CONFIG_OPENRISC_FLASH_BOOT */
 #if 1
 	LOAD_SYMBOL_2_GPR(r4,_string_ok_booting)
 	tophys	(r3,r4)

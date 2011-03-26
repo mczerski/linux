@@ -115,14 +115,6 @@ config OPENRISC_HAVE_INST_DIV
 endmenu
 
 
-config OPENRISC_FLASH_BOOT
-	bool "Boot from FLASH"
-	default n
-	help
-	  This alows you have support for extreamly simple bootloader
-          in the kernel. It will just copy kernel image from FLASH to RAM and
-	  start executing it.
-
 source "kernel/time/Kconfig"
 source kernel/Kconfig.hz
 source kernel/Kconfig.preempt
