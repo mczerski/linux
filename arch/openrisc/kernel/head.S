@@ -33,14 +33,6 @@
 #define EXCEPTION_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_SM)
 #define SYSCALL_SR  (SPR_SR_DME | SPR_SR_IME | SPR_SR_DCE | SPR_SR_ICE | SPR_SR_IEE | SPR_SR_TEE | SPR_SR_SM)
 
-#undef	CONFIG_OPENRISC_EXCEPTION_REGENERATE
-//#define	CONFIG_OPENRISC_EXCEPTION_REGENERATE 1
-#undef	CONFIG_OPENRISC_EXCEPTION_DEBUG
-//#define	CONFIG_OPENRISC_EXCEPTION_DEBUG 1
-
-#undef	DEBUG_TLB_EXCEPTIONS
-//#define	DEBUG_TLB_EXCEPTIONS 1
-
 /* ============================================[ tmp store locations ]=== */
 
 /*
@@ -63,42 +55,6 @@
 
 #define EMERGENCY_PRINT_STORE_GPR9	l.sw    0x34(r0),r9
 #define EMERGENCY_PRINT_LOAD_GPR9	l.lwz   r9,0x34(r0)
-
-/*
- * EXCEPTION_DEBUG temporary stores
- */
-#define EXCEPTION_DEBUG_STORE_GPR3	l.sw    0x40(r0),r3
-#define EXCEPTION_DEBUG_LOAD_GPR3	l.lwz   r3,0x40(r0)
-
-#define EXCEPTION_DEBUG_STORE_GPR4	l.sw    0x44(r0),r4
-#define EXCEPTION_DEBUG_LOAD_GPR4	l.lwz   r4,0x44(r0)
-
-#define EXCEPTION_DEBUG_STORE_GPR9	l.sw    0x48(r0),r9
-#define EXCEPTION_DEBUG_LOAD_GPR9	l.lwz   r9,0x48(r0)
-
-#define EXCEPTION_DEBUG_STORE_F_GPR9	l.sw    0x4c(r0),r9
-#define EXCEPTION_DEBUG_LOAD_F_GPR9	l.lwz   r9,0x4c(r0)
-
-/*
- * EXCEPTION_REGENERATE temporary stores
- */
-#define E_REGEN_STORE_STATUS(reg)	l.sw    0x50(r0),reg
-#define E_REGEN_LOAD_STATUS(reg)	l.lwz   reg,0x50(r0)
-
-#define E_REGEN_STORE_GPR3		l.sw    0x54(r0),r3
-#define E_REGEN_LOAD_GPR3		l.lwz   r3,0x54(r0)
-
-#define E_REGEN_STORE_GPR4		l.sw    0x58(r0),r4
-#define E_REGEN_LOAD_GPR4		l.lwz   r4,0x58(r0)
-
-#define E_REGEN_STORE_GPR5		l.sw    0x5c(r0),r5
-#define E_REGEN_LOAD_GPR5		l.lwz   r5,0x5c(r0)
-
-#define E_REGEN_STORE_GPR6		l.sw    0x60(r0),r6
-#define E_REGEN_LOAD_GPR6		l.lwz   r6,0x60(r0)
-
-#define E_REGEN_STORE_GPR9		l.sw    0x14(r0),r9
-#define E_REGEN_LOAD_GPR9		l.lwz   r9,0x14(r0)
 
 
 /*
@@ -151,112 +107,6 @@
 	tophys  (t1,reg)					;\
 	l.lwz   reg,0(t1)
 
-#if defined(CONFIG_OPENRISC_EXCEPTION_DEBUG) && defined(CONFIG_OPENRISC_EXCEPTION_REGENERATE)
-#  define EXCEPTION_DEBUG					\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	_exception_debug 				;\
-	  l.mfspr	r4,r0,SPR_NPC				;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#  define EXCEPTION_DEBUG_VALUE(value)				\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	_exception_debug				;\
-	  l.addi	r4,r0,value				;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#  define EXCEPTION_DEBUG_ER					\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	_exception_debug				;\
-	  l.mfspr	r4,r0,SPR_NPC				;\
-	  l.jal	_exception_regenerate				;\
-	  l.nop							;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	_exception_debug				;\
-	  l.addi	r4,r0,value				;\
-	  l.jal	_exception_regenerate				;\
-	  l.nop							;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-#elif !defined(CONFIG_OPENRISC_EXCEPTION_DEBUG) && defined(CONFIG_OPENRISC_EXCEPTION_REGENERATE)
-#  define EXCEPTION_DEBUG
-#  define EXCEPTION_DEBUG_VALUE(value)
-
-#  define EXCEPTION_DEBUG_ER					\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	   _exception_regenerate			;\
-	  l.nop							;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-   	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	   _exception_regenerate			;\
-	  l.nop							;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-#elif defined(CONFIG_OPENRISC_EXCEPTION_DEBUG) && !defined(CONFIG_OPENRISC_EXCEPTION_REGENERATE)
-#  define EXCEPTION_DEBUG					\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	   _exception_debug 				;\
-	  l.mfspr  r4,r0,SPR_NPC					;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-#  define EXCEPTION_DEBUG_VALUE(value)				\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	   _exception_debug				;\
-	  l.addi   r4,r0,value					;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-#  define EXCEPTION_DEBUG_ER					\
-	  EXCEPTION_DEBUG
-#  define EXCEPTION_DEBUG_VALUE_ER(value)			\
-	  EXCEPTION_DEBUG_VALUE(value)
-#else
-#  define EXCEPTION_DEBUG
-#  define EXCEPTION_DEBUG_VALUE(value)
-#  define EXCEPTION_DEBUG_ER
-#  define EXCEPTION_DEBUG_VALUE_ER(value)
-#endif
-
-#  define EXCEPTION_DEBUG_VALUE_ER_ENABLED(value)		\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	_exception_debug				;\
-	  l.addi	r4,r0,value				;\
-	  l.jal	_exception_regenerate				;\
-	  l.nop							;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#  define EXCEPTION_DEBUG_VALUE_ENABLED(value)			\
-	  EXCEPTION_DEBUG_STORE_GPR4				;\
-	  EXCEPTION_DEBUG_STORE_F_GPR9				;\
-	  l.jal	   _exception_debug				;\
-	  l.addi   r4,r0,value					;\
-	  EXCEPTION_DEBUG_LOAD_GPR4				;\
-	  EXCEPTION_DEBUG_LOAD_F_GPR9
-
-#ifdef DEBUG_TLB_EXCEPTIONS
-#  define DEBUG_TLB_PROBE(value)				\
-	  EXCEPTION_DEBUG_VALUE_ENABLED(value)
-#else
-#  define DEBUG_TLB_PROBE(value)
-#endif
-
 
 /*
  * DSCR: this is a common hook for handling exceptions. it will save
@@ -291,7 +141,6 @@
  */
 
 #define EXCEPTION_HANDLE(handler)				\
-	EXCEPTION_DEBUG						;\
 	EXCEPTION_T_STORE_GPR30					;\
 	l.mfspr r30,r0,SPR_ESR_BASE				;\
 	l.andi  r30,r30,SPR_SR_SM				;\
@@ -363,7 +212,6 @@
  *
  */
 #define UNHANDLED_EXCEPTION(handler)				\
-	EXCEPTION_DEBUG						;\
 	EXCEPTION_T_STORE_GPR31					;\
 	EXCEPTION_T_STORE_GPR10					;\
 	EXCEPTION_T_STORE_SP					;\
@@ -681,7 +529,6 @@ _start:
 	l.sw	TI_KSP(r31), r1
 
 	l.ori	r4,r0,0x0
-	E_REGEN_STORE_STATUS(r4)			//
 
 
 	/*
@@ -1019,8 +866,6 @@ ENTRY(_dc_enable)
 
 	.global dtlb_miss_handler
 dtlb_miss_handler:
-	EXCEPTION_DEBUG_VALUE_ER(0x900)
-
 	EXCEPTION_STORE_GPR2
 	EXCEPTION_STORE_GPR3
 	EXCEPTION_STORE_GPR4
@@ -1118,16 +963,12 @@ d_pte_not_present:
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
 	EXCEPTION_LOAD_GPR6
-	// __PHX__ for debugging purposes
-	DEBUG_TLB_PROBE(0x903)
 	l.j	_dispatch_do_dpage_fault
 	l.nop
 
 /* ==============================================[ ITLB miss handler ]=== */
 	.global itlb_miss_handler
 itlb_miss_handler:
-	EXCEPTION_DEBUG_VALUE_ER(0xa00)
-
 	EXCEPTION_STORE_GPR2
 	EXCEPTION_STORE_GPR3
 	EXCEPTION_STORE_GPR4
@@ -1246,8 +1087,6 @@ i_pte_not_present:
 	EXCEPTION_LOAD_GPR4
 	EXCEPTION_LOAD_GPR5
 	EXCEPTION_LOAD_GPR6
-	// __PHX__ for debugging purposes
-	DEBUG_TLB_PROBE(0xa04)
 	l.j	_dispatch_do_ipage_fault
 	l.nop
 
@@ -1274,7 +1113,6 @@ boot_dtlb_miss_handler:
 #define PPN_MASK 0xfffff000
 
 
-	EXCEPTION_DEBUG_VALUE_ER(0x9b0)
 	EXCEPTION_STORE_GPR6
 
 #if 0
@@ -1366,8 +1204,6 @@ boot_itlb_miss_handler:
 */
 
 
-
-	EXCEPTION_DEBUG_VALUE_ER(0xab0)
 
 	EXCEPTION_STORE_GPR2
 	EXCEPTION_STORE_GPR3
@@ -1651,219 +1487,6 @@ trampoline_out:
 	l.jr	r9
 	l.nop
 
-/*
- * dumping processor state without mmu
- * (not yet finnished)
- */
-
-ENTRY(_debug_tng)
-	l.addi	r1,r1,-16
-	l.sw	0(r1),r3
-	l.sw	4(r1),r4
-	l.mfspr	r3,r0,SPR_SR
-	l.sw	8(r1),r3
-	l.mfspr	r3,r0,SPR_NPC
-	l.sw	12(r1),r3
-
-	l.ori	r3,r0,0x8001
-	l.mtspr	r0,r3,SPR_ESR_BASE
-	LOAD_SYMBOL_2_GPR(r3,nommu_entry)
-	tophys	(r4,r3)
-	l.mtspr	r0,r4,SPR_EPCR_BASE
-
-	l.lwz	r3,0(r1)
-	l.lwz	r4,4(r1)
-	l.addi	r1,r1,8
-	l.rfe
-
-nommu_entry:
-	EXCEPTION_T_STORE_GPR31
-	EXCEPTION_T_STORE_GPR10
-	EXCEPTION_T_STORE_SP
-	/* temporary store r3, r9 into r1, r10 */
-	l.addi	r1,r3,0x0
-	l.addi	r10,r9,0x0
-	/* the string referenced by r3 must be low enough */
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_ed)
-	l.mfspr	r3,r0,SPR_NPC
-	l.jal	_emergency_print_nr
-	l.andi	r3,r3,0x1f00
-	/* the string referenced by r3 must be low enough */
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_epc_prefix)
-	l.jal	_emergency_print_nr
-	l.mfspr	r3,r0,SPR_EPCR_BASE
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_nl)
-	/* end of printing */
-	l.addi	r3,r1,0x0
-	l.addi	r9,r10,0x0
-	/* extract current, ksp from current_set */
-	LOAD_SYMBOL_2_GPR(r1,_unhandled_stack_top)
-	/* create new stack frame, save only needed gprs */
-	/* r1: KSP, r10: current, r31: __pa(KSP) */
-	/* r12:	temp, syscall indicator, r13 temp */
-	l.addi  r1,r1,-(INT_FRAME_SIZE)
-	/* r1 is KSP, r31 is __pa(KSP) */
-	tophys  (r31,r1)
-	l.sw    PT_GPR12(r31),r12
-	l.mfspr r12,r0,SPR_EPCR_BASE
-	l.sw    PT_PC(r31),r12
-	l.mfspr r12,r0,SPR_ESR_BASE
-	l.sw    PT_SR(r31),r12
-	/* save r31 */
-	EXCEPTION_T_LOAD_GPR31(r12)
-	l.sw	PT_GPR31(r31),r12
-	/* save r10 as was prior to exception */
-	EXCEPTION_T_LOAD_GPR10(r12)
-	l.sw	PT_GPR10(r31),r12
-	/* save PT_SP as was prior to exception */
-	EXCEPTION_T_LOAD_SP(r12)
-	l.sw	PT_SP(r31),r12
-	l.sw    PT_GPR13(r31),r13
-	/* --> */
-	/* save exception r4, set r4 = EA */
-	l.sw	PT_GPR4(r31),r4
-	l.mfspr r4,r0,SPR_EEAR_BASE
-	/* r31 is __pa(r1), r1 <- r31 */
-	l.addi	r1,r31,0x0
-	/* r1, r10, EPCR, ESR a	already saved */
-	l.sw    PT_GPR2(r1),r2
-	l.sw    PT_GPR3(r1),r3
-	l.sw    PT_ORIG_GPR11(r1),r11
-	l.sw    PT_GPR5(r1),r5
-	l.sw    PT_GPR6(r1),r6
-	l.sw    PT_GPR7(r1),r7
-	l.sw    PT_GPR8(r1),r8
-	l.sw    PT_GPR9(r1),r9
-	/* r10 already saved */
-	l.sw    PT_GPR11(r1),r11
-	/* r12,r13 already saved */
-	l.sw    PT_GPR14(r1),r14
-	l.sw    PT_GPR15(r1),r15
-	l.sw    PT_GPR16(r1),r16
-	l.sw    PT_GPR17(r1),r17
-	l.sw    PT_GPR18(r1),r18
-	l.sw    PT_GPR19(r1),r19
-	l.sw    PT_GPR20(r1),r20
-	l.sw    PT_GPR21(r1),r21
-	l.sw    PT_GPR22(r1),r22
-	l.sw    PT_GPR23(r1),r23
-	l.sw    PT_GPR24(r1),r24
-	l.sw    PT_GPR25(r1),r25
-	l.sw    PT_GPR26(r1),r26
-	l.sw    PT_GPR27(r1),r27
-	l.sw    PT_GPR28(r1),r28
-	l.sw    PT_GPR29(r1),r29
-	l.sw    PT_GPR30(r1),r30
-	/* r31 already saved */
-	l.addi	r3,r1,0
-	/* r4 is exception EA */
-	l.addi	r5,r0,0xdead
-	l.jal	nommu_dump_state
-	l.nop
-
-
-/* ========================================[ standard debugging aids ]=== */
-
-// this HAS to be atomic. also disable interrupts beetwen to entries
-// may use gpr4
-ENTRY(_exception_regenerate)
-	E_REGEN_LOAD_STATUS(r4)		// were we in this exception yet
-	l.sfeqi	r4,0x0
-	l.bnf	1f
-	l.nop
-
-0:					// first entry into this exception
-					// patch the ESR, reenter exception
-
-	l.mfspr r4,r0,SPR_ESR_BASE	// get original ESR
-	E_REGEN_STORE_STATUS(r4)	// save original ESR
-
-	SPR_DISABLE_LO_BITS(SPR_ESR_BASE,
-		(SPR_SR_ICE | SPR_SR_DCE | SPR_SR_IEE | SPR_SR_TEE),r4)
-	SPR_DISABLE_LO_BITS(SPR_SR,
-		(SPR_SR_ICE | SPR_SR_DCE | SPR_SR_IEE | SPR_SR_TEE),r4)
-
-	EXCEPTION_DEBUG_LOAD_GPR4
-	EXCEPTION_DEBUG_LOAD_F_GPR9
-
-	l.rfe				// this will regenerate exception
-
-1:					// second entry into this exception
-					// patch ESR, invalidate the caches
-
-	// we already loaded previous ESR into r4
-	l.mtspr r0,r4,SPR_ESR_BASE
-
-	l.ori	r4,r0,0x0		// next time is fresh entry
-	E_REGEN_STORE_STATUS(r4)	// prepare for next exception
-
-	E_REGEN_STORE_GPR3
-	E_REGEN_STORE_GPR4
-	E_REGEN_STORE_GPR5
-	E_REGEN_STORE_GPR6
-	E_REGEN_STORE_GPR9
-	l.jal	_dc_enable
-	l.nop
-	l.jal	_ic_enable
-	l.nop
-	E_REGEN_LOAD_GPR3
-	E_REGEN_LOAD_GPR4
-	E_REGEN_LOAD_GPR5
-	E_REGEN_LOAD_GPR6
-	E_REGEN_LOAD_GPR9
-
-	l.jr	r9
-	l.nop
-
-ENTRY(_exception_debug)
-	EXCEPTION_DEBUG_STORE_GPR3
-	EXCEPTION_DEBUG_STORE_GPR9
-
-	// disable tick timer
-	l.mfspr	r3,r0,SPR_TTMR
-	LOAD_SYMBOL_2_GPR(r9,~(0x30000003))
-	l.and	r3,r3,r9
-	l.mtspr	r0,r3,SPR_TTMR
-
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_debug_exception)
-	l.jal	_emergency_print_nr
-	l.andi	r3,r4,0x1ff0
-	/* the string referenced by r3 must be low enough */
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_epc_prefix)
-
-	l.jal	_emergency_print_nr
-	l.mfspr	r3,r0,SPR_EPCR_BASE
-
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_debug_esr_prefix)
-
-	l.jal	_emergency_print_nr
-	l.mfspr	r3,r0,SPR_ESR_BASE
-
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_debug_eear_prefix)
-
-	l.jal	_emergency_print_nr
-	l.mfspr	r3,r0,SPR_EEAR_BASE
-
-	l.jal	_emergency_print
-	l.ori	r3,r0,lo(_string_nl)
-
-	// enable tick timer
-	l.mfspr	r3,r0,SPR_TTMR
-	LOAD_SYMBOL_2_GPR(r9,0x20000001)
-	l.or	r3,r3,r9
-	l.mtspr	r0,r3,SPR_TTMR
-
-	EXCEPTION_DEBUG_LOAD_GPR3
-	EXCEPTION_DEBUG_LOAD_GPR9
-	l.jr	r9
-	l.nop
 
 /*
  * DSCR: prints a string referenced by r3.
@@ -2046,15 +1669,6 @@ _string_epc_prefix:
 
 _string_nl:
 	.string "\n\r\0"
-
-_string_debug_exception:
-	.string "\n\r\tDebug: exception 0x\0"
-
-_string_debug_esr_prefix:
-	.string ", ESR=0x\0"
-
-_string_debug_eear_prefix:
-	.string ", EEAR=0x\0"
 
 _string_dcache_clean:
 	.string "dcache cleaning\n\r\0"
