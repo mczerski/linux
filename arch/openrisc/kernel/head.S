@@ -1670,30 +1670,6 @@ _string_epc_prefix:
 _string_nl:
 	.string "\n\r\0"
 
-_string_dcache_clean:
-	.string "dcache cleaning\n\r\0"
-
-_string_icache_clean:
-	.string "icache cleaning\n\r\0"
-
-_string_ic_invalidate:
-	.string "\n\r\tic invalidate:  \0"
-
-_string_ic_enable:
-	.string "\n\ricache enabling\n\r\0"
-
-_string_dc_invalidate:
-	.string "\n\r\tdc invalidate:  \0"
-
-_string_dc_enable:
-	.string "\n\rdcache enabling\n\r\0"
-
-_string_pbjds:
-	.string "[jd]"
-
-_string_ed:
-	.string "\n\r[debug] "
-
 	.global	_string_esr_irq_bug
 _string_esr_irq_bug:
 	.string "\n\rESR external interrupt bug, for details look into entry.S\n\r\0"
