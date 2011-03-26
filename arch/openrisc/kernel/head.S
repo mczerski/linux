@@ -25,14 +25,14 @@
 #include <asm/asm-offsets.h>
 
 #define tophys(rd,rs)				\
-	l.movhi	rd,hi(-KERNELBASE);		\
-	l.add	rd,rd,rs;
+	l.movhi	rd,hi(-KERNELBASE)		;\
+	l.add	rd,rd,rs
 
-#define CLEAR_GPR(gpr)			\
+#define CLEAR_GPR(gpr)				\
 	l.or    gpr,r0,r0
 
-#define LOAD_SYMBOL_2_GPR(gpr,symbol)	\
-	l.movhi gpr,hi(symbol)		;\
+#define LOAD_SYMBOL_2_GPR(gpr,symbol)		\
+	l.movhi gpr,hi(symbol)			;\
 	l.ori   gpr,gpr,lo(symbol)
 
 
@@ -517,14 +517,6 @@ clear_bss:
 	l.bf    1b
 	l.addi  r28,r28,4
 
-/*
-	LOAD_SYMBOL_2_GPR(r24, or32_early_setup)
-	tophys(r28,r24)
-	CLEAR_GPR(r24)
-	l.jalr r28
-	l.nop
-*/
-
 enable_ic:
 	l.jal	_ic_enable
 	 l.nop
@@ -548,7 +540,7 @@ flush_tlb:
 	l.addi	r6,r6,1
 	l.sfeq	r7,r0
 	l.bnf	1b
-	l.addi	r7,r7,-1
+	 l.addi	r7,r7,-1
 
 
 /* The MMU needs to be enabled before or32_early_setup is called */
@@ -585,8 +577,7 @@ enable_mmu:
 
 	LOAD_SYMBOL_2_GPR(r24, or32_early_setup)
 	l.jalr r24
-	l.nop
-
+	 l.nop
 
 clear_regs:
 	/*
