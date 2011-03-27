@@ -16,6 +16,7 @@
 #  define LOAD_BASE    PAGE_OFFSET
 
 #include <asm/page.h>
+#include <asm/cache.h>
 #include <asm-generic/vmlinux.lds.h>
 	
 OUTPUT_FORMAT("elf32-or32", "elf32-or32", "elf32-or32")
@@ -76,7 +77,7 @@ SECTIONS
 	/* Align __setup_start on 16 byte boundary */
 	INIT_DATA_SECTION(16)
 
-	PERCPU(8192)
+	PERCPU(L1_CACHE_BYTES, PAGE_SIZE)
 
         __init_end = .;
 	

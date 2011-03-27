@@ -109,11 +109,10 @@ void __init init_IRQ(void)
 	 * so if EDGE triggered is needed then this needs to be fixed
 	 * up.
 	 */
-
 	for (i = 0; i < NR_IRQS; i++) {
-		set_irq_chip_and_handler_name(i, &or1k_pic,
+		irq_set_chip_and_handler_name(i, &or1k_pic,
 			handle_level_irq, irq_name[i]);
-		irq_desc[i].status |= IRQ_LEVEL;
+/*		irq_desc[i].status |= IRQ_LEVEL;*/
 	}
 
 	/* Disable all interrupts until explicitly requested */

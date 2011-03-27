@@ -36,7 +36,6 @@
 #include <linux/string.h>
 
 #include <linux/mm.h>
-#include <linux/smp_lock.h>
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/audit.h>

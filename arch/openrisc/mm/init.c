@@ -53,7 +53,12 @@ int mem_init_done = 0;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
-void show_mem(void)
+/* There's a generic version of show_mem in lib/show_mem.c...
+ * see if it's possible to use that version instead of this custom
+ * code
+ */
+
+void show_mem(unsigned int filter)
 {
    
 	int i,free = 0,total = 0,cached = 0, reserved = 0, nonshared = 0;

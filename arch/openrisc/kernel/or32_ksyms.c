@@ -20,7 +20,6 @@
 #include <linux/sched.h>
 #include <linux/in6.h>
 #include <linux/interrupt.h>
-#include <linux/smp_lock.h>
 #include <linux/vmalloc.h>
 #include <linux/semaphore.h>
 
