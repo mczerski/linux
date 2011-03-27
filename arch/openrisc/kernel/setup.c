@@ -152,7 +152,7 @@ static void print_cpuinfo(void) {
 	version = (vr & SPR_VR_VER) >> 24;
 	revision = (vr & SPR_VR_REV);
 
-	printk(KERN_INFO "CPU: OpenRISC-%x (revision %x) @%d MHz\n", 
+	printk(KERN_INFO "CPU: OpenRISC-%x (revision %d) @%d MHz\n", 
 		version, revision, cpuinfo.clock_frequency / 1000000);
 
 	if (!(upr & SPR_UPR_UP)) {
@@ -354,7 +354,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	revision = vr & SPR_VR_REV;
 
 	return seq_printf(m,
-		"cpu\t\t: OpenRISC-%d\n"
+		"cpu\t\t: OpenRISC-%x\n"
 		"revision\t: %d\n"
 		"dcache size\t: %d bytes\n"
 		"dcache block size\t: %d bytes\n"
