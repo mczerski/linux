@@ -768,6 +768,8 @@ boot_dtlb_miss_handler:
  */
 #define DTLB_TR_MASK 0xfffff332
 
+/* These are for masking out the VPN/PPN value from the MR/TR registers...
+ * it's not the same as the PFN */
 #define VPN_MASK 0xfffff000
 #define PPN_MASK 0xfffff000
 
