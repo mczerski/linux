@@ -1,4 +1,6 @@
 /*
+ * OpenRISC Timekeeping
+ *
  *  Copyright (C) 2010 Jonas Bonn 
  *
  *      This program is free software; you can redistribute it and/or
