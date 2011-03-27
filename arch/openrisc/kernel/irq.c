@@ -119,46 +119,6 @@ void __init init_IRQ(void)
 	mtspr(SPR_PICMR, (0UL));
 }
 
-int show_interrupts(struct seq_file *p, void *v)
-{
-        int i = *(loff_t *) v, j;
-        struct irqaction *action;
-        unsigned long flags;
-
-        if (i == 0) {
-                seq_printf(p, "         ");
-                for_each_online_cpu(j)
-                        seq_printf(p, "CPU%-8d", j);
-                seq_putc(p, '\n');
-        }
-
-        if (i < NR_IRQS) {
-                raw_spin_lock_irqsave(&irq_desc[i].lock, flags);
-                action = irq_desc[i].action;
-                if (!action)
-                        goto skip;
-                seq_printf(p, "%3d: ", i);
-#ifndef CONFIG_SMP
-                seq_printf(p, "%10u ", kstat_irqs(i));
-#else
-                for_each_online_cpu(j)
-                        seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
-#endif
-                seq_printf(p, " %8s", irq_desc[i].status &
-                                        IRQ_LEVEL ? "level" : "edge");
-                seq_printf(p, " %8s", irq_desc[i].irq_data.chip->name);
-                seq_printf(p, "  %s", action->name);
-
-                for (action = action->next; action; action = action->next)
-                        seq_printf(p, ", %s", action->name);
-
-                seq_putc(p, '\n');
-skip:
-                raw_spin_unlock_irqrestore(&irq_desc[i].lock, flags);
-        }
-        return 0;
-}
-
 void __irq_entry do_IRQ(struct pt_regs *regs)
 {
 	int irq;
