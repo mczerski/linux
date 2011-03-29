@@ -88,13 +88,13 @@ static int pic_set_type(struct irq_data *data, unsigned int flow_type) {
 	return 0;
 }
 
-static inline int pic_get_irq(void)
+static inline int pic_get_irq(int first)
 {
 	int irq;
 
-	irq = ffs(mfspr(SPR_PICSR));
+	irq = ffs(mfspr(SPR_PICSR) >> first);
 
-	return irq ? irq - 1 : NO_IRQ;
+	return irq ? irq + first - 1 : NO_IRQ;
 }
 
 static struct irq_chip or1k_pic = {
@@ -126,20 +126,17 @@ void __init init_IRQ(void)
 
 void __irq_entry do_IRQ(struct pt_regs *regs)
 {
-	int irq;
+	int irq = -1;
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	irq_enter();
 
-	/* FIXME: This loop always handles the lowest interrupt
-	 * first and seems to be able to lead to starvation for
-	 * handlers with higher numbered IRQ's */
-	while ((irq = pic_get_irq()) != NO_IRQ) {
+	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ) {
 		generic_handle_irq(irq);
 	}
 
-        irq_exit();
-        set_irq_regs(old_regs);
+	irq_exit();
+	set_irq_regs(old_regs);
 }
 
 unsigned int irq_create_of_mapping(struct device_node *controller,
