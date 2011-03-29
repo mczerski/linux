@@ -171,18 +171,18 @@
 	l.addi  r1,r1,-(INT_FRAME_SIZE)				;\
 	/* r1 is KSP, r30 is __pa(KSP) */			;\
 	tophys  (r30,r1)					;\
-	l.sw    PT_GPR12(r30),r12					;\
+	l.sw    PT_GPR12(r30),r12				;\
 	l.mfspr r12,r0,SPR_EPCR_BASE				;\
 	l.sw    PT_PC(r30),r12					;\
 	l.mfspr r12,r0,SPR_ESR_BASE				;\
 	l.sw    PT_SR(r30),r12					;\
 	/* save r30 */						;\
 	EXCEPTION_T_LOAD_GPR30(r12)				;\
-	l.sw	PT_GPR30(r30),r12					;\
+	l.sw	PT_GPR30(r30),r12				;\
 	/* save r10 as was prior to exception */		;\
 	EXCEPTION_T_LOAD_GPR10(r12)				;\
-	l.sw	PT_GPR10(r30),r12					;\
-	/* save PT_SP as was prior to exception */			;\
+	l.sw	PT_GPR10(r30),r12				;\
+	/* save PT_SP as was prior to exception */		;\
 	EXCEPTION_T_LOAD_SP(r12)				;\
 	l.sw	PT_SP(r30),r12					;\
 	/* save exception r4, set r4 = EA */			;\
