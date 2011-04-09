@@ -988,6 +988,9 @@ config FB_EPSON1355
 config FB_OC
 	bool "OpenCores VGA/LCD core 2.0 framebuffer support"
 	depends on OPENRISC
+	select FB_CFB_FILLRECT
+	select FB_CFB_COPYAREA
+	select FB_CFB_IMAGEBLIT
 	default n
 	---help---
 	  Frame buffer driver for the OpenCores VGA/LCD core.
@@ -1002,14 +1005,6 @@ config FB_OC_SHMEM
 	  If VGA/LCD core has dedicated framebuffer memory answer N
 
 	  If unsure, say Y.
-
-config FB_OC_SHMEM_SIZE
-        hex "Frame buffer memory size [hex, bytes]"
-        depends on FB_OC_SHMEM
-        default 00100000 if FB_OC_SHMEM
-        ---help---
-          Specify the size of frame buffer for OpenCores VGA/LCD core.
-
 
 config FB_S1D13XXX
 	tristate "Epson S1D13XXX framebuffer support"
