@@ -431,7 +431,7 @@ _dispatch_do_ipage_fault:
 
 /*    .text*/
 
-/* This early stuff belongs in HEAD, but some of the function belows definitely
+/* This early stuff belongs in HEAD, but some of the functions below definitely
  * don't... */
 
 	__HEAD
