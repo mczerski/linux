@@ -135,7 +135,7 @@ register struct thread_info *current_thread_info_reg asm("r10");
 
 /* Work to do when returning from interrupt/exception */
 /* For OpenRISC, this is anything in the LSW other than syscall trace */
-#define _TIF_WORK_MASK (0xff & (~_TIF_SYSCALL_TRACE|~TIF_SINGLESTEP))
+#define _TIF_WORK_MASK (0xff & ~(_TIF_SYSCALL_TRACE|_TIF_SINGLESTEP))
 
 #endif /* __KERNEL__ */
 
