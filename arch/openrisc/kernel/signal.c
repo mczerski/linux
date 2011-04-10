@@ -1,12 +1,6 @@
 /*
- *  linux/arch/or32/kernel/signal.c
- *
  *  or32 version
  *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
- *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
  *
  *  derived from cris, i386, m68k, ppc, sh ports.
  *
@@ -36,6 +30,8 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/or32-hf.h>
+
+#include "ptrace.h"
 
 #define DEBUG_SIG 0
 
@@ -138,6 +134,8 @@ _sys_rt_sigreturn(struct pt_regs *regs)
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
 	do_sigaltstack(&st, NULL, regs->sp);
+
+	single_step_trap(current);
 
 //	return regs->gprs[1];
 	return regs->gpr[11];
@@ -319,6 +317,7 @@ handle_signal(unsigned long sig,
 	if (!(ka->sa.sa_flags & SA_NODEFER))
 		sigaddset(&current->blocked, sig);
 	recalc_sigpending();
+
 	spin_unlock_irq(&current->sighand->siglock);
 }
 
@@ -339,6 +338,7 @@ void do_signal(struct pt_regs *regs)
 	siginfo_t info;
 	int signr;
 	struct k_sigaction ka;
+
 #if 0
 	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
 #endif
@@ -352,8 +352,9 @@ void do_signal(struct pt_regs *regs)
 	if (!user_mode(regs))
 		return;
 
-	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
+	single_step_clear(current);
 
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 
 	/* If we are coming out of a syscall then we need
 	 * to check if the syscall was interrupted and wants to be
@@ -395,7 +396,6 @@ void do_signal(struct pt_regs *regs)
 		}
 	}
 
-
 	if (signr <= 0) {
 		/* no signal to deliver so we just put the saved sigmask
 		 * back */
@@ -403,6 +403,7 @@ void do_signal(struct pt_regs *regs)
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
 			sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
 		}
+
 	} else { /* signr > 0 */
 		sigset_t *oldset;
 
@@ -424,6 +425,8 @@ void do_signal(struct pt_regs *regs)
 					 test_thread_flag(TIF_SINGLESTEP));
 	}
 
+	single_step_set(current);
+
 	return;
 }
 
@@ -433,6 +436,7 @@ do_notify_resume(struct pt_regs *regs)
 	if (current_thread_info()->flags & _TIF_SIGPENDING)
 		do_signal(regs);
 
+
 	if (current_thread_info()->flags & _TIF_NOTIFY_RESUME) {
 		clear_thread_flag(TIF_NOTIFY_RESUME);
 		tracehook_notify_resume(regs);
@@ -440,4 +444,3 @@ do_notify_resume(struct pt_regs *regs)
 			key_replace_session_keyring();
 	}
 }
-

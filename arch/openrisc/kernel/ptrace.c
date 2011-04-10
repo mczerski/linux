@@ -39,14 +39,17 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/audit.h>
-#include <linux/tracehook.h>
 #include <linux/regset.h>
+#include <linux/tracehook.h>
 
-#include <asm/uaccess.h>
+#include <asm/thread_info.h>
+#include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/or32-hf.h>
+
+#include "ptrace.h"
 
 /*
  * retrieve the contents of OpenRISC userspace general registers
@@ -158,78 +161,269 @@ void user_disable_single_step(struct task_struct *child)
 }
 
 
-
-
-
-
-
-
 /*
  * does not yet catch signals sent when the child dies.
  * in exit.c or in signal.c.
  */
 
 
+
+#define OPC_MASK 0x3f
+#define OPC_SHIFT 26
+#define OPC_J    0x00
+#define OPC_JAL  0x01
+#define OPC_BNF  0x03
+#define OPC_BF   0x04
+#define OPC_SYSC 0x08
+#define OPC_JR   0x11
+#define OPC_JALR 0x12
+
+#define JUMP_IMM_MASK 0x03ffffff
+#define JUMP_IMM_SIGN 0x02000000
+
+/* Trap instruction on bit 15 of SR, fixed one, unconditional */
+#define OR1K_TRAP 0x2100000f
+
+/* Macro to extract branch offset with sign extension of immediate. */
+#define BRANCH_OFFSET(insn) ((insn & JUMP_IMM_SIGN) ?			\
+			     ((insn & JUMP_IMM_MASK) << 2) | 0xf0000000 : \
+			     ((insn & JUMP_IMM_MASK) << 2))
+
+/* Get address of next instruction we can insert a breakpoint on */
+/* pc passed to function is address of instruction we've now just trapped on.
+   It is yet/next to be executed. We determine next instruction after PC to
+   place a l.trap on. If we should take a branch, we must remember this.
+*/
+static unsigned long
+get_next_address(struct task_struct *tsk, unsigned long pc,
+		 unsigned long insn)
+{
+	struct pt_regs *regs;
+	struct debug_info *dbg;
+	char opc;
+	unsigned long npc;
+	unsigned long rB;
+
+	dbg = &current_thread_info()->debug;
+
+	regs = task_pt_regs(tsk);
+	/* Extract opcode from instruction */
+	opc = (insn >> OPC_SHIFT) & OPC_MASK;
+
+	pr_debug(KERN_INFO "ptrace get_next_address: pc 0x%.8lx insn. 0x%.8lx opc. 0x%.2x\n",
+		pc, insn, opc);
+
+	/*
+	   Will always proceed to next instruction if this function was called
+	   ie. we know we're not in a delay slot - the function calling this
+	   checks dbg->branch_taken.
+	*/
+	npc = pc + 4;
+
+	/* Check if we're to record a branch */
+	switch (opc) {
+	case OPC_BNF:
+		/* Check flag - we're branching if !flag */
+		if (!(((regs)->sr) & SPR_SR_F))
+		{
+			dbg->bp.branch = 1;
+			dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
+		}
+		break;
+	case OPC_BF:
+		/* Check flag - we're branching if flag */
+		if (((regs)->sr) & SPR_SR_F)
+		{
+			dbg->bp.branch = 1;
+			dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
+		}
+		break;
+	case OPC_J:
+	case OPC_JAL:
+		/* PC-relative branch target encoded in instruction. Extract
+		   and add it. */
+		dbg->bp.branch = 1;
+		dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
+		break;
+	case OPC_JR:
+	case OPC_JALR:
+		/* Register number holding branch target is encoded in rB slot
+		   of instruction. Extract it. */
+		rB = (insn >> 11) & 0x1f;
+		pr_debug(KERN_INFO "ptrace get_next_address: jump reg from r%d=0x%08lx\n",
+		       rB,/* *((unsigned long*)((char*)regs + (rB<<2) + 4))*/ regs->gprs[rB-2]);
+		if (rB < 2)
+			pr_debug(KERN_WARNING "ptrace get_next_address(): Warning, JR with GPR < 2");
+		dbg->bp.branch = 1;
+		dbg->bp.branch_target = /* *((unsigned long*)((char*)regs + (rB<<2) + 4))*/regs->gprs[rB-2];
+		break;
 #if 0
+	case OPC_SYSC:
+		/* Not sure we want to do this */
+		/* Remember - l.sys has no delay slot. */
+		npc = 0x900;
+		break;
+#endif
+	default:
+		break;
+	}
+
+	/* If setting a branch target, remember where branch was */
+	if (dbg->bp.branch)
+		dbg->bp.branch_insn_address = pc;
+
+	if (dbg->bp.branch)
+		pr_debug(KERN_INFO "ptrace get_next_address: branch detected to 0x%.8lx\n",dbg->bp.branch_target);
+	pr_debug(KERN_INFO "ptrace get_next_address: returning 0x%.8lx\n",npc);
+
+	return npc;
+}
+
+static inline int
+read_instr(struct task_struct *tsk, unsigned long addr, u32 *res)
+{
+	int ret;
+	u32 val;
+	ret = access_process_vm(tsk, addr & ~3, &val, sizeof(val), 0);
+	ret = ret == sizeof(val) ? 0 : -EIO;
+	*res = val;
+	return ret;
+}
+
+
+static int
+swap_insn(struct task_struct *tsk, unsigned long addr,
+	  void *old_insn, void *new_insn, int size)
+{
+	int ret;
+
+	ret = access_process_vm(tsk, addr, old_insn, size, 0);
+	if (ret == size)
+		ret = access_process_vm(tsk, addr, new_insn, size, 1);
+	return ret;
+}
+
+static void
+add_breakpoint(struct task_struct *tsk, struct debug_info *dbg,
+	       unsigned long addr)
+{
+	u32 new_insn = OR1K_TRAP;
+	int res;
+
+	res = swap_insn(tsk, addr, &dbg->bp.insn, &new_insn, 4);
+
+	pr_debug(KERN_INFO "ptrace add_breakpoint: addr 0x%.8lx insn 0x%.8lx %d\n\n", addr,
+	       dbg->bp.insn, res);
+
+	if (res == 4) {
+		dbg->bp.address = addr;
+		dbg->bp.set = 1;
+	}
+}
+
+
 /*
- * Write contents of register REGNO in task TASK.
+ * Clear the breakpoint in the user program.
  */
-static inline int put_reg(struct task_struct *task, int regno,
-			  unsigned long data)
+static void clear_breakpoint(struct task_struct *tsk, struct debug_entry *bp)
 {
-	/* Whatever happens, don't let any process the the sr flags and elevate
-	 * their privaleges to kernel mode. */
-	if((regno < sizeof(struct pt_regs)) &&
-	   (regno != offsetof(struct pt_regs, sr))) {
-		*((unsigned long *)task_pt_regs(task) + (regno >> 2)) = data;
-		return 0;
-	}
-	return -EIO;
-}
-#endif
+	u32 old_insn;
+	int ret;
+	struct pt_regs *regs;
+	unsigned long pc;
 
-static void set_singlestep(struct task_struct *child)
-{
-	/* FIXME */
-#if 0
-	struct pt_regs *regs = get_child_regs(child);
+	unsigned long addr = bp->address;
 
-	/*
-	 * Always set TIF_SINGLESTEP - this guarantees that 
-	 * we single-step system calls etc..  This will also
-	 * cause us to set TF when returning to user mode.
-	 */
-	set_tsk_thread_flag(child, TIF_SINGLESTEP);
+	regs = task_pt_regs(tsk);
+	pc = instruction_pointer(regs); /* This is NPC */
 
-	/*
-	 * If TF was already set, don't do anything else
-	 */
-	if (regs->eflags & TRAP_FLAG)
+	// Either at the breakpoint, or in delay slot (pc will be at address of
+	// branch instruction - OR1K exception handlers do that, for now.
+	// Perhaps FIXME
+	if ((pc == addr) ||
+	    ((bp->branch_insn_address == pc) && bp->branch))
+		ret = swap_insn(tsk, addr & ~3, &old_insn,
+				&bp->insn, 4);
+	else
+	{
+		// Trapped for some other reason.
+		pr_debug(KERN_INFO "ptrace clear_breakpoint: not correct, pc 0x%.8lx bp 0x%.8lx\n",
+		       pc, addr);
+		pr_debug(KERN_INFO "ptrace clear_breakpoint: 0x%.8lx 0x%.8lx %d\n",
+		       bp->branch_insn_address, bp->branch_target, bp->branch);
 		return;
-
-	/* Set TF on the kernel stack.. */
-	regs->eflags |= TRAP_FLAG;
-
-	child->ptrace |= PT_DTRACE;
-#endif
-}
-
-
-static void clear_singlestep(struct task_struct *child)
-{
-	/* FIXME */
-#if 0
-	/* Always clear TIF_SINGLESTEP... */
-	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
-
-	/* But touch TF only if it was set by us.. */
-	if (child->ptrace & PT_DTRACE) {
-		struct pt_regs *regs = get_child_regs(child);
-		regs->eflags &= ~TRAP_FLAG;
-		child->ptrace &= ~PT_DTRACE;
 	}
-#endif
+
+	pr_debug(KERN_INFO "ptrace clear_breakpoint: addr 0x%.8lx insn 0x%.8lx %d\n", addr,
+	       bp->insn, ret);
+
+	if (ret != 4 || old_insn != OR1K_TRAP)
+	  pr_debug(KERN_ERR "%s:%d: corrupted breakpoint at 0x%08lx (0x%08x)\n", tsk->comm,
+			task_pid_nr(tsk), addr, old_insn);
+
+	bp->set = 0;
 }
+
+
+void ptrace_set_bpt(struct task_struct *tsk)
+{
+	struct pt_regs *regs;
+	unsigned long pc;
+	u32 insn;
+	int res;
+
+	regs = task_pt_regs(tsk);
+	pc = instruction_pointer(regs); /* This is NPC */
+
+	res = read_instr(tsk, pc, &insn);
+	if (!res) {
+		struct debug_info *dbg = &current_thread_info()->debug;
+		unsigned long npc;
+
+		/* First check if breakpoint is still set, if so, probably
+		   just let us run until we hit it.
+		   This can occur because perhaps we caused an exception before
+		   a jump or in a delay slot, and the OR1K exception handlers
+		   will rewind us to the branch before the delay slot or jump
+		   target.
+		   This way we skip everything that goes on during an exception
+		   and can hopefully just track the program's execution.
+		*/
+		if (dbg->bp.set)
+			return;
+
+		/* Are we in delay slot of branch we should take? */
+		if (dbg->bp.branch == 1)
+		{
+			/* Branch target is already determined. Set l.trap. */
+			npc = dbg->bp.branch_target;
+
+			// Reset NPC to branch instruction - should be one
+			// before this one.
+			instruction_pointer(regs) = dbg->bp.branch_insn_address;
+
+			/* Now mark this as no longer needing to be taken */
+			dbg->bp.branch = 0;
+		}
+		else
+		{
+			npc = get_next_address(tsk, pc, insn);
+		}
+
+		add_breakpoint(tsk, dbg, npc);
+	}
+}
+
+
+/*
+ * Ensure no single-step breakpoint is pending.  Returns non-zero
+ * value if child was being single-stepped.
+ */
+void ptrace_cancel_bpt(struct task_struct *tsk)
+{
+	clear_breakpoint(tsk, &current_thread_info()->debug);
+}
+
 
 
 /*
@@ -239,7 +433,7 @@ static void clear_singlestep(struct task_struct *child)
  */
 void ptrace_disable(struct task_struct *child)
 {
-	printk("ptrace_disable(): TODO\n");
+	pr_debug(KERN_WARNING "ptrace_disable(): TODO\n");
 
 	user_disable_single_step(child);
 	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
@@ -256,9 +450,8 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 	struct pt_regs* regs;
 	unsigned long tmp;
 
-/*	if (off & 3 || off >= sizeof(struct user))
-		return -EIO;
-*/
+  /*	if (off & 3 || off >= sizeof(struct user))
+      return -EIO;*/
 
 	regs = task_pt_regs(tsk);
 
@@ -285,10 +478,9 @@ static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
 {
 	struct pt_regs* regs;
 
-/*
-	if (off & 3 || off >= sizeof(struct user))
-		return -EIO;
-*/
+	/*if (off & 3 || off >= sizeof(struct user))
+		return -EIO;*/
+
 	if (off >= sizeof(struct pt_regs))
 		return 0;
 
@@ -311,8 +503,6 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 	int ret;
 	unsigned long __user *datap = (unsigned long __user *)data;
 
-	//printk("ptrace request: %d\n", request);
-
 	switch (request) {
 	/* read the word at location addr in the USER area. */
 	case PTRACE_PEEKUSR:
@@ -326,126 +516,10 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 		break;
 	}
 
+	single_step_set(current);
+
 	return ret;
 }
-
-#if 0
-long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
-	         unsigned long data)
-{
-	int ret;
-	unsigned long __user *datap = (unsigned long __user *)data;
-
-	switch (request) {
-	/* when I and D space are separate, these will need to be fixed. */
-	case PTRACE_PEEKTEXT: /* read word at location addr. */ 
-	case PTRACE_PEEKDATA: {
-		unsigned long tmp;
-		int copied;
-
-		copied = access_process_vm(child, addr, &tmp, sizeof(tmp), 0);
-		ret = -EIO;
-		if (copied != sizeof(tmp))
-			break;
-		ret = put_user(tmp,(unsigned long *) datap);
-		break;
-	}
-
-	/* read the word at location addr in the USER area. */
-	case PTRACE_PEEKUSR:
-		ret = -EIO;
-#if 0
-		if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
-			break;
-#endif
-		ret = put_user(get_reg(child, addr), datap);
-		break;
-
-	/* when I and D space are separate, this will have to be fixed. */
-	case PTRACE_POKETEXT: /* write the word at location addr. */
-	case PTRACE_POKEDATA:
-		ret = 0;
-		if (access_process_vm(child, addr, &data, sizeof(data), 1) == sizeof(data))
-			break;
-		ret = -EIO;
-		break;
-
-	case PTRACE_POKEUSR: /* write the word at location addr in the USER area */
-		ret = -EIO;
-#if 0
-		if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
-			break;
-#endif
-
-		ret = put_reg(child, addr, data);	    
-		break;
-
-	case PTRACE_SYSCALL: /* continue and stop at next (return from) syscall */
-	case PTRACE_CONT: /* restart after signal. */
-		ret = -EIO;
-		if (!valid_signal(data))
-			break;
-		if (request == PTRACE_SYSCALL) {
-			set_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		} else {
-			clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		}
-		child->exit_code = data;
-		/* make sure the single step bit is not set. */
-		clear_singlestep(child);
-		wake_up_process(child);
-		ret = 0;
-		break;
-
-/*
- * make the child exit.  Best I can do is send it a sigkill. 
- * perhaps it should be put in the status that it wants to 
- * exit.
- */
-	case PTRACE_KILL:
-		ret = 0;
-		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
-			break;
-		child->exit_code = SIGKILL;
-		/* make sure the single step bit is not set. */
-		clear_singlestep(child);
-		wake_up_process(child);
-		break;
-
-		/*case PTRACE_SYSEMU_SINGLESTEP:  Same as SYSEMU, but singlestep if not syscall RGD */
-	case PTRACE_SINGLESTEP:  /* set the trap flag. */
-		printk("SINGLESTEP: TODO\n");
-		ret = -ENOSYS;
-#if 0
-		ret = -EIO;
-		if (!valid_signal(data))
-			break;
-
-		if (request == PTRACE_SYSEMU_SINGLESTEP)
-			set_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-		else
-			clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
-
-		clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
-		set_singlestep(child);
-		child->exit_code = data;
-		/* give it a chance to run. */
-		wake_up_process(child);
-		ret = 0;
-#endif
-		break;
-
-	case PTRACE_DETACH: /* detach a process that was attached. */
-		ret = ptrace_detach(child, data);
-		break;
-
-	default:
-		ret = ptrace_request(child, request, addr, data);
-		break;
-	}
-	return ret;
-}
-#endif
 
 /* notification of system call entry/exit
  * - triggered by current->work.syscall_trace
@@ -496,7 +570,7 @@ do_syscall_trace_enter(struct pt_regs *regs)
 		audit_syscall_entry(audit_arch(), regs->regs[2],
 				    regs->regs[4], regs->regs[5],
 				    regs->regs[6], regs->regs[7]);/*RGD*/
-  
+
 #endif
 }
 
@@ -506,7 +580,7 @@ do_syscall_trace_leave(struct pt_regs* regs)
 	int step;
 
 	if (unlikely(current->audit_context))
-		audit_syscall_exit(AUDITSC_RESULT(regs->gpr[11]), 
+		audit_syscall_exit(AUDITSC_RESULT(regs->gpr[11]),
 				   regs->gpr[11]);
 
 /*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))

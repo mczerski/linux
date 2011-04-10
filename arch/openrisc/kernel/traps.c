@@ -1,5 +1,5 @@
 /*
- *  linux/arch/or32/kernel/traps.c
+ *  arch/openrisc/kernel/traps.c
  *
  *  or32 version
  *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
@@ -331,14 +331,14 @@ void __init trap_init(void)
 asmlinkage void do_trap(struct pt_regs *regs, unsigned long address)
 {
 	siginfo_t info;
-
 	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGTRAP;
 	info.si_code = TRAP_TRACE;
 	info.si_addr = (void*) address;
 	force_sig_info(SIGTRAP, &info, current);
 
-	regs->pc += 4;
+	if (!(test_tsk_thread_flag(current, TIF_SINGLESTEP)))
+		regs->pc += 4;
 }
 
 asmlinkage void do_unaligned_access(struct pt_regs *regs, unsigned long address)

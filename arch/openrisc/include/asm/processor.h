@@ -1,5 +1,5 @@
 /*
- * include/asm-or32/processor.h
+ * openrisc/include/asm/processor.h
  *
  * Based on:
  * include/asm-cris/processor.h

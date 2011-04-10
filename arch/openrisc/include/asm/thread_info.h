@@ -35,6 +35,19 @@
 
 typedef unsigned long mm_segment_t;
 
+struct debug_entry {
+	unsigned long			address; /* Address of breakpoint */
+	unsigned long             	insn; /* Instruction replaced */
+	unsigned long                   set; /* Is BP active? */
+	unsigned long                   branch; /* BP is after a branch */
+	unsigned long                   branch_target; /* Branch address */
+	unsigned long                   branch_insn_address; /* PC of l.b/l.j */
+};
+
+struct debug_info {
+	struct debug_entry	bp;
+};
+
 struct thread_info {
 	struct task_struct	*task;		/* main task structure */
 	struct exec_domain	*exec_domain;	/* execution domain */
@@ -51,6 +64,8 @@ struct thread_info {
 
 	/* saved context data */
 	unsigned long           ksp;
+
+	struct debug_info	debug;
 };
 #endif
 
