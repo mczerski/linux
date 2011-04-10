@@ -6,28 +6,33 @@
 
 
 /*
- * Change virtual addresses to physical addresses and vv.
+ * Change virtual addresses to physical addresses and vice versa.
  */
 
-static inline unsigned long virt_to_phys(volatile void * address)
+static inline unsigned long
+virt_to_phys(volatile void * address)
 {
 	return __pa(address);
 }
 
-static inline void * phys_to_virt(unsigned long address)
+static inline void*
+phys_to_virt(unsigned long address)
 {
 	return __va(address);
 }
 
-extern void * __ioremap(unsigned long offset, unsigned long size, unsigned long flags);
+extern void __iomem*
+__ioremap(phys_addr_t offset, unsigned long size, unsigned long flags);
 
-extern inline void * ioremap(unsigned long offset, unsigned long size)
+static inline void __iomem*
+ioremap(phys_addr_t offset, unsigned long size)
 {
 	return __ioremap(offset, size, 0);
 }
 
 /* #define _PAGE_CI       0x002 */
-extern inline void * ioremap_nocache(unsigned long offset, unsigned long size)
+static inline void __iomem*
+ioremap_nocache(phys_addr_t offset, unsigned long size)
 {
 	return __ioremap(offset, size, 0x002);
 }

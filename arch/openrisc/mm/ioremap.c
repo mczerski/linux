@@ -1,156 +1,27 @@
 /*
- * arch/or32/mm/ioremap.c
+ * ioremap.c
  *
  * Re-map IO memory to kernel address space so that we can access it.
  * Needed for memory-mapped I/O devices mapped outside our normal DRAM
  * window (that is, all memory-mapped I/O devices).
  *
  * (C) Copyright 1995 1996 Linus Torvalds
- * CRIS-port by Axis Communications AB
+ * OpenRISC version by:
+ *   2010 Jonas Bonn
  */
 
 #include <linux/vmalloc.h>
 #include <linux/io.h>
-//#include <asm/io.h>
 #include <asm/pgalloc.h>
-//#include <asm/cacheflush.h>
-//#include <asm/tlbflush.h>
 #include <asm/kmap_types.h>
 #include <asm/fixmap.h>
 #include <asm/bug.h>
+#include <asm/pgtable.h>
 #include <linux/sched.h>
-
-/* __PHX__ cleanup, check */
-#define __READABLE   ( _PAGE_ALL | _PAGE_URE | _PAGE_SRE )
-#define __WRITEABLE  ( _PAGE_WRITE )
-#define _PAGE_GLOBAL ( 0 )
-#define _PAGE_KERNEL ( _PAGE_ALL | _PAGE_SRE | _PAGE_SWE | _PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC )
 
 extern int mem_init_done;
 
 static unsigned int fixmaps_used __initdata = 0;
-
-#if 0
-/* bt ioremaped lenghts */
-static unsigned int bt_ioremapped_len[NR_FIX_BTMAPS] __initdata = 
- {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-#endif
-/*
- * IO remapping core to use when system is running
- */
-void *ioremap_core(unsigned long phys_addr, unsigned long size,
-                   unsigned long flags)
-{
-	struct vm_struct * area;
-	unsigned long addr;
-	pgprot_t prot;
-
-	if (likely(mem_init_done)) {
-		area = get_vm_area(size, VM_IOREMAP);
-		if (!area)
-			return NULL;
-		addr = (unsigned long) area->addr;
-	} else {
-//		printk("JONAS IOREMAP %lx\n", size);
-		if ((fixmaps_used + (size >> PAGE_SHIFT)) > FIX_N_IOREMAPS)
-			return NULL;
-		addr = fix_to_virt(FIX_IOREMAP_BEGIN+fixmaps_used);
-		fixmaps_used += (size >> PAGE_SHIFT);
-/*		ioremap_bot -= size;
-		addr = ioremap_bot;
-*/
-	}
-
-	prot = __pgprot(_PAGE_PRESENT | __READABLE | __WRITEABLE | _PAGE_GLOBAL |
-		        _PAGE_KERNEL | flags);
-
-	if (ioremap_page_range((unsigned long) addr, addr + size, phys_addr, prot)) {
-		if (likely(mem_init_done))
-			vfree(area->addr);
-		else
-			fixmaps_used -= (size >> PAGE_SHIFT);
-//			ioremap_bot += size;
-		return NULL;
-	}
-/* Is this flush necessary??  Can we get flush_cache_vmap to cover it??? */
-//	flush_tlb_all();
-	return (void*) addr;
-}
-
-#if 0
-/*
- * Boot-time IO remapping core to use
- */
-static void __init *bt_ioremap_core(unsigned long phys_addr, unsigned long size,
-                                    unsigned long flags)
-{
-	unsigned int nrpages;
-	unsigned int i;
-	unsigned int nr_free;
-	unsigned int idx;
-
-	/*
-	 * Mappings have to fit in the FIX_BTMAP area.
-	 */
-	nrpages = size >> PAGE_SHIFT;
-	if (nrpages > NR_FIX_BTMAPS)
-		return NULL;
-
-	/*
-	 * Find a big enough gap in NR_FIX_BTMAPS
-	 */
-	idx = FIX_BTMAP_BEGIN;
-	for(i = 0, nr_free = 0; i < NR_FIX_BTMAPS; i++) {
-		if(!bt_ioremapped_len[i])
-			nr_free++;
-		else {
-			nr_free = 0;
-			idx = FIX_BTMAP_BEGIN - i;
-			i += bt_ioremapped_len[i] - 2;
-		}
-		if(nr_free == nrpages)
-			break;
-	}
-
-	if(nr_free < nrpages)
-		return NULL;
-
-	bt_ioremapped_len[FIX_BTMAP_BEGIN - idx] = nrpages;
-
-	/*
-	 * Ok, go for it..
-	 */
-	for(i = idx; nrpages > 0; i--, nrpages--) {
-		set_fixmap_nocache(i, phys_addr);
-		phys_addr += PAGE_SIZE;
-	}
-
-	return (void *)fix_to_virt(idx);
-}
-
-static void __init bt_iounmap(void *addr)
-{
-	unsigned long virt_addr;
-	unsigned int nr_pages;
-	unsigned int idx;
-
-	virt_addr = (unsigned long)addr;
-	idx = virt_to_fix(virt_addr);
-	nr_pages = bt_ioremapped_len[FIX_BTMAP_BEGIN - idx];
-	bt_ioremapped_len[FIX_BTMAP_BEGIN - idx] = 0;
-
-	while (nr_pages > 0) {
-		clear_fixmap(idx);
-		--idx;
-		--nr_pages;
-	}
-}
-#endif
-
-
-/*
- * Generic mapping function (not visible outside):
- */
 
 /*
  * Remap an arbitrary physical address space into the kernel virtual
@@ -161,78 +32,59 @@ static void __init bt_iounmap(void *addr)
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem* __init_refok
+__ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 {
-	void * addr;
+	phys_addr_t p;
+	unsigned long v;
 	unsigned long offset, last_addr;
+	struct vm_struct *area = NULL;
+	pgprot_t prot;
 
 	/* Don't allow wraparound or zero size */
-	last_addr = phys_addr + size - 1;
-	if (!size || last_addr < phys_addr)
+	last_addr = addr + size - 1;
+	if (!size || last_addr < addr)
 		return NULL;
-
-#if 0
-	/* TODO: Here we can put checks for driver-writer abuse...  */
-
-	/*
-	 * Don't remap the low PCI/ISA area, it's always mapped..
-	 */
-	if (phys_addr >= 0xA0000 && last_addr < 0x100000)
-		return phys_to_virt(phys_addr);
-
-	/*
-	 * Don't allow anybody to remap normal RAM that we're using..
-	 */
-	if (phys_addr < virt_to_phys(high_memory)) {
-		char *t_addr, *t_end;
-		struct page *page;
-
-		t_addr = __va(phys_addr);
-		t_end = t_addr + (size - 1);
-	   
-		for(page = virt_to_page(t_addr); page <= virt_to_page(t_end); page++)
-			if(!PageReserved(page))
-				return NULL;
-	}
-#endif
 
 	/*
 	 * Mappings have to be page-aligned
 	 */
-	offset = phys_addr & ~PAGE_MASK;
-	phys_addr &= PAGE_MASK;
-	size = PAGE_ALIGN(last_addr+1) - phys_addr;
+	offset = addr & ~PAGE_MASK;
+	p = addr & PAGE_MASK;
+	size = PAGE_ALIGN(last_addr+1) - p;
 
-	/*
-	 * Ok, go for it..
-	 */
-	if(mem_init_done) {
-		addr = ioremap_core(phys_addr, size, flags);
+	if (likely(mem_init_done)) {
+		area = get_vm_area(size, VM_IOREMAP);
+		if (!area)
+			return NULL;
+		v = (unsigned long) area->addr;
 	} else {
-//		printk("JONAS JONAS: bt_iorempa_core\n");
-		addr = ioremap_core(phys_addr, size, flags);
-		//addr = bt_ioremap_core(phys_addr, size, flags);
+		if ((fixmaps_used + (size >> PAGE_SHIFT)) > FIX_N_IOREMAPS)
+			return NULL;
+		v = fix_to_virt(FIX_IOREMAP_BEGIN+fixmaps_used);
+		fixmaps_used += (size >> PAGE_SHIFT);
 	}
 
-	return (void *) (offset + (char *)addr);
-}
+	prot = __pgprot(_PAGE_ALL | _PAGE_SRE | _PAGE_SWE |
+			_PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC | flags);
 
-#if 0
-static inline int is_bt_ioremapped(void *addr)
-{
-	unsigned long a = (unsigned long)addr;
-	return (a < FIXADDR_TOP) && (a >= FIXADDR_BOOT_START);
+	if (ioremap_page_range(v, v + size, p, prot)) {
+		if (likely(mem_init_done))
+			vfree(area->addr);
+		else
+			fixmaps_used -= (size >> PAGE_SHIFT);
+		return NULL;
+	}
+
+
+	return (void __iomem *) (offset + (char *)v);
 }
-#endif
 
 void iounmap(void *addr)
 {
-
-//	if(is_bt_ioremapped(addr))
-//		return bt_iounmap(addr);
-	/* FIXME: How does this account for ioremap_bot */
-
-	/* If the page is from the fixmap pool then we just leave it. */ 
+	/* If the page is from the fixmap pool then we just clear out
+	 * the fixmap mapping.
+	 */ 
 	if (unlikely((unsigned long)addr > FIXADDR_START)) {
 		clear_fixmap(virt_to_fix((unsigned long) addr));
 		return;
@@ -241,14 +93,15 @@ void iounmap(void *addr)
 	return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
 
-
-//RGD stolen from PPC probably doesn't work on or32 not called right now
+/*
+ * OR1K has no port-mapped IO, only MMIO
+ */
 void __iomem *ioport_map(unsigned long port, unsigned int len)
 {
-	return (void __iomem *) (port + IO_BASE);
+	BUG();
 }
 
 void ioport_unmap(void __iomem *addr)
 {
-	/* Nothing to do */
+	BUG();	
 }
