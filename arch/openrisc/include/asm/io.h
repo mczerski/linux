@@ -44,23 +44,50 @@ extern void iounmap(void *addr);
 #define virt_to_bus virt_to_phys
 #define bus_to_virt phys_to_virt
 
-/*
- * readX/writeX() are used to access memory mapped devices. On some
- * architectures the memory mapped IO stuff needs to be accessed
- * differently. On the openrisc architecture, we just read/write the
- * memory location directly.
- */
-
 #define __raw_readb(addr) (*(volatile unsigned char *) (addr))
 #define __raw_readw(addr) (*(volatile unsigned short *) (addr))
 #define __raw_readl(addr) (*(volatile unsigned int *) (addr))
-#define readb __raw_readb
-#define readw(addr) (le16_to_cpu(__raw_readw(addr)))
-#define readl(addr) (le32_to_cpu(__raw_readl(addr)))
 
 #define __raw_writeb(b,addr) ((*(volatile unsigned char *) (addr)) = (b))
 #define __raw_writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
 #define __raw_writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
+
+/* Wishbone Interface
+ *
+ * The Wishbone bus can be both big or little-endian, but is generally
+ * of the same endianess as the CPU ("native endian").  As peripherals
+ * are generally synthesized together with the CPU, they will also be
+ * of the same endianess.  In order to simplify things, we assume for
+ * now that there are no memory-mapped IO devices on any other bus than
+ * then the local Wishbone bus and that these devices are all native
+ * endian.
+ */
+
+#define wb_ioread8(p)  __raw_readb(p)
+#define wb_ioread16(p) __raw_readw(p)
+#define wb_ioread32(p) __raw_readl(p)
+
+#define wb_iowrite8(v,p)  __raw_writeb(v,p)
+#define wb_iowrite16(v,p) __raw_writew(v,p)
+#define wb_iowrite32(v,p) __raw_writel(v,p)
+
+/*
+ * readX/writeX() are used to access memory mapped devices.
+ *
+ * Note that these accessors make assumptions about the endianess of
+ * the accessed device and, as such, aren't particularly useful on a
+ * platform like OpenRISC where the device endianess is generally
+ * determined at synthesis time and where the device endianess is
+ * generally the same as the CPU (native endian).
+ *
+ * For OpenRISC it is recommended to use the __iomem accessors
+ * instead of these MMIO accessors.
+ */
+
+#define readb __raw_readb
+#define readw(addr) (le16_to_cpu(__raw_readw(addr)))
+#define readl(addr) (le32_to_cpu(__raw_readl(addr)))
+
 #define writeb __raw_writeb
 #define writew(b,addr) __raw_writew(cpu_to_le16(b), addr)
 #define writel(b,addr) __raw_writel(cpu_to_le32(b), addr)
@@ -150,19 +177,21 @@ static inline void iowrite32_rep(void __iomem *port, void *buf, unsigned long co
 extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
 extern void ioport_unmap(void __iomem *);
 
-/* ioread/iowrite are defined with the __raw_* variants here because we
- * haven't gotten the device/bus endianess bits straightened out for 
- * "native" endianess yet... these should be changed to the non-raw
- * variants when that work's done
+/* __iomem accessors
+ *
+ * These accessors work on __iomem cookies and the recommended means of
+ * doing MMIO access for OpenRISC.  The current assumption for OpenRISC
+ * is that the Wishbone bus is the only bus with memory mapped peripherals
+ * and that the bus endianess (and device endianess) is the same as that
+ * of the CPU.
  */
 
-#define ioread8(addr)           readb(addr)
-#define ioread16(addr)          __raw_readw(addr)
-#define ioread32(addr)          __raw_readl(addr)
+#define ioread8(addr)           wb_ioread8(addr)
+#define ioread16(addr)          wb_ioread16(addr)
+#define ioread32(addr)          wb_ioread32(addr)
 
-#define iowrite8(v, addr)       writeb((v), (addr))
-#define iowrite16(v, addr)      __raw_writew((v), (addr))
-#define iowrite32(v, addr)      __raw_writel((v), (addr))
-
+#define iowrite8(v, addr)       wb_iowrite8((v),(addr))
+#define iowrite16(v, addr)      wb_iowrite16((v),(addr))
+#define iowrite32(v, addr)      wb_iowrite32((v),(addr))
 
 #endif
