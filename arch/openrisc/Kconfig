@@ -154,7 +154,7 @@ config CMDLINE_FORCE
           Set this to have arguments from the default kernel command string
           override those passed by the boot loader.
 
-menu "Debuging options"
+menu "Debugging options"
 
 config DEBUG_STACKOVERFLOW
 	bool "Check for kernel stack overflow"
