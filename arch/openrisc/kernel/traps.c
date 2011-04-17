@@ -142,23 +142,23 @@ void show_registers(struct pt_regs *regs)
 	       "   PC: %08lx    SR: %08lx    SP: %08lx\n",
 	       smp_processor_id(), regs->pc, regs->sr, regs->sp);
 	printk("GPR00: %08lx GPR01: %08lx GPR02: %08lx GPR03: %08lx\n",
-	       0L, regs->sp, regs->gprs[0], regs->gprs[1]);
+	       0L, regs->gpr[1], regs->gpr[2], regs->gpr[3]);
 	printk("GPR04: %08lx GPR05: %08lx GPR06: %08lx GPR07: %08lx\n",
-	       regs->gprs[2], regs->gprs[3], regs->gprs[4], regs->gprs[5]);
+	       regs->gpr[4], regs->gpr[5], regs->gpr[6], regs->gpr[7]);
 	printk("GPR08: %08lx GPR09: %08lx GPR10: %08lx GPR11: %08lx\n",
-	       regs->gprs[6], regs->gprs[7], regs->gprs[8], regs->gprs[9]);
+	       regs->gpr[8], regs->gpr[9], regs->gpr[10], regs->gpr[11]);
 	printk("GPR12: %08lx GPR13: %08lx GPR14: %08lx GPR15: %08lx\n",
-	       regs->gprs[10], regs->gprs[11], regs->gprs[12], regs->gprs[13]);
+	       regs->gpr[12], regs->gpr[13], regs->gpr[14], regs->gpr[15]);
 	printk("GPR16: %08lx GPR17: %08lx GPR18: %08lx GPR19: %08lx\n",
-	       regs->gprs[14], regs->gprs[15], regs->gprs[16], regs->gprs[17]);
+	       regs->gpr[16], regs->gpr[17], regs->gpr[18], regs->gpr[19]);
 	printk("GPR20: %08lx GPR21: %08lx GPR22: %08lx GPR23: %08lx\n",
-	       regs->gprs[18], regs->gprs[19], regs->gprs[20], regs->gprs[21]);
+	       regs->gpr[20], regs->gpr[21], regs->gpr[22], regs->gpr[23]);
 	printk("GPR24: %08lx GPR25: %08lx GPR26: %08lx GPR27: %08lx\n",
-	       regs->gprs[22], regs->gprs[23], regs->gprs[24], regs->gprs[25]);
+	       regs->gpr[24], regs->gpr[25], regs->gpr[26], regs->gpr[27]);
 	printk("GPR28: %08lx GPR29: %08lx GPR30: %08lx GPR31: %08lx\n",
-	       regs->gprs[26], regs->gprs[27], regs->gprs[28], regs->gprs[29]);
+	       regs->gpr[28], regs->gpr[29], regs->gpr[30], regs->gpr[31]);
 	printk("  RES: %08lx oGPR11: %08lx syscallno: %08lx\n",
-	       regs->gprs[9], regs->orig_gpr11, regs->syscallno);
+	       regs->gpr[11], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 	       current->comm, current->pid, (unsigned long)current);
@@ -204,23 +204,23 @@ void nommu_dump_state(struct pt_regs *regs,
 	       "   PC: %08lx    SR: %08lx    SP: %08lx\n",
 	       0, regs->pc, regs->sr, regs->sp);
 	printk("GPR00: %08lx GPR01: %08lx GPR02: %08lx GPR03: %08lx\n",
-	       0L, regs->sp, regs->gprs[0], regs->gprs[1]);
+	       0L, regs->gpr[1], regs->gpr[2], regs->gpr[3]);
 	printk("GPR04: %08lx GPR05: %08lx GPR06: %08lx GPR07: %08lx\n",
-	       regs->gprs[2], regs->gprs[3], regs->gprs[4], regs->gprs[5]);
+	       regs->gpr[4], regs->gpr[5], regs->gpr[6], regs->gpr[7]);
 	printk("GPR08: %08lx GPR09: %08lx GPR10: %08lx GPR11: %08lx\n",
-	       regs->gprs[6], regs->gprs[7], regs->gprs[8], regs->gprs[9]);
+	       regs->gpr[8], regs->gpr[9], regs->gpr[10], regs->gpr[11]);
 	printk("GPR12: %08lx GPR13: %08lx GPR14: %08lx GPR15: %08lx\n",
-	       regs->gprs[10], regs->gprs[11], regs->gprs[12], regs->gprs[13]);
+	       regs->gpr[12], regs->gpr[13], regs->gpr[14], regs->gpr[15]);
 	printk("GPR16: %08lx GPR17: %08lx GPR18: %08lx GPR19: %08lx\n",
-	       regs->gprs[14], regs->gprs[15], regs->gprs[16], regs->gprs[17]);
+	       regs->gpr[16], regs->gpr[17], regs->gpr[18], regs->gpr[19]);
 	printk("GPR20: %08lx GPR21: %08lx GPR22: %08lx GPR23: %08lx\n",
-	       regs->gprs[18], regs->gprs[19], regs->gprs[20], regs->gprs[21]);
+	       regs->gpr[20], regs->gpr[21], regs->gpr[22], regs->gpr[23]);
 	printk("GPR24: %08lx GPR25: %08lx GPR26: %08lx GPR27: %08lx\n",
-	       regs->gprs[22], regs->gprs[23], regs->gprs[24], regs->gprs[25]);
+	       regs->gpr[24], regs->gpr[25], regs->gpr[26], regs->gpr[27]);
 	printk("GPR28: %08lx GPR29: %08lx GPR30: %08lx GPR31: %08lx\n",
-	       regs->gprs[26], regs->gprs[27], regs->gprs[28], regs->gprs[29]);
+	       regs->gpr[28], regs->gpr[29], regs->gpr[30], regs->gpr[31]);
 	printk("  RES: %08lx oGPR11: %08lx syscallno: %08lx\n",
-	       regs->gprs[9], regs->orig_gpr11, regs->syscallno);
+	       regs->gpr[11], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 	       ((struct task_struct*)(__pa(current)))->comm, 
