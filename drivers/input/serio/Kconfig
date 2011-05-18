@@ -234,4 +234,11 @@ config SERIO_PS2MULT
 	  To compile this driver as a module, choose M here: the
 	  module will be called ps2mult.
 
+config SERIO_OPENCORES_PS2
+	tristate "OpenCores PS/2 controller"
+	help
+	  Say Y here if you have OpenCores PS/2 ports.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called opencores_ps2.
 endif
