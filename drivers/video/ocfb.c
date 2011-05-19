@@ -396,24 +396,18 @@ static int ocfb_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#ifdef CONFIG_OF
 static struct of_device_id ocfb_match[] = {
-	{
-		.compatible = "opencores,ocfb",
-	},
+	{ .compatible = "opencores,ocfb", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, ocfb_match);
-#endif
 
 static struct platform_driver ocfb_driver = {
 	.probe  = ocfb_probe,
 	.remove	= ocfb_remove,
 	.driver = {
 		.name = "ocfb_fb",
-#ifdef CONFIG_OF
 		.of_match_table = ocfb_match,
-#endif
 	}
 };
 
