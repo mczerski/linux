@@ -95,7 +95,6 @@ static int __init ocfb_setup(char *options)
 		mode_option = curr_opt;
 	}
 	
-	printk(KERN_INFO "ocfb: mode_option = %s\n", mode_option);
 	return 0;
 }
 #endif
@@ -160,9 +159,8 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 	/* maximum (8) VBL (video memory burst length)*/
 	bpp_config |= VGA_CTRL_VBL8;
     
-
-	printk(KERN_INFO "ocfb: enabling framebuffer (bpp==%d)\n", 
-	       var->bits_per_pixel);
+	printk(KERN_INFO "ocfb: enabling framebuffer (%s)\n", 
+	       mode_option);
 
 	/* Enable VGA */
 	ocfb_writereg(regs, VGA_CTRL, 
