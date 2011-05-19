@@ -68,7 +68,7 @@ struct ocfb_dev {
 	void __iomem  *regs;
 	/* Physical and virtual addresses of framebuffer */
 	phys_addr_t    fb_phys;
-	void __iomem  *fb_virt;	
+	void __iomem  *fb_virt;
 	u32            pseudo_palette[PALETTE_SIZE];
 };
 
@@ -94,7 +94,7 @@ static int __init ocfb_setup(char *options)
 			continue;
 		mode_option = curr_opt;
 	}
-	
+
 	return 0;
 }
 #endif
@@ -110,7 +110,7 @@ static inline void ocfb_writereg(void __iomem *base, loff_t offset, u32 data)
 }
 
 static int ocfb_setupfb(struct ocfb_dev *fbdev)
-{	
+{
 	unsigned long             bpp_config;
 	struct fb_var_screeninfo *var   = &fbdev->info.var;
 	void __iomem             *regs  = fbdev->regs;
@@ -118,52 +118,52 @@ static int ocfb_setupfb(struct ocfb_dev *fbdev)
 
 	/* Horizontal timings */
 	ocfb_writereg(regs, VGA_HTIM,
-		      ((var->hsync_len    - 1) << 24) | 
-		      ((var->right_margin - 1) << 16) | 
+		      ((var->hsync_len    - 1) << 24) |
+		      ((var->right_margin - 1) << 16) |
 		      ( var->xres         - 1));
 
 	/* Vertical timings */
-	ocfb_writereg(regs, VGA_VTIM, 
-		      ((var->vsync_len    - 1) << 24) | 
-		      ((var->lower_margin - 1) << 16) | 
+	ocfb_writereg(regs, VGA_VTIM,
+		      ((var->vsync_len    - 1) << 24) |
+		      ((var->lower_margin - 1) << 16) |
 		      ( var->yres         - 1));
-	
+
 	/* Total length of frame */
-	hlen = var->left_margin  + var->right_margin + 
+	hlen = var->left_margin  + var->right_margin +
 	       var->hsync_len    + var->xres;
 
 	vlen = var->upper_margin + var->lower_margin +
 	       var->vsync_len    + var->yres;
 
-	ocfb_writereg(regs, VGA_HVLEN, 
-		      ((hlen - 1) << 16) | 
+	ocfb_writereg(regs, VGA_HVLEN,
+		      ((hlen - 1) << 16) |
 		      ( vlen - 1));
-	
+
 	/* Register framebuffer address */
 	ocfb_writereg(regs, VGA_VBARA, fbdev->fb_phys);
 
 	bpp_config = VGA_CTRL_CD8;
 	switch (var->bits_per_pixel) {
-	case 8:	
+	case 8:
 		if (!var->grayscale)
 		    bpp_config |= VGA_CTRL_PC;  /* enable palette */
 		break;
 	case 16: bpp_config |= VGA_CTRL_CD16; break;
 	case 24: bpp_config |= VGA_CTRL_CD24; break;
 	case 32: bpp_config |= VGA_CTRL_CD32; break;
-	default: 
-		printk(KERN_ERR "ocfb: no bpp specified\n"); 
+	default:
+		printk(KERN_ERR "ocfb: no bpp specified\n");
 		break;
 	}
-	
+
 	/* maximum (8) VBL (video memory burst length)*/
 	bpp_config |= VGA_CTRL_VBL8;
-    
-	printk(KERN_INFO "ocfb: enabling framebuffer (%s)\n", 
+
+	printk(KERN_INFO "ocfb: enabling framebuffer (%s)\n",
 	       mode_option);
 
 	/* Enable VGA */
-	ocfb_writereg(regs, VGA_CTRL, 
+	ocfb_writereg(regs, VGA_CTRL,
 		     (VGA_CTRL_VEN |  bpp_config));
 	return 0;
 }
@@ -172,7 +172,7 @@ static int ocfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			  unsigned blue, unsigned transp,
 			  struct fb_info *info)
 {
-	struct ocfb_par *par = (struct ocfb_par *)info->par;	
+	struct ocfb_par *par = (struct ocfb_par *)info->par;
 	u32 color;
 
 	if (regno >= info->cmap.len) {
@@ -201,7 +201,7 @@ static int ocfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			(blue   << info->var.blue.offset)  |
 			(transp << info->var.transp.offset);
 	}
-       	return 0;
+	return 0;
 }
 static int ocfb_init_fix(struct ocfb_dev *fbdev)
 {
@@ -285,14 +285,14 @@ static int ocfb_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, fbdev);
 
-        fbdev->info.fbops  = &ocfb_ops;
+	fbdev->info.fbops  = &ocfb_ops;
 	fbdev->info.var    = ocfb_var;
 	fbdev->info.fix    = ocfb_fix;
 	fbdev->info.device = &pdev->dev;
 	fbdev->info.par    = par;
 
 	/* Video mode setup */
-	if (!fb_find_mode(&fbdev->info.var, &fbdev->info, mode_option, 
+	if (!fb_find_mode(&fbdev->info.var, &fbdev->info, mode_option,
 			  NULL, 0, &default_mode, 16)) {
 		dev_err(&pdev->dev, "No valid video modes found\n");
 		ret = -EINVAL;
@@ -318,15 +318,15 @@ static int ocfb_probe(struct platform_device *pdev)
 		goto err_free;
 	}
 	fbdev->regs = devm_ioremap_nocache(&pdev->dev, mmio->start,
-				           resource_size(mmio));
+					   resource_size(mmio));
 	if (!fbdev->regs) {
 		dev_err(&pdev->dev, "I/O memory remap request failed\n");
 		ret = -ENXIO;
-		goto err_iomap;		
+		goto err_iomap;
 	}
 	par->pal_adr = (fbdev->regs + VGA_PALETTE);
 
-	/* Allocate framebuffer memory */       
+	/* Allocate framebuffer memory */
 	fbsize = fbdev->info.fix.smem_len;
 	fbdev->fb_virt = dma_alloc_coherent(&pdev->dev, PAGE_ALIGN(fbsize),
 					    &fbdev->fb_phys, GFP_KERNEL);
@@ -342,11 +342,11 @@ static int ocfb_probe(struct platform_device *pdev)
 	/* Clear framebuffer */
 	memset_io((void __iomem *)fbdev->fb_virt, 0, fbsize);
 
-	/* Setup and enable the framebuffer */ 
+	/* Setup and enable the framebuffer */
 	ocfb_setupfb(fbdev);
 
 	/* Allocate color map */
-	ret = fb_alloc_cmap(&fbdev->info.cmap, PALETTE_SIZE, 0); 
+	ret = fb_alloc_cmap(&fbdev->info.cmap, PALETTE_SIZE, 0);
 	if (ret) {
 		dev_err(&pdev->dev, "Color map allocation failed\n");
 		goto err_cmap;
@@ -383,7 +383,7 @@ static int ocfb_remove(struct platform_device *pdev)
 	fb_dealloc_cmap(&fbdev->info.cmap);
 	dma_free_coherent(&pdev->dev, PAGE_ALIGN(fbdev->info.fix.smem_len),
 			  fbdev->fb_virt, fbdev->fb_phys);
-	
+
 	/* Disable display */
 	ocfb_writereg(fbdev, VGA_CTRL, 0);
 
