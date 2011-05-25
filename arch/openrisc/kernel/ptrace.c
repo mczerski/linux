@@ -250,7 +250,7 @@ get_next_address(struct task_struct *tsk, unsigned long pc,
 		/* Register number holding branch target is encoded in rB slot
 		   of instruction. Extract it. */
 		rB = (insn >> 11) & 0x1f;
-		pr_debug(KERN_INFO "ptrace get_next_address: jump reg from r%d=0x%08lx\n",
+		pr_debug(KERN_INFO "ptrace get_next_address: jump reg from r%ld=0x%08lx\n",
 		       rB,/* *((unsigned long*)((char*)regs + (rB<<2) + 4))*/ regs->gprs[rB-2]);
 		if (rB < 2)
 			pr_debug(KERN_WARNING "ptrace get_next_address(): Warning, JR with GPR < 2");
@@ -349,7 +349,7 @@ static void clear_breakpoint(struct task_struct *tsk, struct debug_entry *bp)
 		// Trapped for some other reason.
 		pr_debug(KERN_INFO "ptrace clear_breakpoint: not correct, pc 0x%.8lx bp 0x%.8lx\n",
 		       pc, addr);
-		pr_debug(KERN_INFO "ptrace clear_breakpoint: 0x%.8lx 0x%.8lx %d\n",
+		pr_debug(KERN_INFO "ptrace clear_breakpoint: 0x%.8lx 0x%.8lx %ld\n",
 		       bp->branch_insn_address, bp->branch_target, bp->branch);
 		return;
 	}
@@ -421,7 +421,7 @@ void ptrace_set_bpt(struct task_struct *tsk)
  */
 void ptrace_cancel_bpt(struct task_struct *tsk)
 {
-	clear_breakpoint(tsk, &current_thread_info()->debug);
+	clear_breakpoint(tsk, (struct debug_entry*) &current_thread_info()->debug);
 }
 
 
