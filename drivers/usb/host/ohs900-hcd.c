@@ -959,10 +959,10 @@ static int ohs900h_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 		else
 			pr_debug("dequeue, urb %p active %s; wait4irq\n", urb,
 			     (ohs900->active_a == ep) ? "A" : "B");
-	} else
+	}
 
 fail:
-		spin_unlock_irqrestore(&ohs900->lock, flags);
+	spin_unlock_irqrestore(&ohs900->lock, flags);
 	return retval;
 }
 
