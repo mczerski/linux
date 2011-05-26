@@ -1026,13 +1026,18 @@ static int ohs900h_hub_status_data(struct usb_hcd *hcd, char *buf)
 static void
 ohs900h_hub_descriptor(struct ohs900 *ohs900, struct usb_hub_descriptor *desc)
 {
-	u16 temp = 0;
+	u16 temp;
 
 	desc->bDescriptorType = 0x29;
 	desc->bHubContrCurrent = 0;
 
 	desc->bNbrPorts = 1;
-	desc->bDescLength = 9;
+	desc->bDescLength = 7 + 2 * desc->bNbrPorts;
+
+	temp = 1 + (desc->bNbrPorts / 8);
+	/* two bitmaps:  ports removable, and usb 1.0 legacy PortPwrCtrlMask */
+	memset(&desc->u.hs.DeviceRemovable[0], 0, temp);
+	memset(&desc->u.hs.DeviceRemovable[temp], 0xff, temp);
 
 	/* per-port power switching (gang of one!), or none */
 	desc->bPwrOn2PwrGood = 0;
@@ -1040,18 +1045,14 @@ ohs900h_hub_descriptor(struct ohs900 *ohs900, struct usb_hub_descriptor *desc)
 		desc->bPwrOn2PwrGood = ohs900->board->potpg;
 		if (!desc->bPwrOn2PwrGood)
 			desc->bPwrOn2PwrGood = 10;
-		temp = 0x0001;
+		temp = 0x0001;	/* per-port power control */
 	} else
-		temp = 0x0002;
+		temp = 0x0002;	/* no power switching */
 
 	/* no overcurrent errors detection/handling */
 	temp |= 0x0010;
 
 	desc->wHubCharacteristics = cpu_to_le16(temp);
-
-	/* two bitmaps:  ports removable, and legacy PortPwrCtrlMask */
-	desc->bitmap[0] = 0 << 1;
-	desc->bitmap[1] = ~0;
 }
 
 static void ohs900h_timer(unsigned long _ohs900)
