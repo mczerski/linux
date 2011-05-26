@@ -48,7 +48,7 @@ union semun {
 	unsigned short __user *array;	/* array for GETALL & SETALL */
 	struct seminfo __user *__buf;	/* buffer for IPC_INFO */
 	void __user *__pad;
-};
+} __attribute__ ((transparent_union));
 
 struct  seminfo {
 	int semmap;
