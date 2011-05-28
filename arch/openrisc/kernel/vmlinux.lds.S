@@ -77,7 +77,7 @@ SECTIONS
 	/* Align __setup_start on 16 byte boundary */
 	INIT_DATA_SECTION(16)
 
-	PERCPU(L1_CACHE_BYTES, PAGE_SIZE)
+	PERCPU_SECTION(L1_CACHE_BYTES)
 
         __init_end = .;
 	
