@@ -1,16 +1,18 @@
 /*
- * Implements the generic device dma API for OpenRISC
+ * OpenRISC Linux
  *
- * Derived from MicroBlaze version:
- *  Copyright (C) 2009-2010 Michal Simek <monstr@monstr.eu>
- *  Copyright (C) 2009-2010 PetaLogix
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source
+ * declaration.
  *
- * This file is subject to the terms and conditions of the GNU General
- * Public License. See the file COPYING in the main directory of this
- * archive for more details.
+ * OpenRISC implementation:
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ * et al.
  *
- * This file is base on powerpc and x86 dma-mapping.h versions
- * Copyright (C) 2004 IBM
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  */
 
 #ifndef __ASM_OPENRISC_DMA_MAPPING_H

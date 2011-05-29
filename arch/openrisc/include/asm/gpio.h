@@ -1,11 +1,14 @@
 /*
- * Generic GPIO API implementation for OpenRISC
+ * OpenRISC Linux
  *
- * Copyright (c) 2010 Jonas Bonn
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source
+ * declaration.
  *
- * Derived from arch/microblaze/include/asm/gpio.h
- *   Copyright (c) 2007-2008  MontaVista Software, Inc.
- *   Author: Anton Vorontsov <avorontsov@ru.mvista.com>
+ * OpenRISC implementation:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ * et al.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by

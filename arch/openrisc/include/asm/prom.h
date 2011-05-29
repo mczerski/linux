@@ -1,15 +1,18 @@
 /*
- * Definitions for talking to the Open Firmware PROM on
- * Power Macintosh computers.
+ * OpenRISC Linux
  *
- * Copyright (C) 1996-2005 Paul Mackerras.
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source
+ * declaration.
  *
- * Updates for PPC64 by Peter Bergner & David Engebretsen, IBM Corp.
+ * OpenRISC implementation:
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ * et al.
  *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  */
 
 #include <linux/of.h>	/* linux/of.h gets to determine #include ordering */

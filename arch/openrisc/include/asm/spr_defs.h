@@ -1,56 +1,21 @@
-/* ipc.h.  Microkernel IPC header for Or1ksim
-	
-   Copyright (C) 2000 Damjan Lampret
-   Copyright (C) 2008, 2010 Embecosm Limited
-   
-   Contributor Damjan Lampret <lampret@opencores.org>
-   Contributor Jeremy Bennett <jeremy.bennett@embecosm.com>
-
-   This file is part of OpenRISC 1000 Architectural Simulator.
-
-   This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License as published by the Free
-   Software Foundation; either version 3 of the License, or (at your option)
-   any later version.
-
-   This program is distributed in the hope that it will be useful, but WITHOUT
-   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-   more details.
-
-   You should have received a copy of the GNU General Public License along
-   with this program.  If not, see <http:  www.gnu.org/licenses/>.  */
-
-/* ----------------------------------------------------------------------------
-   This code is commented throughout for use with Doxygen.
-   --------------------------------------------------------------------------*/
-
-/* This file is part of test microkernel for OpenRISC 1000. */
-/* spr-defs.h -- Defines OR1K architecture specific special-purpose registers
-
-   Copyright (C) 1999 Damjan Lampret, lampret@opencores.org
-   Copyright (C) 2008 Embecosm Limited
-  
-   Contributor Jeremy Bennett <jeremy.bennett@embecosm.com>
-  
-   This file is part of OpenRISC 1000 Architectural Simulator.
-  
-   This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License as published by the Free
-   Software Foundation; either version 3 of the License, or (at your option)
-   any later version.
-  
-   This program is distributed in the hope that it will be useful, but WITHOUT
-   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-   more details.
-  
-   You should have received a copy of the GNU General Public License along
-   with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-/* This program is commented throughout in a fashion suitable for processing
-   with Doxygen. */
-
+/*
+ * OpenRISC Linux
+ *
+ * SPR Definitions
+ *
+ * Copyright (C) 2000 Damjan Lampret
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2008, 2010 Embecosm Limited
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ * et al.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This file is part of OpenRISC 1000 Architectural Simulator.
+ */
 
 #ifndef SPR_DEFS__H
 #define SPR_DEFS__H
