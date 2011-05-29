@@ -73,13 +73,13 @@ source "init/Kconfig"
 menu "Processor type and features"
 
 choice 
-	prompt "Subarchitecture/SoC type"
-	default OPENRISC_GENERIC
+	prompt "Subarchitecture"
+	default OR1K_1200
 
-config OPENRISC_GENERIC
-	bool "or1200/Generic"
+config OR1K_1200
+	bool "OR1200"
 	help
-	  Generic OpenRISC 1200 platform
+	  Generic OpenRISC 1200 architecture
 
 endchoice
 
@@ -121,14 +121,14 @@ source kernel/Kconfig.preempt
 source "mm/Kconfig"
 
 config OPENRISC_NO_SPR_SR_DSX
-	bool "use SPR_SR_DSX software emulation" if OPENRISC_GENERIC
+	bool "use SPR_SR_DSX software emulation" if OR1K_1200
 	default y
 	help
 	  SPR_SR_DSX bit is status register bit indicating whether
 	  the last exception has happened in delay slot.	
 
 	  OpenRISC architecture makes it optional to have it implemented
- 	  in hardware, and Marvin and Highland SoC do not have it.
+	  in hardware and the OR1200 does not have it.
 
 	  Say N here if you know that your OpenRISC processor has
 	  SPR_SR_DSX bit implemented. Say Y if you are unsure.
