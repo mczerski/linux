@@ -1,15 +1,21 @@
 /*
- *      Precise Delay Loops for or32
+ * OpenRISC delay.c
  *
- *      Copyright (C) 1993 Linus Torvalds
- *      Copyright (C) 1997 Martin Mares <mj@atrey.karlin.mff.cuni.cz>
- *	Copyright (C) 2005-2006 Atmel Corporation
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      version 2 as published by the Free Software Foundation
+ *
+ * Precise Delay Loops
  */
-
+ 
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/timex.h>
