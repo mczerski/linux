@@ -1,33 +1,20 @@
 /*
- *  linux/arch/or32/kernel/ptrace.c
+ * OpenRISC ptrace.c
  *
- *  or32 version
- *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2005 Gyorgy Jeney <nog@bsemi.com>
+ * Copyright (C) 2010 Julius Baxter <julius.baxter@orsoc.se>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
- *  derived from cris, i386, m68k, ppc, sh ports.
- *
- *  changes:
- *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
- *    initial port to or32 architecture
- *  31. 12. 2005: Gyorgy Jeney (nog@bsemi.com)
- *    Added actual ptrace implementation except for single step traceing
- *    (Basically copy arch/i386/kernel/ptrace.c)
- *
- *  Based on:
- *
- *  linux/arch/m68k/kernel/ptrace
- *
- *  Copyright (C) 1994 by Hamish Macdonald
- *  Taken from linux/kernel/ptrace.c and modified for M680x0.
- *  linux/kernel/ptrace.c is by Ross Biro 1/23/92, edited by Linus Torvalds
- *
- * This file is subject to the terms and conditions of the GNU General
- * Public License.  See the file COPYING in the main directory of
- * this archive for more details.
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
  */
 
 #include <stddef.h>

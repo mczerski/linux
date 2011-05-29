@@ -1,12 +1,23 @@
-/* ld script to make Linux/or32 kernel
- * Authors: Matjaz Breskvar <phoenix@bsemi.com>
+/*
+ * OpenRISC vmlinux.lds.S
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
+ *
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
+ *
+ * ld script for OpenRISC architecture
  */
 
-/* __PHX__ :: TODO 
+/* TODO 
  *		- clean up __offset & stuff
  *		- change all 8192 aligment to PAGE !!!
  *		- recheck if all aligments are really needed

@@ -1,21 +1,21 @@
 /*
- * Architecture specific procedures for creating, accessing and 
- * interpreting the device tree.
+ * OpenRISC prom.c
  *
- * Copyright (C) 2010 Jonas Bonn
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- * Based on arch/microblaze/kernel/prom.c with following ownership:
- *
- * Paul Mackerras	August 1996.
- * Copyright (C) 1996-2005 Paul Mackerras.
- *
- *  Adapted for 64bit PowerPC by Dave Engebretsen and Peter Bergner.
- *    {engebret|bergner}@us.ibm.com
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
+ *
+ * Architecture specific procedures for creating, accessing and 
+ * interpreting the device tree.
+ *
  */
 
 #include <stdarg.h>

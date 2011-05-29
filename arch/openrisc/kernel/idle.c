@@ -1,30 +1,21 @@
 /*
- *  linux/arch/or32/kernel/idle.c
+ * OpenRISC idle.c
  *
- *  or32 version
- *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
- *  derived from cris, i386, m68k, ppc, sh ports.
- *
- *  changes:
- *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
- *    initial port to or32 architecture
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
  *
  * Idle daemon for or32.  Idle daemon will handle any action
  * that needs to be taken when the system becomes idle.
- *
- * Based on:
- * arch/ppc/kernel/idle.c
- * Written by Cort Dougan (cort@cs.nmt.edu)
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version
- * 2 of the License, or (at your option) any later version.
  */
 
 #include <linux/errno.h>

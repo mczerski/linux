@@ -1,7 +1,5 @@
-# Linux/or32 Makefile
 #
 # Makefile for the linux kernel.
-#
 #
 
 extra-y	:= head.o vmlinux.lds init_task.o

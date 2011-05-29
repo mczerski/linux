@@ -1,26 +1,23 @@
 /*
- *  linux/arch/or32/kernel/sys_or32.c
+ * OpenRISC sys_or32.c
  *
- *  or32 version
- *    author(s): Matjaz Breskvar (phoenix@bsemi.com)
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- *  For more information about OpenRISC processors, licensing and
- *  design services you may contact Beyond Semiconductor at
- *  sales@bsemi.com or visit website http://www.bsemi.com.
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
- *  derived from cris, i386, m68k, ppc, sh ports.
- *
- *  changes:
- *  18. 11. 2003: Matjaz Breskvar (phoenix@bsemi.com)
- *    initial port to or32 architecture
- *
- * based on: linux/arch/cris/kernel/sys_cris.c
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
  *
  * This file contains various random system calls that
  * have a non-standard calling sequence on some platforms.
  * Since we don't have to do any backwards compatibility, our
  * versions are done in the most "normal" way possible.
- *
  */
 
 #include <linux/errno.h>
