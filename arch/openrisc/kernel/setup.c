@@ -37,6 +37,8 @@
 #include <linux/of_fdt.h>
 #include <linux/of.h>
 #include <linux/memblock.h>
+#include <linux/device.h>
+#include <linux/of_platform.h>
  
 #include <asm/segment.h>
 #include <asm/system.h>
@@ -254,6 +256,18 @@ void __init or32_early_setup(/*unsigned long fdt*/ void) {
 
 }
 
+const struct of_device_id openrisc_bus_ids[] = {
+        { .type = "soc", },
+        { .compatible = "soc", },
+        {},
+};
+
+static int __init openrisc_device_probe(void)
+{
+        of_platform_bus_probe(NULL, openrisc_bus_ids, NULL);
+        return 0;
+}
+device_initcall(openrisc_device_probe);
 
 
 static inline unsigned long extract_value_bits(unsigned long reg, 

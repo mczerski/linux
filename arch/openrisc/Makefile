@@ -53,8 +53,7 @@ head-y 		:= arch/openrisc/kernel/head.o arch/openrisc/kernel/init_task.o
 
 core-y		+= arch/openrisc/lib/ \
 		   arch/openrisc/kernel/ \
-		   arch/openrisc/mm/ \
-		   arch/openrisc/board/ 
+		   arch/openrisc/mm/
 libs-y		+= $(LIBGCC)
 
 ifneq '$(CONFIG_OPENRISC_BUILTIN_DTB)' '""'
