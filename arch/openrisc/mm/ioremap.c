@@ -1,13 +1,18 @@
 /*
- * ioremap.c
+ * OpenRISC ioremap.c
  *
- * Re-map IO memory to kernel address space so that we can access it.
- * Needed for memory-mapped I/O devices mapped outside our normal DRAM
- * window (that is, all memory-mapped I/O devices).
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- * (C) Copyright 1995 1996 Linus Torvalds
- * OpenRISC version by:
- *   2010 Jonas Bonn
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
  */
 
 #include <linux/vmalloc.h>

@@ -1,17 +1,19 @@
 /*
- * OR32 support for cache consistent memory.
- * Copyright (C) 2010 Michal Simek <monstr@monstr.eu>
- * Copyright (C) 2010 PetaLogix
- * Copyright (C) 2005 John Williams <jwilliams@itee.uq.edu.au>
+ * OpenRISC consistent.c
  *
- * Based on Microblaze version which was derived from PowerPC version 
- * which was, in turn, derived from arch/arm/mm/consistent.c
- * Copyright (C) 2001 Dan Malek (dmalek@jlc.net)
- * Copyright (C) 2000 Russell King
+ * Linux architectural port borrowing liberally from similar works of
+ * others.  All original copyrights apply as per the original source 
+ * declaration.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Modifications for the OpenRISC architecture:
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
+ *
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
+ * 
+ * OpenRISC support for cache consistent memory.
  */
 
 #include <linux/module.h>
