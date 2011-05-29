@@ -1,7 +1,7 @@
 /*
  * OpenRISC IRQ
  *
- * Copyright (C) 2010 Jonas Bonn <jonas@southpole.se>
+ * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -36,24 +36,21 @@ EXPORT_SYMBOL(arch_local_irq_restore);
 
 /* OR1K PIC implementation */
 
-static const char const * irq_name[NR_IRQS] = {
-	"int0", "int1", "int2", "int3",	"int4", "int5", "int6", "int7",
-	"int8", "int9", "int10", "int11", "int12", "int13", "int14", "int15",
-	"int16", "int17", "int18", "int19", "int20", "int21", "int22", "int23",
-	"int24", "int25", "int26", "int27", "int28", "int29", "int30", "int31",
-};
+/* We're a couple of cycles faster than the generic implementations with
+ * these 'fast' versions.
+ */
 
-static void pic_mask(struct irq_data *data)
+static void or1k_pic_mask(struct irq_data *data)
 {
 	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->irq));
 }
 
-static void pic_unmask(struct irq_data *data)
+static void or1k_pic_unmask(struct irq_data *data)
 {
 	mtspr(SPR_PICMR, mfspr(SPR_PICMR) | (1UL << data->irq));
 }
 
-static void pic_ack(struct irq_data *data)
+static void or1k_pic_ack(struct irq_data *data)
 {
 	/* EDGE-triggered interrupts need to be ack'ed in order to clear
 	 * the latch.  
@@ -62,30 +59,40 @@ static void pic_ack(struct irq_data *data)
 	 * trying to figure out what type it is...
 	 */
 
-	/* FIXME: This is contrary to spec which says write 1 to ack
-	 * interrupt... */
-//	mtspr(SPR_PICSR, (1UL << irq)); 
+	/* The OpenRISC 1000 spec says to write a 1 to the bit to ack the
+	 * interrupt, but the OR1200 does this backwards and requires a 0
+	 * to be written...
+	 */
+
+#ifdef CONFIG_OR1K_1200
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));
+#else
+	WARN(1, "Interrupt handling possibily broken\n");
+	mtspr(SPR_PICSR, (1UL << irq));
+#endif
 }
 
-static void pic_mask_ack(struct irq_data *data)
+static void or1k_pic_mask_ack(struct irq_data *data)
 {
-	/* Comment for pic_ack applies here, too */
+	/* Comments for pic_ack apply here, too */
 
 	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->irq));
-	/* FIXME: This is contrary to spec which says write 1 to ack
-	 * interrupt... */
-//	mtspr(SPR_PICSR, (1UL << irq)); 
+
+#ifdef CONFIG_OR1K_1200
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));
+#else
+	WARN(1, "Interrupt handling possibily broken\n");
+	mtspr(SPR_PICSR, (1UL << irq));
+#endif
 }
 
-static int pic_set_type(struct irq_data *data, unsigned int flow_type) {
+static int or1k_pic_set_type(struct irq_data *data, unsigned int flow_type) {
 	/* There's nothing to do in the PIC configuration when changing
 	 * flow type.  Level and edge-triggered interrupts are both
 	 * supported, but it's PIC-implementation specific which type
 	 * is handled. */
 
-	return 0;
+	return irq_setup_alt_chip(data, flow_type);
 }
 
 static inline int pic_get_irq(int first)
@@ -97,31 +104,37 @@ static inline int pic_get_irq(int first)
 	return irq ? irq + first - 1 : NO_IRQ;
 }
 
-static struct irq_chip or1k_pic = {
-	.name = "or1k-PIC",
-	.irq_unmask = pic_unmask,
-	.irq_mask = pic_mask,
-	.irq_ack = pic_ack,
-	.irq_mask_ack = pic_mask_ack,
-	.irq_set_type = pic_set_type
-};
-
-void __init init_IRQ(void)
+static void __init or1k_irq_init(void)
 {
-	int i;
-
-	/* Setup IRQ descriptors... these all default to LEVEL triggered
-	 * so if EDGE triggered is needed then this needs to be fixed
-	 * up.
-	 */
-	for (i = 0; i < NR_IRQS; i++) {
-		irq_set_chip_and_handler_name(i, &or1k_pic,
-			handle_level_irq, irq_name[i]);
-/*		irq_desc[i].status |= IRQ_LEVEL;*/
-	}
+        struct irq_chip_generic *gc;
+        struct irq_chip_type *ct;
 
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
+
+	gc = irq_alloc_generic_chip("or1k-PIC", 1, 0, 0, handle_level_irq);
+	ct = gc->chip_types;
+
+	ct->chip.irq_unmask = or1k_pic_unmask;
+	ct->chip.irq_mask = or1k_pic_mask;
+	ct->chip.irq_ack = or1k_pic_ack;
+	ct->chip.irq_mask_ack = or1k_pic_mask_ack;
+	ct->chip.irq_set_type = or1k_pic_set_type;
+
+	/* The OR1K PIC can handle both level and edge trigged
+	 * interrupts in roughly the same manner
+	 */
+#if 0
+	/* FIXME: chip.type??? */
+	ct->chip.type = IRQ_TYPE_EDGE_BOTH | IRQ_TYPE_LEVEL_MASK;
+#endif
+
+        irq_setup_generic_chip(gc, IRQ_MSK(NR_IRQS), 0,
+                               IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+}
+
+void __init init_IRQ(void) {
+	or1k_irq_init();
 }
 
 void __irq_entry do_IRQ(struct pt_regs *regs)
