@@ -47,7 +47,6 @@ Changelog:
 /*#define DEBUG*/
 #undef DEBUG
 
-#include <linux/platform_device.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -61,18 +60,13 @@ Changelog:
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/usb.h>
-
 #include <linux/of.h>
 #include <linux/platform_device.h>
-
 #include <linux/io.h>
 #include <linux/irq.h>
-/*#include <asm/system.h>
-#include <asm/byteorder.h>
-*/
+#include <linux/prefetch.h>
 
 #include <linux/ohs900.h>
-
 #include <linux/usb/hcd.h>
 #include "ohs900-hcd.h"
 
