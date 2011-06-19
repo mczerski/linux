@@ -2,7 +2,7 @@
  * OpenRISC vmlinux.lds.S
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -17,7 +17,7 @@
  * ld script for OpenRISC architecture
  */
 
-/* TODO 
+/* TODO
  *		- clean up __offset & stuff
  *		- change all 8192 aligment to PAGE !!!
  *		- recheck if all aligments are really needed
@@ -29,21 +29,19 @@
 #include <asm/page.h>
 #include <asm/cache.h>
 #include <asm-generic/vmlinux.lds.h>
-	
+
 OUTPUT_FORMAT("elf32-or32", "elf32-or32", "elf32-or32")
-/*OUTPUT_ARCH(or32)*/
 jiffies = jiffies_64 + 4;
-/*PAGE_SIZE = 8192;*/
 
 SECTIONS
 {
         /* Read-only sections, merged into text segment: */
-        . = LOAD_BASE ; 
+        . = LOAD_BASE ;
 
 	/* _s_kernel_ro must be page aligned */
-	. = ALIGN(8192);
+	. = ALIGN(PAGE_SIZE);
 	_s_kernel_ro = .;
-	
+
         .text                   : AT(ADDR(.text) - LOAD_OFFSET)
 	{
           _stext = .;
@@ -63,13 +61,13 @@ SECTIONS
 	_sdata = .;
 
 	/* Page alignment required for RO_DATA_SECTION */
-	RO_DATA_SECTION(8192)
+	RO_DATA_SECTION(PAGE_SIZE)
 	_e_kernel_ro = .;
 
 	/* Whatever comes after _e_kernel_ro had better be page-aligend, too */
 
-	/* 32 here is cacheline size... recheck this <-- Jonas */
-	RW_DATA_SECTION(32, 8192, 8192)
+	/* 32 here is cacheline size... recheck this */
+	RW_DATA_SECTION(32, PAGE_SIZE, PAGE_SIZE)
 
         _edata  =  .;
 
@@ -77,13 +75,13 @@ SECTIONS
 	NOTES
 
 	/* Init code and data */
-	. = ALIGN(8192);
+	. = ALIGN(PAGE_SIZE);
 	__init_begin = .;
 
 	HEAD_TEXT_SECTION
 
 	/* Page aligned */
-	INIT_TEXT_SECTION(8192)
+	INIT_TEXT_SECTION(PAGE_SIZE)
 
 	/* Align __setup_start on 16 byte boundary */
 	INIT_DATA_SECTION(16)
@@ -91,15 +89,15 @@ SECTIONS
 	PERCPU_SECTION(L1_CACHE_BYTES)
 
         __init_end = .;
-	
-	. = ALIGN(8192); 
+
+	. = ALIGN(PAGE_SIZE);
 	.initrd			: AT(ADDR(.initrd) - LOAD_OFFSET)
 	{
-		__initrd_start = .; 
+		__initrd_start = .;
 		*(.initrd)
-		__initrd_end = .; 
+		__initrd_end = .;
 		FILL (0);
-                . = ALIGN (8192);
+                . = ALIGN (PAGE_SIZE);
 	}
 
         __vmlinux_end = .;            /* last address of the physical file */

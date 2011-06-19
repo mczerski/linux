@@ -2,7 +2,7 @@
  * OpenRISC module.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -118,7 +118,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
- 	return 0;
+	return 0;
 }
 
 void module_arch_cleanup(struct module *mod)

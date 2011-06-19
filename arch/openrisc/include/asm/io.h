@@ -129,7 +129,7 @@ extern void iounmap(void *addr);
 #define IO_SPACE_LIMIT 		0xffffffff
 
 #define inb(port)		(*(volatile unsigned char *) (port+IO_BASE))
-#define outb(value,port)	((*(volatile unsigned char *) (port+IO_BASE)) = (value))	
+#define outb(value,port)	((*(volatile unsigned char *) (port+IO_BASE)) = (value))
 
 #define inb_p(port)             inb((port))
 #define outb_p(val, port)       outb((val), (port))

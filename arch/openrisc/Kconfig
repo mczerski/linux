@@ -50,7 +50,7 @@ config GENERIC_HWEIGHT
 config FRAME_POINTER
        bool
        default y
- 
+
 config GENERIC_GPIO
 	def_bool y
 
@@ -73,7 +73,7 @@ source "init/Kconfig"
 
 menu "Processor type and features"
 
-choice 
+choice
 	prompt "Subarchitecture"
 	default OR1K_1200
 
@@ -126,7 +126,7 @@ config OPENRISC_NO_SPR_SR_DSX
 	default y
 	help
 	  SPR_SR_DSX bit is status register bit indicating whether
-	  the last exception has happened in delay slot.	
+	  the last exception has happened in delay slot.
 
 	  OpenRISC architecture makes it optional to have it implemented
 	  in hardware and the OR1200 does not have it.
@@ -165,7 +165,7 @@ config DEBUG_STACKOVERFLOW
           critical functions. This will cause kernel to run a bit slower,
 	  but will catch most of kernel stack overruns and exit gracefuly.
 
-	  Say Y if you are unsure. 
+	  Say Y if you are unsure.
 
 config JUMP_UPON_UNHANDLED_EXCEPTION
 	bool "Try to die gracefully"
@@ -184,7 +184,7 @@ config OPENRISC_EXCEPTION_DEBUG
 	  debugging.
 
 	  Say N if you are unsure.
-	
+
 config OPENRISC_ESR_EXCEPTION_BUG_CHECK
 	bool "Check for possible ESR exception bug"
 	default n

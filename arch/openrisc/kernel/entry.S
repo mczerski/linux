@@ -2,7 +2,7 @@
  * OpenRISC entry.S
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -1109,7 +1109,7 @@ ENTRY(sys_rt_sigreturn)
 /* This is a catch-all syscall for atomic instructions for the OpenRISC 1000.
  * The functions takes a variable number of parameters depending on which
  * particular flavour of atomic you want... parameter 1 is a flag identifying
- * the atomic in question.  Currently, this function implements the 
+ * the atomic in question.  Currently, this function implements the
  * following variants:
  *
  * XCHG:
@@ -1117,7 +1117,7 @@ ENTRY(sys_rt_sigreturn)
  *  @ptr1:
  *  @ptr2:
  * Atomically exchange the values in pointers 1 and 2.
- * 
+ *
  */
 
 ENTRY(sys_or1k_atomic)
@@ -1132,4 +1132,3 @@ ENTRY(sys_or1k_atomic)
 	 l.or	r11,r0,r0
 
 /* ============================================================[ EOF ]=== */
-

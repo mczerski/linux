@@ -49,22 +49,22 @@
 			compatible = "opencores,or1k-pic";
 			#interrupt-cells = <1>;
 			interrupt-controller;
-		};		
-	
+		};
+
 		scet0: scet@8c000000 {
 			compatible = "opencores,scet";
-			reg = <0x8c000000 0x100>;			
+			reg = <0x8c000000 0x100>;
 		};
 
 		serial0: serial@90000000 {
-			/* FIXME: device_type is still needed here... 
+			/* FIXME: device_type is still needed here...
 			   should remove requirement from of_serial driver */
 			device_type = "serial";
 			compatible = "opencores,uart", "ns16550a";
 			reg = <0x90000000 0x100>;
 			interrupts = <2>;
 			clock-frequency = <20000000>;
-		};			
+		};
 
 		serial1: serial@93000000 {
 			device_type = "serial";
@@ -81,7 +81,7 @@
 			interrupts = <5>;
 			clock-frequency = <20000000>;
 		};
-			
+
 		enet0: ethoc@92000000 {
 			compatible = "opencores,ethoc", "ethoc";
 			reg = <0x92000000 0x53>;
@@ -92,8 +92,8 @@
 			compatible = "opencores,ohs900-ocores";
 			reg = <0x9c000000 0x100>;
 			interrupts = <20 21>;
-			can_wakeup = <1>;			
-			potpg = <10>;			
+			can_wakeup = <1>;
+			potpg = <10>;
 			power = <250>;
 		};
 
@@ -105,10 +105,10 @@
 			regstep = <1>;
 			clock-frequency = <20000000>;
 
-			/* Devices connected on this I2C bus get 
+			/* Devices connected on this I2C bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -117,7 +117,7 @@
 				compatible = "dummy";
 				reg = <60>;
 			};
-		}; 
+		};
 
 		i2c1: ocores@a1000000 {
 			compatible = "opencores,i2c-ocores";
@@ -127,10 +127,10 @@
 			regstep = <1>;
 			clock-frequency = <20000000>;
 
-			/* Devices connected on this I2C bus get 
+			/* Devices connected on this I2C bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -144,7 +144,7 @@
 				compatible = "dummy";
 				reg = <64>;
 			};
-		}; 
+		};
 
 		i2c2: ocores@a2000000 {
 			compatible = "opencores,i2c-ocores";
@@ -154,14 +154,14 @@
 			regstep = <1>;
 			clock-frequency = <20000000>;
 
-			/* Devices connected on this I2C bus get 
+			/* Devices connected on this I2C bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
-		}; 
+		};
 
 		i2c3: ocores@a3000000 {
 			compatible = "opencores,i2c-ocores";
@@ -171,23 +171,23 @@
 			regstep = <1>;
 			clock-frequecy = <20000000>;
 
-			/* Devices connected on this I2C bus get 
+			/* Devices connected on this I2C bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
-		}; 
+		};
 
 		spi0: spi0@b0000000 {
 			compatible = "opencores,spi-simple";
 			reg = <0xb0000000 0x5>;
 
-			/* Devices connected on this SPI bus get 
+			/* Devices connected on this SPI bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices.
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -216,10 +216,10 @@
 			compatible = "opencores,spi-simple";
 			reg = <0xb1000000 0x5>;
 
-			/* Devices connected on this SPI bus get 
+			/* Devices connected on this SPI bus get
 			 * defined here; address- and size-cells
 			 * apply to these child devices.
-			 */	
+			 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -233,7 +233,7 @@
 		};
 
 		gpio0: gpio@91000000 {
-                	compatible = "opencores,jbtrivial";
+                        compatible = "opencores,jbtrivial";
                         reg = <0x91000000 0x6>;
                         #gpio-cells = <2>;
                         gpio-controller;

@@ -2,7 +2,7 @@
  * OpenRISC setup.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -16,7 +16,7 @@
  *
  * This file handles the architecture-dependent parts of initialization
  */
- 
+
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -39,7 +39,7 @@
 #include <linux/memblock.h>
 #include <linux/device.h>
 #include <linux/of_platform.h>
- 
+
 #include <asm/segment.h>
 #include <asm/system.h>
 #include <asm/smp.h>
@@ -50,41 +50,28 @@
 #include <asm/cpuinfo.h>
 
 /*
- * Debugging stuff
- */
-
-int __phx_mmu__ = 0;
-int __phx_warn__ = 0;
-int __phx_debug__ = 0;
-int __phx_signal__ = 0;
- 
-/*
  * Setup options
  */
- 
+
 extern int root_mountflags;
 extern char _stext, _etext, _edata, _end;
 extern int __init setup_early_serial8250_console(char *cmdline);
 #ifdef CONFIG_BLK_DEV_INITRD
-//extern unsigned long initrd_start, initrd_end;
 extern char __initrd_start, __initrd_end;
 extern char __initramfs_start;
 #endif
 
 extern u32 __dtb_start[];
- 
+
 unsigned long or32_mem_size = 0;
 
 #ifdef CONFIG_CMDLINE
 char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
 #else
 char __initdata cmd_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200";
-//char __initdata cmd_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::";
 #endif
 
-extern const unsigned long text_start, edata; /* set by the linker script */ 
-       
-//char cmd_line[COMMAND_LINE_SIZE];
+extern const unsigned long text_start, edata; /* set by the linker script */
 
 static unsigned long __init setup_memory(void)
 {
@@ -116,13 +103,13 @@ static unsigned long __init setup_memory(void)
 
 	max_pfn = ram_end_pfn;
 
-	/* 
+	/*
 	 * initialize the boot-time allocator (with low memory only).
 	 *
 	 * This makes the memory from the end of the kernel to the end of
 	 * RAM usable.
 	 * init_bootmem sets the global values min_low_pfn, max_low_pfn.
-	 */ 
+	 */
 	bootmap_size = init_bootmem(free_ram_start_pfn,
 				    ram_end_pfn-ram_start_pfn);
 	free_bootmem(PFN_PHYS(free_ram_start_pfn),
@@ -146,12 +133,12 @@ static void print_cpuinfo(void) {
 	unsigned long upr = mfspr(SPR_UPR);
 	unsigned long vr = mfspr(SPR_VR);
 	unsigned int version;
-	unsigned int revision;       
+	unsigned int revision;
 
 	version = (vr & SPR_VR_VER) >> 24;
 	revision = (vr & SPR_VR_REV);
 
-	printk(KERN_INFO "CPU: OpenRISC-%x (revision %d) @%d MHz\n", 
+	printk(KERN_INFO "CPU: OpenRISC-%x (revision %d) @%d MHz\n",
 		version, revision, cpuinfo.clock_frequency / 1000000);
 
 	if (!(upr & SPR_UPR_UP)) {
@@ -159,17 +146,17 @@ static void print_cpuinfo(void) {
 		return;
 	}
 
-	if (upr & SPR_UPR_DCP) 
+	if (upr & SPR_UPR_DCP)
 		printk(KERN_INFO "-- dcache: %4d bytes total, %2d bytes/line, %d way(s)\n",
 			cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
-	else 
+	else
 		printk(KERN_INFO "-- dcache disabled\n");
-	if (upr & SPR_UPR_ICP) 
+	if (upr & SPR_UPR_ICP)
 		printk(KERN_INFO "-- icache: %4d bytes total, %2d bytes/line, %d way(s)\n",
 			cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
-	else 
+	else
 		printk(KERN_INFO "-- icache disabled\n");
-	
+
 	if (upr & SPR_UPR_DMP)
 		printk(KERN_INFO "-- dmmu: %4d entries, %lu way(s)\n",
 			1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
@@ -245,7 +232,6 @@ void __init or32_early_setup(/*unsigned long fdt*/ void) {
 	early_init_devtree((void *) __dtb_start);
 
 
-
 /*	if (fdt)
 		printk("FDT at 0x%08x\n", fdt);
 	else*/
@@ -270,13 +256,13 @@ static int __init openrisc_device_probe(void)
 device_initcall(openrisc_device_probe);
 
 
-static inline unsigned long extract_value_bits(unsigned long reg, 
+static inline unsigned long extract_value_bits(unsigned long reg,
 					       short bit_nr, short width)
 {
 	return((reg >> bit_nr) & (0 << width));
 }
 
-static inline unsigned long extract_value(unsigned long reg, 
+static inline unsigned long extract_value(unsigned long reg,
 					  unsigned long mask)
 {
 	while (!(mask & 0x1)) {
@@ -328,29 +314,16 @@ void __init setup_arch(char **cmdline_p)
 
         /* setup bootmem allocator */
 	max_low_pfn = setup_memory();
-		
+
 	/* paging_init() sets up the MMU and marks all pages as reserved */
 	paging_init();
-	
-#ifdef CONFIG_SERIAL_8250_CONSOLE
-	//	early_serial_console_init(command_line); RGD
-	//setup_early_serial8250_console(cmd_line);
-#endif
 
 #if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
 	if(!conswitchp)
-        	conswitchp = &dummy_con;
+		conswitchp = &dummy_con;
 #endif
 
 	*cmdline_p = cmd_line;
-	
-	/* Save command line copy for /proc/cmdline RGD removed 2.6.21*/
-	//memcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
-	//saved_command_line[COMMAND_LINE_SIZE-1] = '\0';
-
-	/* fire up 8051 */
-//	printk("Starting 8051...\n");
-//	oc8051_init();
 
 	printk("OpenRISC Linux -- http://openrisc.net\n");
 }
@@ -394,7 +367,7 @@ static void *c_start(struct seq_file *m, loff_t *pos)
 	/* We only have one CPU... */
 	return *pos < 1 ? (void *)1 : NULL;
 }
- 
+
 static void *c_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	++*pos;
@@ -412,16 +385,6 @@ struct seq_operations cpuinfo_op = {
 	show:   show_cpuinfo,
 };
 
-/*void arch_gettod(int *year, int *mon, int *day, int *hour,
-		                  int *min, int *sec)
-{
-   
-	if (mach_gettod)
-		mach_gettod(year, mon, day, hour, min, sec);
-	else
-		*year = *mon = *day = *hour = *min = *sec = 0;
-}
-*/
 /*RGD this awful hack is because our compiler does
  *support the "weak" attribute correctly at this time
  *once we do (support weak) this should be removed!!

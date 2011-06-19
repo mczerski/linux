@@ -30,11 +30,14 @@
 #endif
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
-#define PAGE_OFFSET		0xc0000000	
+#define PAGE_OFFSET		0xc0000000
 #define KERNELBASE  		PAGE_OFFSET
 
 /* #define ARCH_PFN_OFFSET	(PAGE_OFFSET >> PAGE_SHIFT) */
 
+/* This is not necessarily the right place for this, but it's needed by
+ * drivers/of/fdt.c
+ */
 #include <asm/setup.h>
 
 #ifndef __ASSEMBLY__

@@ -2,7 +2,7 @@
  * OpenRISC init_task.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:

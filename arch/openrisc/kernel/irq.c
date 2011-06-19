@@ -2,7 +2,7 @@
  * OpenRISC irq.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -58,8 +58,8 @@ static void or1k_pic_unmask(struct irq_data *data)
 static void or1k_pic_ack(struct irq_data *data)
 {
 	/* EDGE-triggered interrupts need to be ack'ed in order to clear
-	 * the latch.  
-	 * LEVER-triggered interrupts do not need to be ack'ed; however, 
+	 * the latch.
+	 * LEVER-triggered interrupts do not need to be ack'ed; however,
 	 * ack'ing the interrupt has no ill-effect and is quicker than
 	 * trying to figure out what type it is...
 	 */
@@ -70,6 +70,12 @@ static void or1k_pic_ack(struct irq_data *data)
 	 */
 
 #ifdef CONFIG_OR1K_1200
+	/* There are two oddities with the OR1200 PIC implementation:
+	 * i)  LEVEL-triggered interrupts are latched and need to be cleared
+	 * ii) the interrupt latch is cleared by writing a 0 to the bit,
+	 *     as opposed to a 1 as mandated by the spec
+	 */
+
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));
 #else
 	WARN(1, "Interrupt handling possibily broken\n");
@@ -80,8 +86,6 @@ static void or1k_pic_ack(struct irq_data *data)
 static void or1k_pic_mask_ack(struct irq_data *data)
 {
 	/* Comments for pic_ack apply here, too */
-
-	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->irq));
 
 #ifdef CONFIG_OR1K_1200
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->irq));

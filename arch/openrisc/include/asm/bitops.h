@@ -20,7 +20,7 @@
 #define __ASM_OPENRISC_BITOPS_H
 
 /*
- * Where we haven't written assembly versions yet, we fall back to the 
+ * Where we haven't written assembly versions yet, we fall back to the
  * generic implementations.  Otherwise, we pull in our (hopefully)
  * optimized versions.
  */

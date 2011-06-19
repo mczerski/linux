@@ -22,5 +22,3 @@
 /* empty */
 
 #endif /* __ASM_OPENRISC_MEMBLOCK_H */
-
-

@@ -26,10 +26,9 @@ struct cpuinfo {
 	u32 icache_block_size;
 
 	u32 dcache_size;
-	u32 dcache_block_size;	
+	u32 dcache_block_size;
 };
 
 extern struct cpuinfo cpuinfo;
 
 #endif /* __ASM_OPENRISC_CPUINFO_H */
-

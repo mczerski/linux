@@ -32,4 +32,3 @@
 #include <asm-generic/tlb.h>
 
 #endif /* __ASM_OPENRISC_TLB_H__ */
-

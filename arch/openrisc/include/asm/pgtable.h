@@ -65,7 +65,7 @@ extern void paging_init(void);
 /*
  * entries per page directory level: we use a two-level, so
  * we don't really have any PMD directory physically.
- * pointers are 4 bytes so we can use the page size and 
+ * pointers are 4 bytes so we can use the page size and
  * divide it by 4 (shift by 2).
  */
 #define PTRS_PER_PTE	(1UL << (PAGE_SHIFT-2))
@@ -81,7 +81,7 @@ extern void paging_init(void);
 #define FIRST_USER_ADDRESS      0
 
 /*
- * Kernels own virtual memory area. 
+ * Kernels own virtual memory area.
  */
 
 /*
@@ -104,12 +104,12 @@ extern void paging_init(void);
  * io.h for ioremap_nocache() too.
  */
 
-/* 
+/*
  * An OR32 PTE looks like this:
  *
  * |  31 ... 10 |  9  |  8 ... 6  |  5  |  4  |  3  |  2  |  1  |  0  |
  *  Phys pg.num    L     PP Index    D     A    WOM   WBC   CI    CC
- * 
+ *
  *  L  : link
  *  PPI: Page protection index
  *  D  : Dirty
@@ -143,8 +143,8 @@ extern void paging_init(void);
  *       1 - for SMP (when we support it)
  *       0 - otherwise
  *
- * we just reuse this bit in software for _PAGE_PRESENT and 
- * force it to 0 when loading it into TLB. 
+ * we just reuse this bit in software for _PAGE_PRESENT and
+ * force it to 0 when loading it into TLB.
  */
 #define _PAGE_PRESENT  _PAGE_CC
 #define _PAGE_USER     _PAGE_URE
@@ -254,8 +254,8 @@ static inline pte_t pte_exprotect(pte_t pte)
 
 static inline pte_t pte_mkclean(pte_t pte)
 {
-	pte_val(pte) &= ~(_PAGE_DIRTY); 
-	return pte; 
+	pte_val(pte) &= ~(_PAGE_DIRTY);
+	return pte;
 }
 
 static inline pte_t pte_mkold(pte_t pte)
@@ -399,7 +399,7 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD]; /* defined in head.S */
 /*
  * or32 doesn't have any external MMU info: the kernel page
  * tables contain all the necessary information.
- * 
+ *
  * Actually I am not sure on what this could be used for.
  */
 static inline void update_mmu_cache(struct vm_area_struct * vma,
@@ -408,7 +408,7 @@ static inline void update_mmu_cache(struct vm_area_struct * vma,
 }
 
 /* __PHX__ FIXME, SWAP, this probably doesn't work */
-                
+
 /* Encode and de-code a swap entry (must be !pte_none(e) && !pte_present(e)) */
 /* Since the PAGE_PRESENT bit is bit 4, we can use the bits above */
 

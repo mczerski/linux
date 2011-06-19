@@ -2,7 +2,7 @@
  * OpenRISC ioremap.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -89,12 +89,12 @@ void iounmap(void *addr)
 {
 	/* If the page is from the fixmap pool then we just clear out
 	 * the fixmap mapping.
-	 */ 
+	 */
 	if (unlikely((unsigned long)addr > FIXADDR_START)) {
 		clear_fixmap(virt_to_fix((unsigned long) addr));
 		return;
 	}
-		
+
 	return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
 
@@ -108,5 +108,5 @@ void __iomem *ioport_map(unsigned long port, unsigned int len)
 
 void ioport_unmap(void __iomem *addr)
 {
-	BUG();	
+	BUG();
 }

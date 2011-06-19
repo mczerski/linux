@@ -4,7 +4,7 @@ Format:
 alias : name[@bus] {
 
 
-Note that size-cells and address-cells apply values of child nodes; furthermore, 
+Note that size-cells and address-cells apply values of child nodes; furthermore,
 they are not inherited, so every container with children needs to specify these
 properties.
 
@@ -48,7 +48,7 @@ properties.
 		   region to 0x40000000 */
 		ranges = <0x80000000 0x80000000 0x40000000>;
 
-		/* An alternative is to specify an empty ranges here to 
+		/* An alternative is to specify an empty ranges here to
 		   indicates 1:1 mapping of SOC addresses (device addresses)
 		   to CPU addresses */
 		/*ranges;*/
@@ -66,8 +66,8 @@ properties.
 			compatible = "opencores,or1k-pic";
 			#interrupt-cells = <1>;
 			interrupt-controller;
-		};		
-	
+		};
+
 		serial0: serial@90000000 {
 			/* FIXME: device_type is still needed here...
 			   should remove requirement from of_serial driver */

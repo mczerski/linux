@@ -2,7 +2,7 @@
  * OpenRISC tlb.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -31,7 +31,6 @@
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
-#include <asm/or32-hf.h>
 #include <asm/spr_defs.h>
 
 #define NO_CONTEXT -1
@@ -126,7 +125,7 @@ void flush_tlb_range(struct vm_area_struct *vma,
 	}
 }
 
-/* 
+/*
  * Invalidate the selected mm context only.
  *
  * FIXME: Due to some bug here, we're flushing everything for now.

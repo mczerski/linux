@@ -25,4 +25,3 @@
 #define NO_IRQ		(-1)
 
 #endif /* __ASM_OPENRISC_IRQ_H__ */
-

@@ -15,7 +15,7 @@
 # Based on:
 # arch/i386/Makefile
 
-KBUILD_DEFCONFIG := usbeth_defconfig
+KBUILD_DEFCONFIG := or1ksim_defconfig
 
 LDFLAGS         :=
 OBJCOPYFLAGS    := -O binary -R .note -R .comment -S

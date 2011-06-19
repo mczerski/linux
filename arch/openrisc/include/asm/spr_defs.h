@@ -519,7 +519,7 @@
 #define SPR_PCMR_DDS	0x00004000  /* Data dependency stall event */
 #define SPR_PCMR_WPE	0x03ff8000  /* Watchpoint events */
 
-/* 
+/*
  * Bit definitions for the Power management register
  *
  */

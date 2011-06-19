@@ -98,7 +98,7 @@ unsigned long get_wchan(struct task_struct *p);
 /*
  * Free current thread data structures etc..
  */
- 
+
 extern inline void exit_thread(void)
 {
          /* Nothing needs to be done.  */

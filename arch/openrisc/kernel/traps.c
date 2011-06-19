@@ -2,7 +2,7 @@
  * OpenRISC traps.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -14,8 +14,8 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  *
- *  Here we handle the break vectors not used by the system call 
- *  mechanism, as well as some general stack/register dumping 
+ *  Here we handle the break vectors not used by the system call
+ *  mechanism, as well as some general stack/register dumping
  *  things.
  *
  */
@@ -37,9 +37,6 @@
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
-
-/* __PHX__ asm/hw_irq.h missing */
-// #include <linux/irq.h>
 
 extern char _etext, _stext;
 
@@ -107,8 +104,8 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 
 void show_trace_task(struct task_struct *tsk)
 {
-	/* 
-	 * __PHX__: TODO: SysRq-T trace dump... 
+	/*
+	 * TODO: SysRq-T trace dump...
 	 */
 }
 
@@ -217,7 +214,7 @@ void nommu_dump_state(struct pt_regs *regs,
 	       regs->gpr[11], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
-	       ((struct task_struct*)(__pa(current)))->comm, 
+	       ((struct task_struct*)(__pa(current)))->comm,
 	       ((struct task_struct*)(__pa(current)))->pid,
 	       (unsigned long)current);
 
@@ -228,7 +225,7 @@ void nommu_dump_state(struct pt_regs *regs,
 			break;
 		stack++;
 
-		printk("%lx :: sp + %02d: 0x%08lx\n", stack, i*4, 
+		printk("%lx :: sp + %02d: 0x%08lx\n", stack, i*4,
 		       *((unsigned long*)(__pa(stack))));
 	}
 	printk("\n");
@@ -348,7 +345,7 @@ asmlinkage void do_unaligned_access(struct pt_regs *regs, unsigned long address)
 		force_sig_info(SIGSEGV, &info, current);
 	} else {
 		printk("KERNEL: Unaligned Access 0x%.8lx\n", address);
-		show_regs(regs);
+		show_registers(regs);
 		die("Die:", regs, address);
 	}
 
@@ -367,7 +364,7 @@ asmlinkage void do_bus_fault(struct pt_regs *regs, unsigned long address)
 		force_sig_info(SIGBUS, &info, current);
 	} else {		/* Kernel mode */
 		printk("KERNEL: Bus error (SIGBUS) 0x%.8lx\n", address);
-		show_regs(regs);
+		show_registers(regs);
 		die("Die:", regs, address);
 	}
 }
@@ -387,7 +384,7 @@ asmlinkage void do_illegal_instruction(struct pt_regs *regs,
 	} else {		/* Kernel mode */
 		printk("KERNEL: Illegal instruction (SIGILL) 0x%.8lx\n",
 		       address);
-		show_regs(regs);
+		show_registers(regs);
 		die("Die:", regs, address);
 	}
 }

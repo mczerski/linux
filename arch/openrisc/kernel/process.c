@@ -2,7 +2,7 @@
  * OpenRISC process.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -42,7 +42,6 @@
 #include <asm/io.h>
 #include <asm/processor.h>
 #include <asm/spr_defs.h>
-#include <asm/or32-hf.h>
 
 
 #include <linux/smp.h>
@@ -50,9 +49,11 @@
 /*
  * Pointer to Current thread info structure.
  *
- * Used at user space -> kernel transitions. 
+ * Used at user space -> kernel transitions.
  */
 struct thread_info *current_thread_info_set[NR_CPUS] = {&init_thread_info, };
+
+#if 0
 
 /*
  * The hlt_counter, disable_hlt and enable_hlt is just here as a hook if
@@ -78,7 +79,9 @@ void enable_hlt(void)
 }
 
 EXPORT_SYMBOL(enable_hlt);
- 
+#endif
+
+
 void machine_restart(void)
 {
 	printk("*** MACHINE RESTART ***\n");
@@ -148,7 +151,7 @@ void release_thread(struct task_struct *dead_task)
 
 extern asmlinkage void ret_from_fork(void);
 
-int 
+int
 copy_thread(unsigned long clone_flags, unsigned long usp,
 	    unsigned long unused,
 	    struct task_struct *p, struct pt_regs *regs)
@@ -171,7 +174,7 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 
 	/* Copy parent registers */
 	*childregs = *regs;
-        
+
 	if ((childregs->sr & SPR_SR_SM) == 1) {
                 /* for kernel thread, set `current_thread_info'
 	         * and stackptr in new task
@@ -193,13 +196,13 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
          * system call, using the stack frame created above.
          */
 	/* redzone */
-     	sp -= STACK_FRAME_OVERHEAD;
+	sp -= STACK_FRAME_OVERHEAD;
 	sp -= sizeof(struct pt_regs);
         kregs = (struct pt_regs *) sp;
- 
+
 	ti = task_thread_info(p);
         ti->ksp = sp;
-	
+
 //	kregs->sr = regs->sr | SPR_SR_SM;
 	/* kregs->sp must store the location of the 'pre-switch' kernel stack
 	 * pointer... for a newly forked process, this is simply the top of
@@ -222,8 +225,6 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 {
 	unsigned long sr = regs->sr & ~SPR_SR_SM;
 
-	phx_warn("NIP: %lx, SP: %lx", pc, sp);
-
 	set_fs(USER_DS);
 	memset(regs->gpr, 0, sizeof(regs->gpr));
 
@@ -237,9 +238,9 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 /* Fill in the fpu structure for a core dump.  */
 int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
 {
-	phx_warn("FPU :: TODO");
+	/* TODO */
 	return 0;
-} 
+}
 
 extern struct thread_info* _switch(struct thread_info *old_ti,
 				   struct thread_info *new_ti);
@@ -252,9 +253,7 @@ struct task_struct* __switch_to(struct task_struct* old,
 	unsigned long flags;
 
 	local_irq_save(flags);
-#if 0
-	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
-#endif
+
 	/* current_set is an array of saved current pointers
 	 * (one for each cpu). we need them at user->kernel transition,
 	 * while we save them at kernel->user transition
@@ -264,27 +263,24 @@ struct task_struct* __switch_to(struct task_struct* old,
 
 	current_thread_info_set[smp_processor_id()] = new_ti;
 	last = (_switch(old_ti, new_ti))->task;
-#if 0
-	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
-#endif
+
 	local_irq_restore(flags);
 
 	return last;
-} 
+}
 
 /*
  * fill in the user structure for a core dump..
  */
 void dump_thread(struct pt_regs *regs, struct user *dump)
 {
-	phx_warn("TODO");
+	/* TODO */
 }
 
 extern void _kernel_thread_helper(void);
 
 void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
 {
-/*	printk("Kernel thread fn called = %lx\n", fn); */
         do_exit(fn(arg));
 }
 
@@ -296,12 +292,6 @@ int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
         struct pt_regs regs;
 
         memset(&regs, 0, sizeof(regs));
-
-/*
-	printk("Kernel thread fn = %lx\n", fn);
-	printk("kernel_thread_helper = %lx\n", kernel_thread_helper);
-	printk("_kernel_thread_helper = %lx\n", _kernel_thread_helper);
-*/
 
         regs.gpr[20] = (unsigned long)fn;
         regs.gpr[22] = (unsigned long)arg;
@@ -323,8 +313,6 @@ asmlinkage long _sys_execve(const char __user *name,
 	int error;
 	char * filename;
 
-/*	printk("in execve\n");*/
-
 	filename = getname(name);
 	error = PTR_ERR(filename);
 
@@ -333,29 +321,31 @@ asmlinkage long _sys_execve(const char __user *name,
 
 	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
- 
-out:	
+
+out:
 	return error;
 }
 
 unsigned long get_wchan(struct task_struct *p)
 {
-	phx_warn("TODO");
+	/* TODO */
 
 	return 0;
 }
 
-int kernel_execve(const char *filename, char *const argv[], char *const 
+int kernel_execve(const char *filename, char *const argv[], char *const
 envp[])
 {
-  register long __res asm("r11") = __NR_execve;
-  register long __a asm("r3") = (long)(filename);
-  register long __b asm("r4") = (long)(argv);
-  register long __c asm("r5") = (long)(envp);
-  __asm__ volatile ("l.sys 1"
-	   : "=r" (__res), "=r" (__a), "=r" (__b), "=r" (__c)
-           : "0" (__res), "1" (__a), "2" (__b), "3" (__c)
-	   : "r6", "r7", "r8", "r12", "r13", "r15", "r17", "r19", "r21", "r23", "r25", "r27", "r29", "r31");
-  __asm__ volatile("l.nop");
-  return __res;
+	register long __res asm("r11") = __NR_execve;
+	register long __a asm("r3") = (long)(filename);
+	register long __b asm("r4") = (long)(argv);
+	register long __c asm("r5") = (long)(envp);
+	__asm__ volatile ("l.sys 1"
+	                  : "=r" (__res), "=r" (__a), "=r" (__b), "=r" (__c)
+	                  : "0" (__res), "1" (__a), "2" (__b), "3" (__c)
+	                  : "r6", "r7", "r8", "r12", "r13", "r15",
+	                    "r17", "r19", "r21", "r23", "r25", "r27",
+	                    "r29", "r31");
+	__asm__ volatile("l.nop");
+	return __res;
 }

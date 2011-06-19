@@ -27,7 +27,7 @@
 /*
  * OpenRISC (or1k) does not have on-chip GPIO's so there is not really
  * any standardized implementation that makes sense here.  If passing
- * through gpiolib becomes a bottleneck then it may make sense, on a 
+ * through gpiolib becomes a bottleneck then it may make sense, on a
  * case-by-case basis, to implement these inlined/rapid versions.
  *
  * Just call gpiolib.

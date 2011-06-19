@@ -2,7 +2,7 @@
  * OpenRISC fault.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -18,9 +18,11 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/sched.h>
 
 #include <asm/uaccess.h>
-#include <asm/or32-hf.h>
+#include <asm/siginfo.h>
+#include <asm/signal.h>
 
 #define NUM_TLB_ENTRIES 64
 #define TLB_OFFSET(add) (((add) >> PAGE_SHIFT) & (NUM_TLB_ENTRIES-1))
@@ -52,7 +54,6 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long address,
 	struct vm_area_struct *vma;
 	siginfo_t info;
 	int fault;
-	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
 
 	tsk = current;
 
@@ -200,7 +201,7 @@ no_context:
 
 	/* Are we prepared to handle this kernel fault?
 	 *
-	 * (The kernel has valid exception-points in the source 
+	 * (The kernel has valid exception-points in the source
 	 *  when it acesses user-memory. When it fails in one
 	 *  of those points, we find it in a table and do a jump
 	 *  to some fixup code that loads an appropriate error
@@ -212,10 +213,8 @@ no_context:
 
 		__asm__ __volatile__("l.nop 42");
 
-		// phx_mmu("search exception table");
 		if ((entry = search_exception_tables(regs->pc)) != NULL) {
 			/* Adjust the instruction pointer in the stackframe */
-			// phx_mmu("kernel: doing fixup at EPC=0x%lx to 0x%lx\n", regs->pc, fixup);
 			regs->pc = entry->fixup;
 			return;
 		}
@@ -289,20 +288,21 @@ vmalloc_fault:
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
+/*
 		phx_warn("do_page_fault(): vmalloc_fault will not work, "
 			 "since current_pgd assign a proper value somewhere\n"
 			 "anyhow we don't need this at the moment\n");
 
 		phx_mmu("vmalloc_fault");
-
+*/
 		pgd = (pgd_t *)current_pgd + offset;
 		pgd_k = init_mm.pgd + offset;
 
 		/* Since we're two-level, we don't need to do both
 		 * set_pgd and set_pmd (they do the same thing). If
 		 * we go three-level at some point, do the right thing
-		 * with pgd_present and set_pgd here. 
-		 * 
+		 * with pgd_present and set_pgd here.
+		 *
 		 * Also, since the vmalloc area is global, we don't
 		 * need to copy individual PTE's, it is enough to
 		 * copy the pgd pointer into the pte page of the

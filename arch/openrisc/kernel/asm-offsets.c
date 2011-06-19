@@ -2,7 +2,7 @@
  * OpenRISC asm-offsets.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -40,9 +40,9 @@
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
-        
+
 #define BLANK() asm volatile("\n->" : : )
-        
+
 int
 main(void)
 {
@@ -53,19 +53,19 @@ main(void)
   DEFINE(TASK_THREAD, offsetof(struct task_struct, thread));
   DEFINE(TASK_MM, offsetof(struct task_struct, mm));
   DEFINE(TASK_ACTIVE_MM, offsetof(struct task_struct, active_mm));
-  
+
   /* offsets into thread_info */
   DEFINE(TI_TASK, offsetof(struct thread_info, task));
   DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
   DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
   DEFINE(TI_KSP, offsetof(struct thread_info, ksp));
- 
+
   DEFINE(PT_SIZE, sizeof(struct pt_regs));
- 
+
   /* Interrupt register frame */
   DEFINE(STACK_FRAME_OVERHEAD, STACK_FRAME_OVERHEAD);
   DEFINE(INT_FRAME_SIZE, STACK_FRAME_OVERHEAD + sizeof(struct pt_regs));
-  
+
   DEFINE(NUM_USER_SEGMENTS, TASK_SIZE>>28);
   return 0;
 }

@@ -2,7 +2,7 @@
  * OpenRISC head.S
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -513,7 +513,7 @@ enable_ic:
 
 enable_dc:
 	l.jal	_dc_enable
- 	 l.nop
+	 l.nop
 
 flush_tlb:
 	/*

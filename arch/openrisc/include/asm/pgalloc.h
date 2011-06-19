@@ -30,7 +30,7 @@ extern int mem_init_done;
 #if 1
 #define pmd_populate_kernel(mm, pmd, pte) \
                  set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)))
- 
+
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
 	set_pmd(pmd, __pmd(_KERNPG_TABLE +
@@ -51,7 +51,7 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
 /* __PHX__ check */
 #define pmd_populate_kernel(mm, pmd, pte) pmd_set(pmd, pte)
 #define pmd_populate(mm, pmd, pte) pmd_set(pmd, page_address(pte))
-#endif 
+#endif
 
 
 #if 1
@@ -60,9 +60,9 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *p
  */
 
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
-{  
+{
 	pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
-	
+
 	if (ret) {
 		memset(ret, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
 		memcpy(ret + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD,
@@ -74,7 +74,7 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 #endif
 
 #if 0
-/* __PHX__ check, this is supposed to be 2.6 style, but 
+/* __PHX__ check, this is supposed to be 2.6 style, but
  * we use current_pgd (from mm->pgd) to load kernel pages
  * so we need it initialized.
  */
@@ -103,7 +103,7 @@ static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long ad
 	pte_t* pte;
 
 	if (likely(mem_init_done)) {
-	  	pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
 	} else {
 		pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 //		pte = (pte_t *) __va(memblock_alloc(PAGE_SIZE, PAGE_SIZE));

@@ -55,7 +55,7 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
 
 #endif
 
-static inline void flush_tlb(void) 
+static inline void flush_tlb(void)
 {
 	flush_tlb_mm(current->mm);
 }

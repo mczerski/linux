@@ -2,7 +2,7 @@
  * OpenRISC sys_or32.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -33,18 +33,18 @@ asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
         return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
 }
 
-asmlinkage long sys_mmap(unsigned long addr, unsigned long len, 
-                        unsigned long prot, unsigned long flags, 
-                        unsigned long fd, off_t pgoff) 
-{ 
-        if (pgoff & ~PAGE_MASK) 
-                return -EINVAL; 
+asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
+                        unsigned long prot, unsigned long flags,
+                        unsigned long fd, off_t pgoff)
+{
+        if (pgoff & ~PAGE_MASK)
+                return -EINVAL;
 
-        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT); 
+        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT);
 }
 
 /* These are secondary entry points as the primary entry points are defined in
- * entry.S where we add the 'regs' parameter value 
+ * entry.S where we add the 'regs' parameter value
  */
 
 asmlinkage long _sys_clone(unsigned long clone_flags, unsigned long newsp,
@@ -81,5 +81,3 @@ asmlinkage int _sys_vfork(struct pt_regs *regs)
 	/* This works */
         return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 }
-
-

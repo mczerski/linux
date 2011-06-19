@@ -43,7 +43,7 @@
 //#define MAKE_MM_SEG(s)	((mm_segment_t) s)
 
 /* addr_limit is the maximum accessible address for the task. we misuse
- * the KERNEL_DS and USER_DS values to both assign and compare the 
+ * the KERNEL_DS and USER_DS values to both assign and compare the
  * addr_limit values through the equally misnamed get/set_fs macros.
  * (see above)
  */
@@ -331,7 +331,7 @@ static inline __must_check unsigned long
 clear_user(void *addr, unsigned long size)
 {
 
- 	if (access_ok(VERIFY_WRITE, addr, size))
+	if (access_ok(VERIFY_WRITE, addr, size))
 		return __clear_user(addr, size);
 	if ((unsigned long)addr < TASK_SIZE) {
 		unsigned long over = (unsigned long)addr + size - TASK_SIZE;

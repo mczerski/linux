@@ -2,7 +2,7 @@
  * OpenRISC signal.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -30,7 +30,6 @@
 #include <asm/processor.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
-#include <asm/or32-hf.h>
 
 #include "ptrace.h"
 
@@ -58,9 +57,6 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	unsigned int err = 0;
 	unsigned long old_usp;
 
-	phx_signal("regs %p, sc %p",
-		   regs, sc);
-
 	/* Alwys make any pending restarted system call return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
@@ -72,11 +68,8 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	if (__copy_from_user(regs, sc, sizeof(struct pt_regs)))
                 goto badframe;
 
-	/* make sure the U-flag is set so user-mode cannot fool us */
-
+	/* make sure the SM-bit is cleared so user-mode cannot fool us */
 	regs->sr &= ~SPR_SR_SM;
-//      __PHX__ FIXME	
-//	regs->dccr |= 1 << 8;
 
 	/* restore the old USP as it was before we stacked the sc etc.
 	 * (we cannot just pop the sigcontext since we aligned the sp and
@@ -84,15 +77,12 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	 */
 
 	err |= __get_user(old_usp, &sc->usp);
-	phx_signal("old_usp 0x%lx", old_usp);
 
-//      __PHX__ REALLY ???
-//	wrusp(old_usp);
 	regs->sp = old_usp;
 
 	/* TODO: the other ports use regs->orig_XX to disable syscall checks
 	 * after this completes, but we don't use that mechanism. maybe we can
-	 * use it now ? 
+	 * use it now ?
 	 */
 
 	return err;
@@ -126,7 +116,7 @@ _sys_rt_sigreturn(struct pt_regs *regs)
 	current->blocked = set;
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	
+
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
@@ -138,13 +128,12 @@ _sys_rt_sigreturn(struct pt_regs *regs)
 
 	single_step_trap(current);
 
-//	return regs->gprs[1];
 	return regs->gpr[11];
 
 badframe:
 	force_sig(SIGSEGV, current);
 	return 0;
-}	
+}
 
 /*
  * Set up a signal frame.
@@ -156,17 +145,9 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 	int err = 0;
 	unsigned long usp = regs->sp;
 
-	phx_signal("sc %p, regs %p, mask 0x%lx",
-		   sc, regs, mask);
-
 	/* copy the regs. they are first in sc so we can use sc directly */
 
 	err |= __copy_to_user(sc, regs, sizeof(struct pt_regs));
-
-        /* Set the frametype to CRIS_FRAME_NORMAL for the execution of
-           the signal handler. The frametype will be restored to its previous
-           value in restore_sigcontext. */
-	//        regs->frametype = CRIS_FRAME_NORMAL;
 
 	/* then some other stuff */
 
@@ -176,7 +157,6 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 
 	return err;
 }
-
 
 static inline unsigned long
 align_sigframe(unsigned long sp)
@@ -217,7 +197,7 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 }
 
 /* grab and setup a signal frame.
- * 
+ *
  * basically we stack a lot of state info, and arrange for the
  * user-mode program to return to the kernel using either a
  * trampoline which performs the syscall sigreturn, or a provided
@@ -229,9 +209,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	struct rt_sigframe *frame;
 	unsigned long return_ip;
 	int err = 0;
-
-	phx_signal("sig %d, ka %p, info %p, set %p, regs %p",
-		   sig, ka, info, set, regs);
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
 
@@ -248,7 +225,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* Clear all the bits of the ucontext we don't use.  */
         err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
-	/* Added by jonas */
         err |= __put_user(0, &frame->uc.uc_flags);
         err |= __put_user(NULL, &frame->uc.uc_link);
         err |= __put_user((void *)current->sas_ss_sp,
@@ -256,7 +232,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
         err |= __put_user(sas_ss_flags(regs->sp),
                         &frame->uc.uc_stack.ss_flags);
         err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	/* End added by jonas */
 	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0]);
 
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
@@ -266,7 +241,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* trampoline - the desired return ip is the retcode itself */
 	return_ip = (unsigned long)&frame->retcode;
-	phx_signal("ktrampoline: return_ip 0x%lx", return_ip);
 	/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
 	err |= __put_user(0xa960        , (short *)(frame->retcode+0));
 	err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode+2));
@@ -286,8 +260,6 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
         regs->gpr[5] = (unsigned long) &frame->uc;   /* arg 3: ucontext */
 
 	/* actually move the usp to reflect the stacked frame */
-
-	//	wrusp((unsigned long)frame);
 	regs->sp = (unsigned long)frame;
 
 	return;
@@ -297,11 +269,6 @@ give_sigsegv:
 		ka->sa.sa_handler = SIG_DFL;
 	force_sig(SIGSEGV, current);
 }
-
-/*
- * OK, we're invoking a handler
- */	
-
 
 static inline void
 handle_signal(unsigned long sig,
@@ -340,10 +307,6 @@ void do_signal(struct pt_regs *regs)
 	int signr;
 	struct k_sigaction ka;
 
-#if 0
-	check_stack(NULL, __FILE__, __FUNCTION__, __LINE__);
-#endif
-
 	/*
 	 * We want the common case to go fast, which
 	 * is why we may in certain cases get here from
@@ -361,7 +324,7 @@ void do_signal(struct pt_regs *regs)
 	 * to check if the syscall was interrupted and wants to be
 	 * restarted after handling the signal.  If so, the original
 	 * syscall number is put back into r11 and the PC rewound to
-	 * point at the l.sys instruction that resulted in the 
+	 * point at the l.sys instruction that resulted in the
 	 * original syscall.  Syscall results other than the four
 	 * below mean that the syscall executed to completion and no
 	 * restart is necessary.
@@ -409,7 +372,7 @@ void do_signal(struct pt_regs *regs)
 		sigset_t *oldset;
 
 		if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
-			oldset = &current->saved_sigmask; 
+			oldset = &current->saved_sigmask;
 		else
 			oldset = &current->blocked;
 

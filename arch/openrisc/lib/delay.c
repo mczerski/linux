@@ -2,7 +2,7 @@
  * OpenRISC delay.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -15,7 +15,7 @@
  *
  * Precise Delay Loops
  */
- 
+
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/timex.h>

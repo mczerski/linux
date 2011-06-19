@@ -21,9 +21,8 @@
 
 #include <asm-generic/pci.h>
 
-/* 
+/*
  * no PCI support yet implemented for OpenRISC
  */
 
 #endif /* __ASM_OPENRISC_PCI_H */
-

@@ -2,7 +2,7 @@
  * OpenRISC prom.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -13,7 +13,7 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  *
- * Architecture specific procedures for creating, accessing and 
+ * Architecture specific procedures for creating, accessing and
  * interpreting the device tree.
  *
  */
@@ -46,12 +46,14 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
+
+extern char cmd_line[COMMAND_LINE_SIZE];
 
 void __init early_init_dt_add_memory_arch(u64 base, u64 size)
 {
 	size &= PAGE_MASK;
 	memblock_add(base, size);
-//	memblock_dump_all();
 }
 
 void* __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
@@ -90,15 +92,10 @@ void __init early_init_devtree(void *params)
 	 */
 
 	alloc = __va(memblock_alloc(initial_boot_params->totalsize, PAGE_SIZE));
-//	printk("alloced: %lx\n", alloc);
-//	if (!alloc)
-//		kernel_panic();
 
 	memcpy(alloc, initial_boot_params, initial_boot_params->totalsize);
 
 	initial_boot_params = (void*) alloc;
-
-//	printk("Set initial_boot_params to %lx\n", initial_boot_params);
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
@@ -109,37 +106,4 @@ void __init early_init_dt_setup_initrd_arch(unsigned long start,
 	initrd_end = (unsigned long)__va(end);
 	initrd_below_start_ok = 1;
 }
-#endif
-
-/*******
- *
- * New implementation of the OF "find" APIs, return a refcounted
- * object, call of_node_put() when done.  The device tree and list
- * are protected by a rw_lock.
- *
- * Note that property management will need some locking as well,
- * this isn't dealt with yet.
- *
- *******/
-
-#if 0
-#if defined(CONFIG_DEBUG_FS) || 0
-static struct debugfs_blob_wrapper flat_dt_blob;
-
-static int __init export_flat_device_tree(void)
-{
-	struct dentry *d;
-
-	flat_dt_blob.data = initial_boot_params;
-	flat_dt_blob.size = initial_boot_params->totalsize;
-
-	d = debugfs_create_blob("flat-device-tree", S_IFREG | S_IRUSR,
-				of_debugfs_root, &flat_dt_blob);
-	if (!d)
-		return 1;
-
-	return 0;
-}
-device_initcall(export_flat_device_tree);
-#endif
 #endif

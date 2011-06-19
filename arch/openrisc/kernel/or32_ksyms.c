@@ -2,7 +2,7 @@
  * OpenRISC or32_ksyms.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -45,4 +45,3 @@ DECLARE_EXPORT(__ashldi3);
 DECLARE_EXPORT(__lshrdi3);
 
 EXPORT_SYMBOL(__copy_tofrom_user);
-

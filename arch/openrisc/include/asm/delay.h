@@ -41,7 +41,4 @@ extern inline void udelay(unsigned long usecs)
 	__delay( usecs * loops_per_jiffy * HZ / 1000000 );
 }
 
-#endif 
-
-
-
+#endif

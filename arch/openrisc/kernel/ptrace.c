@@ -2,7 +2,7 @@
  * OpenRISC ptrace.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -28,13 +28,13 @@
 #include <linux/audit.h>
 #include <linux/regset.h>
 #include <linux/tracehook.h>
+#include <linux/elf.h>
 
 #include <asm/thread_info.h>
 #include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-#include <asm/or32-hf.h>
 
 #include "ptrace.h"
 

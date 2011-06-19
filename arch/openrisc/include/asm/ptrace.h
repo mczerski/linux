@@ -36,7 +36,7 @@
  * the values below.
  */
 
-/* 
+/*
  * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
  * process is located in memory.
  */

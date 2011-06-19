@@ -2,7 +2,7 @@
  * OpenRISC time.c
  *
  * Linux architectural port borrowing liberally from similar works of
- * others.  All original copyrights apply as per the original source 
+ * others.  All original copyrights apply as per the original source
  * declaration.
  *
  * Modifications for the OpenRISC architecture:
@@ -26,7 +26,6 @@
 #include <linux/io.h>
 
 #include <asm/cpuinfo.h>
-#include <asm/or32-hf.h>
 
 static int openrisc_timer_set_next_event(unsigned long delta,
                                      struct clock_event_device *dev)
@@ -90,7 +89,7 @@ static inline void timer_ack(void)
 {
 	/* Clear the IP bit and disable further interrupts */
 	/* This can be done very simply... we just need to keep the timer
-	   running, so just maintain the CR bits while clearing the rest 
+	   running, so just maintain the CR bits while clearing the rest
 	   of the register
 	*/
 	mtspr(SPR_TTMR, SPR_TTMR_CR);
@@ -98,7 +97,7 @@ static inline void timer_ack(void)
 
 /*
  * The timer interrupt is mostly handled in generic code nowadays... this
- * function just acknowledges the interrupt and fires the event handler that 
+ * function just acknowledges the interrupt and fires the event handler that
  * has been set on the clockevent device by the generic time management code.
  *
  * This function needs to be called by the timer exception handler and that's
@@ -140,7 +139,7 @@ static __init void openrisc_clockevent_init(void)
 }
 
 
-/** 
+/**
  * Clocksource: Based on OpenRISC timer/counter
  *
  * This sets up the OpenRISC Tick Timer as a clock source.  The tick timer
@@ -149,7 +148,7 @@ static __init void openrisc_clockevent_init(void)
 
 static cycle_t openrisc_timer_read(struct clocksource* cs) {
 	return (cycle_t) mfspr(SPR_TTCR);
-} 
+}
 
 static struct clocksource openrisc_timer = {
 	.name		= "openrisc_timer",
