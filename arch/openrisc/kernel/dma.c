@@ -57,17 +57,16 @@ or1k_dma_alloc_coherent(struct device *dev, size_t size,
 	va = (unsigned long) area->addr;
 
 	/* This gives us the real physical address of the first page. */
-	//*dma_handle = __pa(page);
+	*dma_handle = __pa(page);
 
 	prot = PAGE_KERNEL_NOCACHE;
 
 	/* This isn't so much ioremap as just simply 'remap' */
-	if (ioremap_page_range(va, va + size, page, prot)) {
+	if (ioremap_page_range(va, va + size, *dma_handle, prot)) {
 		vfree(area->addr);
 		return NULL;
 	}
 
-	*dma_handle = page;
 	return (void*) va;
 }
 
