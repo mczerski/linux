@@ -63,8 +63,6 @@ extern char __initramfs_start;
 
 extern u32 __dtb_start[];
 
-unsigned long or32_mem_size = 0;
-
 #ifdef CONFIG_CMDLINE
 char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
 #else
@@ -118,7 +116,7 @@ static unsigned long __init setup_memory(void)
 			BOOTMEM_DEFAULT);
 
 	for_each_memblock(reserved, region) {
-		printk("Reserved - 0x%08x-0x%08x\n",
+		printk(KERN_INFO "Reserved - 0x%08x-0x%08x\n",
 			(u32) region->base, (u32) region->size);
 		reserve_bootmem(region->base, region->size, BOOTMEM_DEFAULT);
 	}
@@ -227,19 +225,24 @@ void __init setup_cpuinfo(void)
 //	__dc_enable(cpuinfo.dcache_size, cpuinfo.dcache_block_size);
 }
 
-void __init or32_early_setup(/*unsigned long fdt*/ void) {
+/**
+ * or32_early_setup
+ *
+ * Handles the pointer to the device tree that this kernel is to use
+ * for establishing the available platform devices.
+ *
+ * For now, this is limited to using the built-in device tree.  In the future,
+ * it is intended that this function will take a pointer to the device tree
+ * that is potentially built-in, but potentially also passed in by the
+ * bootloader, or discovered by some equally clever means...
+ */
+
+void __init or32_early_setup(void) {
 
 	early_init_devtree((void *) __dtb_start);
 
-
-/*	if (fdt)
-		printk("FDT at 0x%08x\n", fdt);
-	else*/
-		printk("Compiled-in FDT at 0x%08x\n",
-		       (unsigned int)__dtb_start);
-
-//	printk("FDT: size %lx\n", ((struct boot_param_header*) __dtb_start)->totalsize);
-
+	printk(KERN_INFO "Compiled-in FDT at 0x%08x\n",
+	       (unsigned int) __dtb_start);
 }
 
 const struct of_device_id openrisc_bus_ids[] = {
@@ -325,7 +328,7 @@ void __init setup_arch(char **cmdline_p)
 
 	*cmdline_p = cmd_line;
 
-	printk("OpenRISC Linux -- http://openrisc.net\n");
+	printk(KERN_INFO "OpenRISC Linux -- http://openrisc.net\n");
 }
 
 static int show_cpuinfo(struct seq_file *m, void *v)
@@ -379,15 +382,15 @@ static void c_stop(struct seq_file *m, void *v)
 }
 
 struct seq_operations cpuinfo_op = {
-	start:  c_start,
-	next:   c_next,
-	stop:   c_stop,
-	show:   show_cpuinfo,
+	.start = c_start,
+	.next = c_next,
+	.stop = c_stop,
+	.show = show_cpuinfo,
 };
 
 /*RGD this awful hack is because our compiler does
  *support the "weak" attribute correctly at this time
  *once we do (support weak) this should be removed!!
  */
-void __start_notes(void){}
-void __stop_notes(void){}
+//void __start_notes(void){}
+//void __stop_notes(void){}
