@@ -14,46 +14,34 @@ config OPENRISC
 	select GENERIC_IRQ_CHIP
 	select GENERIC_IRQ_PROBE
 	select GENERIC_IRQ_SHOW
-	select NO_IOPORT
 
 config MMU
-	bool
-	default y
+	def_bool y
 
 config SYMBOL_PREFIX
         string
         default ""
 
 config HAVE_DMA_ATTRS
-	bool
-	default y
+	def_bool y
 
 config UID16
-	bool
-	default y
+	def_bool y
 
 config RWSEM_GENERIC_SPINLOCK
-	bool
-	default y
+	def_bool y
 
 config GENERIC_CALIBRATE_DELAY
-	bool
-	default y
+	def_bool y
 
 config RWSEM_XCHGADD_ALGORITHM
-	bool
-	default n
+	def_bool n
 
 config GENERIC_HWEIGHT
-	bool
-	default y
-
-config FRAME_POINTER
-       bool
-       default y
+	def_bool y
 
 config NO_IOPORT
-	bool
+	def_bool y
 
 config GENERIC_GPIO
 	def_bool y
