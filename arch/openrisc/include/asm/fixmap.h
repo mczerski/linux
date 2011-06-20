@@ -27,28 +27,16 @@
 #define FIXADDR_TOP	((unsigned long) (-2*PAGE_SIZE))
 
 #include <linux/kernel.h>
-#include <linux/threads.h>
+//#include <linux/threads.h>
 #include <asm/page.h>
 
 /*
- * Here we define all the compile-time 'special' virtual
- * addresses. The point is to have a constant address at
- * compile time, but to set the physical address only
- * in the boot process. We allocate these special addresses
- * from the end of virtual memory (0xffffb000) backwards.
+ * On OpenRISC we use these special fixed_addresses for doing ioremap
+ * early in the boot process before memory initialization is complete.
+ * This is used, in particular, by the early serial console code.
  *
- * Also this would let us do fail-safe vmalloc(), we
- * can guarantee that these special addresses and
- * vmalloc()-ed addresses never overlap.  We don't actually
- * do this on OpenRISC though (nor do most other arch's).
- *
- * these 'compile-time allocated' memory buffers are
- * fixed-size (PAGE_SIZE) pages. (or larger if used with an increment
- * highger than 1) use fixmap_set(idx,phys) to associate
- * physical memory with fixmap indices.
- *
- * TLB entries of such buffers will not be flushed across
- * task switches.
+ * It's not really 'fixmap', per se, but fits loosely into the same
+ * paradigm.
  */
 enum fixed_addresses {
 	/*
@@ -62,21 +50,8 @@ enum fixed_addresses {
 	__end_of_fixed_addresses
 };
 
-extern void __set_fixmap(enum fixed_addresses idx,
-			 unsigned long phys, pgprot_t flags);
-
-#define set_fixmap(idx, phys) \
-		__set_fixmap(idx, phys, PAGE_KERNEL)
-/*
- * Some hardware wants to get fixmapped without caching.
- */
-#define set_fixmap_nocache(idx, phys) \
-		__set_fixmap(idx, phys, PAGE_KERNEL_NOCACHE)
-
-#define clear_fixmap(idx) \
-		__set_fixmap(idx, 0, __pgprot(0))
-
 #define FIXADDR_SIZE		(__end_of_fixed_addresses << PAGE_SHIFT)
+/* FIXADDR_BOTTOM might be a better name here... */
 #define FIXADDR_START		(FIXADDR_TOP - FIXADDR_SIZE)
 
 #define __fix_to_virt(x)	(FIXADDR_TOP - ((x) << PAGE_SHIFT))

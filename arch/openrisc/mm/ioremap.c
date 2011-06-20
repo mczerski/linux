@@ -23,6 +23,7 @@
 #include <asm/bug.h>
 #include <asm/pgtable.h>
 #include <linux/sched.h>
+#include <asm/tlbflush.h>
 
 extern int mem_init_done;
 
@@ -91,7 +92,20 @@ void iounmap(void *addr)
 	 * the fixmap mapping.
 	 */
 	if (unlikely((unsigned long)addr > FIXADDR_START)) {
-		clear_fixmap(virt_to_fix((unsigned long) addr));
+		/* This is a bit broken... we don't really know
+		 * how big the area is so it's difficult to know
+		 * how many fixed pages to invalidate...
+		 * just flush tlb and hope for the best...
+		 * consider this a FIXME
+		 *
+		 * Really we should be clearing out one or more page
+		 * table entries for these virtual addresses so that
+		 * future references cause a page fault... for now, we
+		 * rely on two things:
+		 *   i)  this code never gets called on known boards
+		 *   ii) invalid accesses to the freed areas aren't made
+		 */
+		flush_tlb_all();
 		return;
 	}
 
