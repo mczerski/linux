@@ -190,28 +190,6 @@ endmenu
 
 endmenu
 
-
-menu "Bus options"
-
-config PCI
-	bool "PCI support"
-	default n
-	help
-	  Find out whether your system includes a PCI bus. PCI is the name of
-	  a bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box.  If you say Y here, the kernel will include drivers and
-	  infrastructure code to support PCI bus devices.
-
-config PCI_DOMAINS
-	bool
-	default PCI
-
-source "drivers/pci/Kconfig"
-
-source "drivers/pcmcia/Kconfig"
-
-endmenu
-
 menu "Executable file formats"
 
 source "fs/Kconfig.binfmt"
