@@ -55,7 +55,6 @@
 
 extern int root_mountflags;
 extern char _stext, _etext, _edata, _end;
-extern int __init setup_early_serial8250_console(char *cmdline);
 #ifdef CONFIG_BLK_DEV_INITRD
 extern char __initrd_start, __initrd_end;
 extern char __initramfs_start;
@@ -63,13 +62,9 @@ extern char __initramfs_start;
 
 extern u32 __dtb_start[];
 
-#ifdef CONFIG_CMDLINE
-char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
-#else
-char __initdata cmd_line[COMMAND_LINE_SIZE] = "console=uart,mmio,0x90000000,115200";
-#endif
-
 extern const unsigned long text_start, edata; /* set by the linker script */
+
+char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
 
 static unsigned long __init setup_memory(void)
 {
@@ -190,13 +185,13 @@ extern void __dc_enable(u32 dcache_size, u32 dcache_block_size);
 
 void __init setup_cpuinfo(void)
 {
-        struct device_node *cpu = NULL;
+	struct device_node *cpu = NULL;
 	unsigned long iccfgr,dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
-//        cpu = (struct device_node *) of_find_node_by_type(NULL, "cpu");
-        cpu = (struct device_node *) of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
-        if (!cpu) {
+	cpu = (struct device_node *) of_find_compatible_node(NULL,
+	                                NULL, "opencores,openrisc-1200");
+	if (!cpu) {
 		panic("No compatible CPU found in device tree...\n");
 	}
 
@@ -212,17 +207,11 @@ void __init setup_cpuinfo(void)
 	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_CBS) >> 7);
 	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
 
-
-
 	cpuinfo.clock_frequency =  fcpu(cpu, "clock-frequency");
 
 	of_node_put(cpu);
 
 	print_cpuinfo();
-
-//	printk("IC ENABLE........................\n");
-//	__ic_enable(cpuinfo.icache_size, cpuinfo.icache_block_size);
-//	__dc_enable(cpuinfo.dcache_size, cpuinfo.dcache_block_size);
 }
 
 /**
@@ -387,10 +376,3 @@ struct seq_operations cpuinfo_op = {
 	.stop = c_stop,
 	.show = show_cpuinfo,
 };
-
-/*RGD this awful hack is because our compiler does
- *support the "weak" attribute correctly at this time
- *once we do (support weak) this should be removed!!
- */
-//void __start_notes(void){}
-//void __stop_notes(void){}
