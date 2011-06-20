@@ -111,16 +111,3 @@ void iounmap(void *addr)
 
 	return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
-
-/*
- * OR1K has no port-mapped IO, only MMIO
- */
-void __iomem *ioport_map(unsigned long port, unsigned int len)
-{
-	BUG();
-}
-
-void ioport_unmap(void __iomem *addr)
-{
-	BUG();
-}
