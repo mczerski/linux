@@ -82,8 +82,7 @@ extern void iounmap(void *addr);
  * are generally synthesized together with the CPU, they will also be
  * of the same endianess.  In order to simplify things, we assume for
  * now that there are no memory-mapped IO devices on any other bus than
- * then the local Wishbone bus and that these devices are all native
- * endian.
+ * the local Wishbone bus and that these devices are all native endian.
  */
 
 #define wb_ioread8(p)  __raw_readb(p)
