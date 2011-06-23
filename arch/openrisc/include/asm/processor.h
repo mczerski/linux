@@ -84,9 +84,7 @@ extern inline void prepare_to_copy(struct task_struct *tsk)
 #define KSTK_ESP(tsk)   (task_pt_regs(tsk)->sp);
 
 
-#if 0
 extern int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
-#endif
 
 void start_thread(struct pt_regs *regs, unsigned long nip, unsigned long sp);
 void release_thread(struct task_struct *);
