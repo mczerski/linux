@@ -38,44 +38,45 @@
 #include <asm/cache.h>
 #include <asm/pgalloc.h>
 
-void (*powersave)(void) = NULL;
+void (*powersave) (void) = NULL;
 
-static inline void pm_idle(void) {
+static inline void pm_idle(void)
+{
 	barrier();
 }
 
 void cpu_idle(void)
 {
-        unsigned int cpu = smp_processor_id();
+	unsigned int cpu = smp_processor_id();
 
-        set_thread_flag(TIF_POLLING_NRFLAG);
+	set_thread_flag(TIF_POLLING_NRFLAG);
 
-        /* endless idle loop with no priority at all */
-        while (1) {
-                tick_nohz_stop_sched_tick(1);
+	/* endless idle loop with no priority at all */
+	while (1) {
+		tick_nohz_stop_sched_tick(1);
 
-                while (!need_resched()) {
-                        check_pgt_cache();
-                        rmb();
+		while (!need_resched()) {
+			check_pgt_cache();
+			rmb();
 
 /*                        if (cpu_is_offline(cpu))
                                 play_dead();
 */
 			clear_thread_flag(TIF_POLLING_NRFLAG);
 
-                        local_irq_disable();
-                        /* Don't trace irqs off for idle */
-                        stop_critical_timings();
-			if (powersave != NULL )
+			local_irq_disable();
+			/* Don't trace irqs off for idle */
+			stop_critical_timings();
+			if (powersave != NULL)
 				powersave();
 			start_critical_timings();
 			local_irq_enable();
-		        set_thread_flag(TIF_POLLING_NRFLAG);
-                }
+			set_thread_flag(TIF_POLLING_NRFLAG);
+		}
 
-                tick_nohz_restart_sched_tick();
-                preempt_enable_no_resched();
-                schedule();
-                preempt_disable();
-        }
+		tick_nohz_restart_sched_tick();
+		preempt_enable_no_resched();
+		schedule();
+		preempt_disable();
+	}
 }
