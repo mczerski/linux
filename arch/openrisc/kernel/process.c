@@ -43,7 +43,6 @@
 #include <asm/processor.h>
 #include <asm/spr_defs.h>
 
-
 #include <linux/smp.h>
 
 /*
@@ -51,7 +50,7 @@
  *
  * Used at user space -> kernel transitions.
  */
-struct thread_info *current_thread_info_set[NR_CPUS] = {&init_thread_info, };
+struct thread_info *current_thread_info_set[NR_CPUS] = { &init_thread_info, };
 
 #if 0
 
@@ -64,7 +63,7 @@ struct thread_info *current_thread_info_set[NR_CPUS] = {&init_thread_info, };
  * region by enable_hlt/disable_hlt.
  */
 
-static int hlt_counter=0;
+static int hlt_counter = 0;
 
 void disable_hlt(void)
 {
@@ -80,7 +79,6 @@ void enable_hlt(void)
 
 EXPORT_SYMBOL(enable_hlt);
 #endif
-
 
 void machine_restart(void)
 {
@@ -114,7 +112,7 @@ void machine_power_off(void)
 
 EXPORT_SYMBOL(machine_power_off);
 
-void (*pm_power_off)(void) = machine_power_off;
+void (*pm_power_off) (void) = machine_power_off;
 EXPORT_SYMBOL(pm_power_off);
 
 /*
@@ -153,11 +151,10 @@ extern asmlinkage void ret_from_fork(void);
 
 int
 copy_thread(unsigned long clone_flags, unsigned long usp,
-	    unsigned long unused,
-	    struct task_struct *p, struct pt_regs *regs)
+	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
-	struct pt_regs* childregs;
-	struct pt_regs* kregs;
+	struct pt_regs *childregs;
+	struct pt_regs *kregs;
 	unsigned long sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
 	struct thread_info *ti;
 	unsigned long top_of_kernel_stack;
@@ -170,52 +167,52 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	/* redzone */
 	sp -= STACK_FRAME_OVERHEAD;
 	sp -= sizeof(struct pt_regs);
-	childregs = (struct pt_regs *) sp;
+	childregs = (struct pt_regs *)sp;
 
 	/* Copy parent registers */
 	*childregs = *regs;
 
 	if ((childregs->sr & SPR_SR_SM) == 1) {
-                /* for kernel thread, set `current_thread_info'
-	         * and stackptr in new task
+		/* for kernel thread, set `current_thread_info'
+		 * and stackptr in new task
 		 */
 		childregs->sp = (unsigned long)task_stack_page(p) + THREAD_SIZE;
-                childregs->gpr[10] = (unsigned long)task_thread_info(p);
-        } else {
+		childregs->gpr[10] = (unsigned long)task_thread_info(p);
+	} else {
 		childregs->sp = usp;
 	}
 
-        childregs->gpr[11] = 0;  /* Result from fork() */
+	childregs->gpr[11] = 0;	/* Result from fork() */
 
-        /*
-         * The way this works is that at some point in the future
-         * some task will call _switch to switch to the new task.
-         * That will pop off the stack frame created below and start
-         * the new task running at ret_from_fork.  The new task will
-         * do some house keeping and then return from the fork or clone
-         * system call, using the stack frame created above.
-         */
+	/*
+	 * The way this works is that at some point in the future
+	 * some task will call _switch to switch to the new task.
+	 * That will pop off the stack frame created below and start
+	 * the new task running at ret_from_fork.  The new task will
+	 * do some house keeping and then return from the fork or clone
+	 * system call, using the stack frame created above.
+	 */
 	/* redzone */
 	sp -= STACK_FRAME_OVERHEAD;
 	sp -= sizeof(struct pt_regs);
-        kregs = (struct pt_regs *) sp;
+	kregs = (struct pt_regs *)sp;
 
 	ti = task_thread_info(p);
-        ti->ksp = sp;
+	ti->ksp = sp;
 
-//	kregs->sr = regs->sr | SPR_SR_SM;
+//      kregs->sr = regs->sr | SPR_SR_SM;
 	/* kregs->sp must store the location of the 'pre-switch' kernel stack
 	 * pointer... for a newly forked process, this is simply the top of
 	 * the kernel stack.
 	 */
 	kregs->sp = top_of_kernel_stack;
-//	kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
-	kregs->gpr[3] = (unsigned long)current;  /* arg to schedule_tail */
+//      kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
+	kregs->gpr[3] = (unsigned long)current;	/* arg to schedule_tail */
 	kregs->gpr[10] = (unsigned long)task_thread_info(p);
 //        kregs->pc = (unsigned long)ret_from_fork;
 	kregs->gpr[9] = (unsigned long)ret_from_fork;
 
-        return 0;
+	return 0;
 }
 
 /*
@@ -236,19 +233,19 @@ void start_thread(struct pt_regs *regs, unsigned long pc, unsigned long sp)
 }
 
 /* Fill in the fpu structure for a core dump.  */
-int dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpu)
+int dump_fpu(struct pt_regs *regs, elf_fpregset_t * fpu)
 {
 	/* TODO */
 	return 0;
 }
 
-extern struct thread_info* _switch(struct thread_info *old_ti,
+extern struct thread_info *_switch(struct thread_info *old_ti,
 				   struct thread_info *new_ti);
 
-struct task_struct* __switch_to(struct task_struct* old,
-				struct task_struct* new)
+struct task_struct *__switch_to(struct task_struct *old,
+				struct task_struct *new)
 {
-	struct task_struct* last;
+	struct task_struct *last;
 	struct thread_info *new_ti, *old_ti;
 	unsigned long flags;
 
@@ -279,45 +276,45 @@ void dump_thread(struct pt_regs *regs, struct user *dump)
 
 extern void _kernel_thread_helper(void);
 
-void __noreturn kernel_thread_helper(int (*fn)(void *), void *arg)
+void __noreturn kernel_thread_helper(int (*fn) (void *), void *arg)
 {
-        do_exit(fn(arg));
+	do_exit(fn(arg));
 }
 
 /*
  * Create a kernel thread.
  */
-int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
+int kernel_thread(int (*fn) (void *), void *arg, unsigned long flags)
 {
-        struct pt_regs regs;
+	struct pt_regs regs;
 
-        memset(&regs, 0, sizeof(regs));
+	memset(&regs, 0, sizeof(regs));
 
-        regs.gpr[20] = (unsigned long)fn;
-        regs.gpr[22] = (unsigned long)arg;
-        regs.sr = mfspr(SPR_SR);
-        regs.pc = (unsigned long)_kernel_thread_helper;
+	regs.gpr[20] = (unsigned long)fn;
+	regs.gpr[22] = (unsigned long)arg;
+	regs.sr = mfspr(SPR_SR);
+	regs.pc = (unsigned long)_kernel_thread_helper;
 
-        return do_fork(flags | CLONE_VM | CLONE_UNTRACED,
-                        0, &regs, 0, NULL, NULL);
+	return do_fork(flags | CLONE_VM | CLONE_UNTRACED,
+		       0, &regs, 0, NULL, NULL);
 }
 
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage long _sys_execve(const char __user *name,
-                           const char __user *const __user *argv,
-                           const char __user *const __user *envp,
-                           struct pt_regs *regs)
+asmlinkage long _sys_execve(const char __user * name,
+			    const char __user * const __user * argv,
+			    const char __user * const __user * envp,
+			    struct pt_regs *regs)
 {
 	int error;
-	char * filename;
+	char *filename;
 
 	filename = getname(name);
 	error = PTR_ERR(filename);
 
 	if (IS_ERR(filename))
-	  goto out;
+		goto out;
 
 	error = do_execve(filename, argv, envp, regs);
 	putname(filename);
@@ -333,19 +330,18 @@ unsigned long get_wchan(struct task_struct *p)
 	return 0;
 }
 
-int kernel_execve(const char *filename, char *const argv[], char *const
-envp[])
+int kernel_execve(const char *filename, char *const argv[], char *const envp[])
 {
 	register long __res asm("r11") = __NR_execve;
 	register long __a asm("r3") = (long)(filename);
 	register long __b asm("r4") = (long)(argv);
 	register long __c asm("r5") = (long)(envp);
-	__asm__ volatile ("l.sys 1"
-	                  : "=r" (__res), "=r" (__a), "=r" (__b), "=r" (__c)
-	                  : "0" (__res), "1" (__a), "2" (__b), "3" (__c)
-	                  : "r6", "r7", "r8", "r12", "r13", "r15",
-	                    "r17", "r19", "r21", "r23", "r25", "r27",
-	                    "r29", "r31");
-	__asm__ volatile("l.nop");
+	__asm__ volatile ("l.sys 1":"=r" (__res), "=r"(__a), "=r"(__b),
+			  "=r"(__c)
+			  : "0"(__res), "1"(__a), "2"(__b), "3"(__c)
+			  : "r6", "r7", "r8", "r12", "r13", "r15",
+			    "r17", "r19", "r21", "r23", "r25", "r27",
+			    "r29", "r31");
+	__asm__ volatile ("l.nop");
 	return __res;
 }
