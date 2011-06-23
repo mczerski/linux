@@ -31,8 +31,7 @@
 #include <asm/delay.h>
 #include <asm/pgalloc.h>
 
-
-#define DECLARE_EXPORT(name) extern void name(void);EXPORT_SYMBOL(name)
+#define DECLARE_EXPORT(name) extern void name(void); EXPORT_SYMBOL(name)
 
 /* compiler generated symbols */
 DECLARE_EXPORT(__udivsi3);
