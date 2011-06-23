@@ -95,7 +95,8 @@ static void or1k_pic_mask_ack(struct irq_data *data)
 #endif
 }
 
-static int or1k_pic_set_type(struct irq_data *data, unsigned int flow_type) {
+static int or1k_pic_set_type(struct irq_data *data, unsigned int flow_type)
+{
 	/* There's nothing to do in the PIC configuration when changing
 	 * flow type.  Level and edge-triggered interrupts are both
 	 * supported, but it's PIC-implementation specific which type
@@ -115,8 +116,8 @@ static inline int pic_get_irq(int first)
 
 static void __init or1k_irq_init(void)
 {
-        struct irq_chip_generic *gc;
-        struct irq_chip_type *ct;
+	struct irq_chip_generic *gc;
+	struct irq_chip_type *ct;
 
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
@@ -138,11 +139,12 @@ static void __init or1k_irq_init(void)
 	ct->chip.type = IRQ_TYPE_EDGE_BOTH | IRQ_TYPE_LEVEL_MASK;
 #endif
 
-        irq_setup_generic_chip(gc, IRQ_MSK(NR_IRQS), 0,
-                               IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
+	irq_setup_generic_chip(gc, IRQ_MSK(NR_IRQS), 0,
+			       IRQ_NOREQUEST, IRQ_LEVEL | IRQ_NOPROBE);
 }
 
-void __init init_IRQ(void) {
+void __init init_IRQ(void)
+{
 	or1k_irq_init();
 }
 
@@ -162,8 +164,9 @@ void __irq_entry do_IRQ(struct pt_regs *regs)
 }
 
 unsigned int irq_create_of_mapping(struct device_node *controller,
-                                   const u32 *intspec, unsigned int intsize)
+				   const u32 * intspec, unsigned int intsize)
 {
-        return intspec[0];
+	return intspec[0];
 }
+
 EXPORT_SYMBOL_GPL(irq_create_of_mapping);
