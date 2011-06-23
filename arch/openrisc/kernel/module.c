@@ -42,17 +42,17 @@ int apply_relocate_add(Elf32_Shdr *sechdrs,
 			+ ELF32_R_SYM(rel[i].r_info);
 		value = sym->st_value + rel[i].r_addend;
 
-		switch(ELF32_R_TYPE(rel[i].r_info)) {
+		switch (ELF32_R_TYPE(rel[i].r_info)) {
 		case R_OR32_32:
 			*location = value;
 			break;
 		case R_OR32_CONST:
-			location = (uint16_t*)location + 1;
-			*((uint16_t*)location) = (uint16_t) (value);
+			location = (uint16_t *)location + 1;
+			*((uint16_t *)location) = (uint16_t) (value);
 			break;
 		case R_OR32_CONSTH:
-			location = (uint16_t*)location + 1;
-			*((uint16_t*)location) = (uint16_t) (value >> 16);
+			location = (uint16_t *)location + 1;
+			*((uint16_t *)location) = (uint16_t) (value >> 16);
 			break;
 		case R_OR32_JUMPTARG:
 			value -= (uint32_t)location;
