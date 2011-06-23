@@ -31,9 +31,6 @@ config UID16
 config RWSEM_GENERIC_SPINLOCK
 	def_bool y
 
-config GENERIC_CALIBRATE_DELAY
-	def_bool y
-
 config RWSEM_XCHGADD_ALGORITHM
 	def_bool n
 
