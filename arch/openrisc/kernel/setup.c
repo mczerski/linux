@@ -48,6 +48,7 @@
 #include <asm/setup.h>
 #include <asm/io.h>
 #include <asm/cpuinfo.h>
+#include <asm/delay.h>
 
 /*
  * Setup options
@@ -277,6 +278,29 @@ void __init detect_unit_config(unsigned long upr, unsigned long mask,
 	}
 	else
 		printk("not present\n");
+}
+
+/*
+ * calibrate_delay
+ *
+ * Lightweight calibrate_delay implementation that calculates loops_per_jiffy
+ * from the clock frequency passed in via the device tree
+ *
+ */
+
+void __cpuinit calibrate_delay(void)
+{
+	const int *val;
+	struct device_node *cpu = NULL;
+	cpu = of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
+	val = of_get_property(cpu, "clock-frequency", NULL);
+	if (!val) {
+		panic("no cpu 'clock-frequency' parameter in device tree");
+	}
+	loops_per_jiffy = *val / HZ;
+	pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
+	        loops_per_jiffy/(500000/HZ),
+	        (loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
 }
 
 void __init setup_arch(char **cmdline_p)
