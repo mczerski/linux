@@ -189,8 +189,7 @@ void __init setup_cpuinfo(void)
 	unsigned long iccfgr,dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
-	cpu = (struct device_node *) of_find_compatible_node(NULL,
-	                                NULL, "opencores,openrisc-1200");
+	cpu = of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
 	if (!cpu) {
 		panic("No compatible CPU found in device tree...\n");
 	}
