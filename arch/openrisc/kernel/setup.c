@@ -177,8 +177,8 @@ static void print_cpuinfo(void) {
 
 static inline unsigned int fcpu(struct device_node *cpu, char *n)
 {
-        int *val;
-        return (val = (int *) of_get_property(cpu, n, NULL)) ? *val : 0;
+        const int *val;
+        return (val = of_get_property(cpu, n, NULL)) ? *val : 0;
 }
 
 extern void __ic_enable(u32 icache_size, u32 icache_block_size);
