@@ -355,6 +355,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	return seq_printf(m,
 		"cpu\t\t: OpenRISC-%x\n"
 		"revision\t: %d\n"
+		"frequency\t: %ld\n"
 		"dcache size\t: %d bytes\n"
 		"dcache block size\t: %d bytes\n"
 		"icache size\t: %d bytes\n"
@@ -365,6 +366,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 		version,
 		revision,
+		loops_per_jiffy * HZ,
 		cpuinfo.dcache_size,
 		cpuinfo.dcache_block_size,
 		cpuinfo.icache_size,
