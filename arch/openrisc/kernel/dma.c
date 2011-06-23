@@ -30,8 +30,8 @@
 /*
  * Alloc "coherent" memory, which for OpenRISC means simply uncached.
  */
-void* or1k_dma_alloc_coherent(struct device *dev, size_t size,
-                              dma_addr_t *dma_handle, gfp_t flag)
+void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
+			      dma_addr_t * dma_handle, gfp_t flag)
 {
 	int order;
 	unsigned long page, va;
@@ -53,7 +53,7 @@ void* or1k_dma_alloc_coherent(struct device *dev, size_t size,
 		free_pages(page, order);
 		return NULL;
 	}
-	va = (unsigned long) area->addr;
+	va = (unsigned long)area->addr;
 
 	/* This gives us the real physical address of the first page. */
 	*dma_handle = __pa(page);
@@ -66,11 +66,11 @@ void* or1k_dma_alloc_coherent(struct device *dev, size_t size,
 		return NULL;
 	}
 
-	return (void*) va;
+	return (void *)va;
 }
 
-void or1k_dma_free_coherent(struct device* dev, size_t size, void* vaddr,
-                            dma_addr_t dma_handle)
+void or1k_dma_free_coherent(struct device *dev, size_t size, void *vaddr,
+			    dma_addr_t dma_handle)
 {
 	vfree(vaddr);
 }
@@ -80,8 +80,9 @@ void or1k_dma_free_coherent(struct device* dev, size_t size, void* vaddr,
 
 static int __init dma_init(void)
 {
-       dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
 
-       return 0;
+	return 0;
 }
+
 fs_initcall(dma_init);
