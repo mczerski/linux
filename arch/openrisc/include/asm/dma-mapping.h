@@ -7,7 +7,6 @@
  *
  * OpenRISC implementation:
  * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
- * et al.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,94 +22,31 @@
  * Documentation/DMA-API.txt for documentation.
  */
 
-#include <linux/types.h>
-#include <linux/cache.h>
-#include <linux/mm.h>
-#include <linux/scatterlist.h>
 #include <linux/dma-debug.h>
-#include <linux/dma-attrs.h>
-#include <asm/io.h>
 #include <asm-generic/dma-coherent.h>
 
 #define DMA_ERROR_CODE		(~(dma_addr_t)0x0)
 
-static inline unsigned long device_to_mask(struct device *dev)
-{
-	if (dev->dma_mask && *dev->dma_mask)
-		return *dev->dma_mask;
-	/* Assume devices without mask can take 32 bit addresses */
-	return 0xfffffffful;
-}
+int dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
 
-extern struct dma_map_ops or1k_dma_ops;
+int dma_supported(struct device *dev, u64 mask);
 
-static inline struct dma_map_ops* get_dma_ops(struct device *dev)
-{
-        return &or1k_dma_ops;
-/*#else
-        if (unlikely(!dev) || !dev->archdata.dma_ops)
-                return dma_ops;
-        else
-                return dev->archdata.dma_ops;
-#endif
-*/
-}
-
-#include <asm-generic/dma-mapping-common.h>
-
-/*
-static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-{
-	dev->archdata.dma_ops = ops;
-}
-*/
-
-static inline int
-dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-{
-	return 0;
-}
-
-static inline int
-dma_supported(struct device *dev, u64 mask)
-{
-	return 1;
-}
-
-static inline int
-dma_set_mask(struct device *dev, u64 mask)
-{
-	if (!dev->dma_mask || !dma_supported(dev, mask))
-		return -EIO;
-
-	*dev->dma_mask = mask;
-
-	return 0;
-}
-
-#if 0
-static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
-{
-	struct dma_map_ops *ops = get_dma_ops(dev);
-	if (ops->mapping_error)
-		return ops->mapping_error(dev, dma_addr);
-
-	return (dma_addr == DMA_ERROR_CODE);
-}
-#endif
+int dma_set_mask(struct device *dev, u64 mask);
 
 #define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
 #define dma_free_noncoherent(d, s, v, h) dma_free_coherent(d, s, v, h)
 
+void* or1k_dma_alloc_coherent(struct device *dev, size_t size,
+                              dma_addr_t *dma_handle, gfp_t flag);
+void or1k_dma_free_coherent(struct device* dev, size_t size, void* vaddr,
+                            dma_addr_t dma_handle);
+
 static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 					dma_addr_t *dma_handle, gfp_t flag)
 {
-	struct dma_map_ops *ops = get_dma_ops(dev);
 	void *memory;
 
-	BUG_ON(!ops);
-
-	memory = ops->alloc_coherent(dev, size, dma_handle, flag);
+	memory = or1k_dma_alloc_coherent(dev, size, dma_handle, flag);
 
 	debug_dma_alloc_coherent(dev, size, *dma_handle, memory);
 	return memory;
@@ -119,11 +55,8 @@ static inline void *dma_alloc_coherent(struct device *dev, size_t size,
 static inline void dma_free_coherent(struct device *dev, size_t size,
 				     void *cpu_addr, dma_addr_t dma_handle)
 {
-	struct dma_map_ops *ops = get_dma_ops(dev);
-
-	BUG_ON(!ops);
 	debug_dma_free_coherent(dev, size, cpu_addr, dma_handle);
-	ops->free_coherent(dev, size, cpu_addr, dma_handle);
+	or1k_dma_free_coherent(dev, size, cpu_addr, dma_handle);
 }
 
 #endif	/* __ASM_OPENRISC_DMA_MAPPING_H */

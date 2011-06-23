@@ -1,5 +1,5 @@
 /*
- * OpenRISC dma.c
+ * OpenRISC Linux
  *
  * Linux architectural port borrowing liberally from similar works of
  * others.  All original copyrights apply as per the original source
@@ -25,14 +25,13 @@
 #include <linux/dma-debug.h>
 #include <linux/io.h>
 #include <linux/vmalloc.h>
-#include <asm/bug.h>
+//#include <asm/bug.h>
 
 /*
  * Alloc "coherent" memory, which for OpenRISC means simply uncached.
  */
-static void*
-or1k_dma_alloc_coherent(struct device *dev, size_t size,
-                   dma_addr_t *dma_handle, gfp_t flag)
+void* or1k_dma_alloc_coherent(struct device *dev, size_t size,
+                              dma_addr_t *dma_handle, gfp_t flag)
 {
 	int order;
 	unsigned long page, va;
@@ -70,74 +69,11 @@ or1k_dma_alloc_coherent(struct device *dev, size_t size,
 	return (void*) va;
 }
 
-static void
-or1k_dma_free_coherent(struct device* dev, size_t size, void* vaddr,
-                  dma_addr_t dma_handle)
+void or1k_dma_free_coherent(struct device* dev, size_t size, void* vaddr,
+                            dma_addr_t dma_handle)
 {
 	vfree(vaddr);
 }
-
-static int
-or1k_dma_map_sg(struct device *dev, struct scatterlist *sgl,
-                int nents, enum dma_data_direction direction,
-                struct dma_attrs *attrs)
-{
-	struct scatterlist *sg;
-	int i;
-
-	BUG();
-	return 0;
-#if 0
-	/* FIXME this part of code is untested */
-	for_each_sg(sgl, sg, nents, i) {
-		sg->dma_address = sg_phys(sg);
-		__dma_sync_page(page_to_phys(sg_page(sg)), sg->offset,
-							sg->length, direction);
-	}
-
-	return nents;
-#endif
-}
-
-static inline dma_addr_t
-or1k_dma_map_page(struct device *dev,
-                    struct page *page,
-                    unsigned long offset,
-                    size_t size,
-                    enum dma_data_direction direction,
-                    struct dma_attrs *attrs)
-{
-	BUG();
-	return NULL;
-}
-
-#if 0
-static void
-__dma_map_range(dma_addr_t dma_addr, size_t size)
-{
-	struct page *page = pfn_to_page(PFN_DOWN(dma_addr));
-	size_t bytesleft = PAGE_SIZE - (dma_addr & (PAGE_SIZE - 1));
-
-	while ((ssize_t)size > 0) {
-		/* Flush the page. */
-
-                homecache_flush_cache(page++, 0);
-
-                /* Figure out if we need to continue on the next page. */
-                size -= bytesleft;
-                bytesleft = PAGE_SIZE;
-        }
-cacheflush(...);
-}
-#endif
-
-struct dma_map_ops or1k_dma_ops = {
-	.alloc_coherent	= or1k_dma_alloc_coherent,
-	.free_coherent	= or1k_dma_free_coherent,
-	.map_sg		= or1k_dma_map_sg,
-	.map_page	= or1k_dma_map_page,
-};
-EXPORT_SYMBOL(or1k_dma_ops);
 
 /* Number of entries preallocated for DMA-API debugging */
 #define PREALLOC_DMA_DEBUG_ENTRIES (1 << 16)
