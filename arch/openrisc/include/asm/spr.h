@@ -17,12 +17,12 @@
 #ifndef __ASM_OPENRISC_SPR_H
 #define __ASM_OPENRISC_SPR_H
 
-#define mtspr(_spr, _val) __asm__ __volatile__ ( 		\
+#define mtspr(_spr, _val) __asm__ __volatile__ (		\
 	"l.mtspr r0,%1,%0"					\
-	:: "K" (_spr), "r" (_val))
-#define mtspr_off(_spr, _off, _val) __asm__ __volatile__ ( 	\
+	: : "K" (_spr), "r" (_val))
+#define mtspr_off(_spr, _off, _val) __asm__ __volatile__ (	\
 	"l.mtspr %0,%1,%2"					\
-	:: "r" (_off), "r" (_val), "K" (_spr))
+	: : "r" (_off), "r" (_val), "K" (_spr))
 
 static inline unsigned long mfspr(unsigned long add)
 {

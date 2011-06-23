@@ -65,7 +65,7 @@ typedef unsigned long elf_fpregset_t;
  */
 
 #define elf_check_arch(x) \
-       (((x)->e_machine == EM_OR32) || ((x)->e_machine == EM_OPENRISC))
+	(((x)->e_machine == EM_OR32) || ((x)->e_machine == EM_OPENRISC))
 
 /* This is the location that an ET_DYN program is loaded if exec'ed.  Typical
    use of this is to invoke "./ld.so someprog" to test out a new version of
@@ -84,8 +84,8 @@ typedef unsigned long elf_fpregset_t;
 
 #define ELF_CORE_COPY_REGS(gregs, regs) \
 	memcpy(gregs, regs, \
-	       sizeof(struct pt_regs) < sizeof(elf_gregset_t)? \
-	       sizeof(struct pt_regs): sizeof(elf_gregset_t));
+	       sizeof(struct pt_regs) < sizeof(elf_gregset_t) ? \
+	       sizeof(struct pt_regs) : sizeof(elf_gregset_t));
 
 
 /* This yields a mask that user programs can use to figure out what

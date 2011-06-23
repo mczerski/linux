@@ -15,7 +15,8 @@
 
 #ifdef CONFIG_OPENRISC_HAVE_INST_FL1
 
-static inline int fls(int x) {
+static inline int fls(int x)
+{
 	int ret;
 
 	__asm__ ( "l.fl1 %0,%1"

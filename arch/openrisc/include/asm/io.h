@@ -28,7 +28,7 @@
  */
 
 static inline unsigned long
-virt_to_phys(volatile void * address)
+virt_to_phys(volatile void *address)
 {
 	return __pa(address);
 }
@@ -57,8 +57,6 @@ ioremap_nocache(phys_addr_t offset, unsigned long size)
 
 extern void iounmap(void *addr);
 
-//#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
-
 /*
  * IO bus memory addresses are also 1:1 with the physical address
  */
@@ -71,9 +69,9 @@ extern void iounmap(void *addr);
 #define __raw_readw(addr) (*(volatile unsigned short *) (addr))
 #define __raw_readl(addr) (*(volatile unsigned int *) (addr))
 
-#define __raw_writeb(b,addr) ((*(volatile unsigned char *) (addr)) = (b))
-#define __raw_writew(b,addr) ((*(volatile unsigned short *) (addr)) = (b))
-#define __raw_writel(b,addr) ((*(volatile unsigned int *) (addr)) = (b))
+#define __raw_writeb(b, addr) ((*(volatile unsigned char *) (addr)) = (b))
+#define __raw_writew(b, addr) ((*(volatile unsigned short *) (addr)) = (b))
+#define __raw_writel(b, addr) ((*(volatile unsigned int *) (addr)) = (b))
 
 /* Wishbone Interface
  *
@@ -89,9 +87,9 @@ extern void iounmap(void *addr);
 #define wb_ioread16(p) __raw_readw(p)
 #define wb_ioread32(p) __raw_readl(p)
 
-#define wb_iowrite8(v,p)  __raw_writeb(v,p)
-#define wb_iowrite16(v,p) __raw_writew(v,p)
-#define wb_iowrite32(v,p) __raw_writel(v,p)
+#define wb_iowrite8(v, p)  __raw_writeb(v,p)
+#define wb_iowrite16(v, p) __raw_writew(v,p)
+#define wb_iowrite32(v, p) __raw_writel(v,p)
 
 /*
  * readX/writeX() are used to access memory mapped devices.
@@ -133,14 +131,16 @@ extern void iounmap(void *addr);
 #define inb_p(port)             inb((port))
 #define outb_p(val, port)       outb((val), (port))
 
-static inline void ioread8_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+ioread8_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned char *p = buf;
 	while (count--)
 		*p++ = readb(port);
 }
 
-static inline void ioread16_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+ioread16_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned short *p = buf;
 	while (count >= 2) {
@@ -149,7 +149,8 @@ static inline void ioread16_rep(void __iomem *port, void *buf, unsigned long cou
 	}
 }
 
-static inline void ioread32_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+ioread32_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned int *p = buf;
 	while (count >= 4) {
@@ -158,14 +159,16 @@ static inline void ioread32_rep(void __iomem *port, void *buf, unsigned long cou
 	}
 }
 
-static inline void iowrite8_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+iowrite8_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned char *p = buf;
 	while (count--)
 		writeb(*p++, port);
 }
 
-static inline void iowrite16_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+iowrite16_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned short *p = buf;
 	while (count >= 2) {
@@ -174,7 +177,8 @@ static inline void iowrite16_rep(void __iomem *port, void *buf, unsigned long co
 	}
 }
 
-static inline void iowrite32_rep(void __iomem *port, void *buf, unsigned long count)
+static inline void
+iowrite32_rep(void __iomem *port, void *buf, unsigned long count)
 {
 	unsigned int *p = buf;
 	while (count >= 4) {
@@ -212,8 +216,8 @@ extern void ioport_unmap(void __iomem *);
 #define ioread16(addr)          wb_ioread16(addr)
 #define ioread32(addr)          wb_ioread32(addr)
 
-#define iowrite8(v, addr)       wb_iowrite8((v),(addr))
-#define iowrite16(v, addr)      wb_iowrite16((v),(addr))
-#define iowrite32(v, addr)      wb_iowrite32((v),(addr))
+#define iowrite8(v, addr)       wb_iowrite8((v), (addr))
+#define iowrite16(v, addr)      wb_iowrite16((v), (addr))
+#define iowrite32(v, addr)      wb_iowrite32((v), (addr))
 
 #endif
