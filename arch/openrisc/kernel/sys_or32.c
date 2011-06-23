@@ -27,20 +27,20 @@
 #include <asm/syscalls.h>
 
 asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
-        unsigned long prot, unsigned long flags,
-        unsigned long fd, unsigned long pgoff)
+			  unsigned long prot, unsigned long flags,
+			  unsigned long fd, unsigned long pgoff)
 {
-        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
+	return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
 }
 
 asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-                        unsigned long prot, unsigned long flags,
-                        unsigned long fd, off_t pgoff)
+			 unsigned long prot, unsigned long flags,
+			 unsigned long fd, off_t pgoff)
 {
-        if (pgoff & ~PAGE_MASK)
-                return -EINVAL;
+	if (pgoff & ~PAGE_MASK)
+		return -EINVAL;
 
-        return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT);
+	return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT);
 }
 
 /* These are secondary entry points as the primary entry points are defined in
@@ -48,8 +48,8 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
  */
 
 asmlinkage long _sys_clone(unsigned long clone_flags, unsigned long newsp,
-                        int __user *parent_tid, int __user *child_tid,
-                        struct pt_regs *regs)
+			   int __user * parent_tid, int __user * child_tid,
+			   struct pt_regs *regs)
 {
 	long ret;
 
@@ -67,7 +67,7 @@ asmlinkage long _sys_clone(unsigned long clone_flags, unsigned long newsp,
 asmlinkage int _sys_fork(struct pt_regs *regs)
 {
 #ifdef CONFIG_MMU
-        return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
+	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 #else
 	return -EINVAL;
 #endif
@@ -79,5 +79,5 @@ asmlinkage int _sys_vfork(struct pt_regs *regs)
 //        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 
 	/* This works */
-        return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
+	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
 }
