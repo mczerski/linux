@@ -1,6 +1,7 @@
 CONFIG_CROSS_COMPILE="or32-linux-"
 CONFIG_LOG_BUF_SHIFT=14
 CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_SOURCE="arch/openrisc/support/initramfs arch/openrisc/support/initramfs.devnodes"
 # CONFIG_RD_GZIP is not set
 CONFIG_EXPERT=y
 # CONFIG_SYSCTL_SYSCALL is not set
