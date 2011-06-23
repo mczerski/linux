@@ -53,7 +53,7 @@ void show_trace(struct task_struct *task, unsigned long *stack)
 	unsigned long addr;
 
 	context = (struct thread_info *)
-		((unsigned long)stack & (~(THREAD_SIZE - 1)));
+	    ((unsigned long)stack & (~(THREAD_SIZE - 1)));
 
 	while (valid_stack_ptr(context, stack)) {
 		addr = *stack++;
@@ -76,7 +76,7 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 	// back trace for this cpu.
 
 	if (esp == NULL)
-		esp = (unsigned long*) &esp;
+		esp = (unsigned long *)&esp;
 
 	stack = esp;
 
@@ -93,7 +93,7 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 		}
 		stack++;
 
-		printk("sp + %02d: 0x%08lx\n", i*4, addr);
+		printk("sp + %02d: 0x%08lx\n", i * 4, addr);
 	}
 	printk("\n");
 
@@ -214,8 +214,8 @@ void nommu_dump_state(struct pt_regs *regs,
 	       regs->gpr[11], regs->orig_gpr11, regs->syscallno);
 
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
-	       ((struct task_struct*)(__pa(current)))->comm,
-	       ((struct task_struct*)(__pa(current)))->pid,
+	       ((struct task_struct *)(__pa(current)))->comm,
+	       ((struct task_struct *)(__pa(current)))->pid,
 	       (unsigned long)current);
 
 	printk("\nStack: ");
@@ -225,8 +225,8 @@ void nommu_dump_state(struct pt_regs *regs,
 			break;
 		stack++;
 
-		printk("%lx :: sp + %02d: 0x%08lx\n", stack, i*4,
-		       *((unsigned long*)(__pa(stack))));
+		printk("%lx :: sp + %02d: 0x%08lx\n", stack, i * 4,
+		       *((unsigned long *)(__pa(stack))));
 	}
 	printk("\n");
 
@@ -272,26 +272,6 @@ void die(const char *str, struct pt_regs *regs, long err)
 	/* shut down interrupts */
 	local_irq_disable();
 
-/*
- * this doesn't work
- *
- */
-#if 0
-	/* stop the simulator */
-	__asm__ __volatile__(
-		"l.nop   1                     ;"
-		"l.ori   r3,r0,0x8001          ;"
-                "l.mtspr r0,r3,64              ;" /* SPR_ESR_BASE */
-                "l.movhi r3,hi(0xf0000100)     ;"
-                "l.ori   r3,r3,lo(0xf0000100)  ;"
-                "l.mtspr r0,r3,32              ;" /* SPR_EPCR_BASE */
-		"l.nop   1                     ;"
-		"l.nop   1                     ;"
-		"l.nop   1                     ;"
-		"l.nop   1                     ;"
-                "l.rfe");
-#endif
-
 	__asm__ __volatile__("l.nop   1");
 	for (;;) ;
 #endif
@@ -325,7 +305,7 @@ asmlinkage void do_trap(struct pt_regs *regs, unsigned long address)
 	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGTRAP;
 	info.si_code = TRAP_TRACE;
-	info.si_addr = (void*) address;
+	info.si_addr = (void *)address;
 	force_sig_info(SIGTRAP, &info, current);
 
 	if (!(test_tsk_thread_flag(current, TIF_SINGLESTEP)))
