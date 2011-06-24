@@ -47,8 +47,6 @@ static inline void pm_idle(void)
 
 void cpu_idle(void)
 {
-	unsigned int cpu = smp_processor_id();
-
 	set_thread_flag(TIF_POLLING_NRFLAG);
 
 	/* endless idle loop with no priority at all */
