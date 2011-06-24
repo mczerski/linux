@@ -25,13 +25,12 @@
 #include <linux/dma-debug.h>
 #include <linux/io.h>
 #include <linux/vmalloc.h>
-//#include <asm/bug.h>
 
 /*
  * Alloc "coherent" memory, which for OpenRISC means simply uncached.
  */
 void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
-			      dma_addr_t * dma_handle, gfp_t flag)
+			      dma_addr_t *dma_handle, gfp_t flag)
 {
 	int order;
 	unsigned long page, va;
@@ -43,9 +42,8 @@ void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
 	order = get_order(size);
 
 	page = __get_free_pages(flag, order);
-	if (!page) {
+	if (!page)
 		return NULL;
-	}
 
 	/* Allocate some common virtual space to map the new pages. */
 	area = get_vm_area(size, VM_ALLOC);
