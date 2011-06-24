@@ -59,9 +59,6 @@ void cpu_idle(void)
 			check_pgt_cache();
 			rmb();
 
-/*                        if (cpu_is_offline(cpu))
-                                play_dead();
-*/
 			clear_thread_flag(TIF_POLLING_NRFLAG);
 
 			local_irq_disable();
