@@ -38,7 +38,7 @@
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
 asmlinkage long
-_sys_sigaltstack(const stack_t * uss, stack_t * uoss, struct pt_regs *regs)
+_sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 {
 	return do_sigaltstack(uss, uoss, regs->sp);
 }
@@ -158,7 +158,7 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 
 static inline unsigned long align_sigframe(unsigned long sp)
 {
-	return (sp & ~3UL);
+	return sp & ~3UL;
 }
 
 /*
@@ -200,8 +200,8 @@ static inline void __user *get_sigframe(struct k_sigaction *ka,
  * trampoline which performs the syscall sigreturn, or a provided
  * user-mode trampoline.
  */
-static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t * info,
-			   sigset_t * set, struct pt_regs *regs)
+static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
+			   sigset_t *set, struct pt_regs *regs)
 {
 	struct rt_sigframe *frame;
 	unsigned long return_ip;
@@ -249,11 +249,11 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t * info,
 	/* TODO what is the current->exec_domain stuff and invmap ? */
 
 	/* Set up registers for signal handler */
-	regs->pc = (unsigned long)ka->sa.sa_handler;	/* what we enter NOW   */
-	regs->gpr[9] = (unsigned long)return_ip;	/* what we enter LATER */
-	regs->gpr[3] = (unsigned long)sig;	/* arg 1: signo */
-	regs->gpr[4] = (unsigned long)&frame->info;	/* arg 2: (siginfo_t*) */
-	regs->gpr[5] = (unsigned long)&frame->uc;	/* arg 3: ucontext */
+	regs->pc = (unsigned long)ka->sa.sa_handler; /* what we enter NOW */
+	regs->gpr[9] = (unsigned long)return_ip;     /* what we enter LATER */
+	regs->gpr[3] = (unsigned long)sig;           /* arg 1: signo */
+	regs->gpr[4] = (unsigned long)&frame->info;  /* arg 2: (siginfo_t*) */
+	regs->gpr[5] = (unsigned long)&frame->uc;    /* arg 3: ucontext */
 
 	/* actually move the usp to reflect the stacked frame */
 	regs->sp = (unsigned long)frame;
@@ -268,8 +268,8 @@ give_sigsegv:
 
 static inline void
 handle_signal(unsigned long sig,
-	      siginfo_t * info, struct k_sigaction *ka,
-	      sigset_t * oldset, struct pt_regs *regs)
+	      siginfo_t *info, struct k_sigaction *ka,
+	      sigset_t *oldset, struct pt_regs *regs)
 {
 	setup_rt_frame(sig, ka, info, oldset, regs);
 
