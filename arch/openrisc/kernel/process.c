@@ -52,72 +52,37 @@
  */
 struct thread_info *current_thread_info_set[NR_CPUS] = { &init_thread_info, };
 
-#if 0
-
-/*
- * The hlt_counter, disable_hlt and enable_hlt is just here as a hook if
- * there would ever be a halt sequence (for power save when idle) with
- * some largish delay when halting or resuming *and* a driver that can't
- * afford that delay.  The hlt_counter would then be checked before
- * executing the halt sequence, and the driver marks the unhaltable
- * region by enable_hlt/disable_hlt.
- */
-
-static int hlt_counter = 0;
-
-void disable_hlt(void)
-{
-	hlt_counter++;
-}
-
-EXPORT_SYMBOL(disable_hlt);
-
-void enable_hlt(void)
-{
-	hlt_counter--;
-}
-
-EXPORT_SYMBOL(enable_hlt);
-#endif
-
 void machine_restart(void)
 {
 	printk(KERN_INFO "*** MACHINE RESTART ***\n");
 	__asm__("l.nop 1");
 }
-EXPORT_SYMBOL(machine_restart);
 
 /*
  * Similar to machine_power_off, but don't shut off power.  Add code
  * here to freeze the system for e.g. post-mortem debug purpose when
  * possible.  This halt has nothing to do with the idle halt.
  */
-
 void machine_halt(void)
 {
 	printk(KERN_INFO "*** MACHINE HALT ***\n");
 	__asm__("l.nop 1");
 }
-EXPORT_SYMBOL(machine_halt);
 
 /* If or when software power-off is implemented, add code here.  */
-
 void machine_power_off(void)
 {
 	printk(KERN_INFO "*** MACHINE POWER OFF ***\n");
 	__asm__("l.nop 1");
 }
-EXPORT_SYMBOL(machine_power_off);
 
 void (*pm_power_off) (void) = machine_power_off;
-EXPORT_SYMBOL(pm_power_off);
 
 /*
  * When a process does an "exec", machine state like FPU and debug
  * registers need to be reset.  This is a hook function for that.
  * Currently we don't have any such state to reset, so this is empty.
  */
-
 void flush_thread(void)
 {
 }
@@ -143,7 +108,6 @@ void release_thread(struct task_struct *dead_task)
  * Copy the thread-specific (arch specific) info from the current
  * process to the new one p
  */
-
 extern asmlinkage void ret_from_fork(void);
 
 int
