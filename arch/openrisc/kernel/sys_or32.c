@@ -48,7 +48,7 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
  */
 
 asmlinkage long _sys_clone(unsigned long clone_flags, unsigned long newsp,
-			   int __user * parent_tid, int __user * child_tid,
+			   int __user *parent_tid, int __user *child_tid,
 			   struct pt_regs *regs)
 {
 	long ret;
