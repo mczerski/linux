@@ -325,13 +325,14 @@ static void clear_breakpoint(struct task_struct *tsk, struct debug_entry *bp)
 	regs = task_pt_regs(tsk);
 	pc = instruction_pointer(regs);	/* This is NPC */
 
-	// Either at the breakpoint, or in delay slot (pc will be at address of
-	// branch instruction - OR1K exception handlers do that, for now.
-	// Perhaps FIXME
+	/* Either at the breakpoint, or in delay slot (pc will be at address of
+	 * branch instruction - OR1K exception handlers do that, for now.
+	 * Perhaps FIXME
+	 */
 	if ((pc == addr) || ((bp->branch_insn_address == pc) && bp->branch))
 		ret = swap_insn(tsk, addr & ~3, &old_insn, &bp->insn, 4);
 	else {
-		// Trapped for some other reason.
+		/* Trapped for some other reason. */
 		pr_debug(KERN_INFO
 			 "ptrace clear_breakpoint: not correct, pc 0x%.8lx bp 0x%.8lx\n",
 			 pc, addr);
@@ -386,8 +387,9 @@ void ptrace_set_bpt(struct task_struct *tsk)
 			/* Branch target is already determined. Set l.trap. */
 			npc = dbg->bp.branch_target;
 
-			// Reset NPC to branch instruction - should be one
-			// before this one.
+			/* Reset NPC to branch instruction - should be one
+			 * before this one.
+			 */
 			instruction_pointer(regs) = dbg->bp.branch_insn_address;
 
 			/* Now mark this as no longer needing to be taken */
@@ -428,7 +430,7 @@ void ptrace_disable(struct task_struct *child)
  * actually access the pt_regs stored on the kernel stack.
  */
 static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
-			    unsigned long __user * ret)
+			    unsigned long __user *ret)
 {
 	struct pt_regs *regs;
 	unsigned long tmp;
@@ -445,9 +447,8 @@ static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
 		tmp = tsk->mm->start_data;
 	else if (off == PT_TEXT_END_ADDR)
 		tmp = tsk->mm->end_code;
-	else if (off < sizeof(struct pt_regs)) {
+	else if (off < sizeof(struct pt_regs))
 		tmp = *((unsigned long *)((char *)regs + off));
-	}
 
 	return put_user(tmp, ret);
 }

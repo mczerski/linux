@@ -18,7 +18,7 @@ extern void ptrace_break(struct task_struct *, struct pt_regs *);
  */
 static inline void single_step_trap(struct task_struct *task)
 {
-	if (test_tsk_thread_flag(task, TIF_SINGLESTEP)){
+	if (test_tsk_thread_flag (task, TIF_SINGLESTEP)){
 		ptrace_cancel_bpt(task);
 		send_sig(SIGTRAP, task, 1);
 	}
