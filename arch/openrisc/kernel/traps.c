@@ -72,9 +72,6 @@ void show_stack(struct task_struct *task, unsigned long *esp)
 	unsigned long addr, *stack;
 	int i;
 
-	// debugging aid: "show_stack(NULL);" prints the
-	// back trace for this cpu.
-
 	if (esp == NULL)
 		esp = (unsigned long *)&esp;
 
@@ -273,7 +270,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	local_irq_disable();
 
 	__asm__ __volatile__("l.nop   1");
-	for (;;) ;
+	do {} while(1);
 #endif
 	do_exit(SIGSEGV);
 }
