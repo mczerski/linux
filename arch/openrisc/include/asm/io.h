@@ -22,7 +22,6 @@
 #include <asm/page.h>   /* for __va, __pa */
 #include <asm/byteorder.h>
 
-
 /*
  * Change virtual addresses to physical addresses and vice versa.
  */
@@ -109,24 +108,24 @@ extern void iounmap(void *addr);
 #define readl(addr) (le32_to_cpu(__raw_readl(addr)))
 
 #define writeb __raw_writeb
-#define writew(b,addr) __raw_writew(cpu_to_le16(b), addr)
-#define writel(b,addr) __raw_writel(cpu_to_le32(b), addr)
+#define writew(b, addr) __raw_writew(cpu_to_le16(b), addr)
+#define writel(b, addr) __raw_writel(cpu_to_le32(b), addr)
 
-#define memset_io(a,b,c)	memset((void *)(a),(b),(c))
-#define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
-#define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
+#define memset_io(a, b, c)	memset((void *)(a), (b), (c))
+#define memcpy_fromio(a, b, c)	memcpy((a), (void *)(b), (c))
+#define memcpy_toio(a, b, c)	memcpy((void *)(a), (b), (c))
 
 /*
  * Again, OpenRISC does not require mem IO specific function.
  */
-
-#define eth_io_copy_and_sum(a,b,c,d)	eth_copy_and_sum((a),(void *)(b),(c),(d))
+#define eth_io_copy_and_sum(a, b, c, d) \
+		eth_copy_and_sum((a), (void *)(b), (c), (d))
 
 #define IO_BASE			0x0
 #define IO_SPACE_LIMIT 		0xffffffff
 
 #define inb(port)		(*(volatile unsigned char *) (port+IO_BASE))
-#define outb(value,port)	((*(volatile unsigned char *) (port+IO_BASE)) = (value))
+#define outb(value, port)	((*(volatile unsigned char *) (port+IO_BASE)) = (value))
 
 #define inb_p(port)             inb((port))
 #define outb_p(val, port)       outb((val), (port))
