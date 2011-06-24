@@ -27,13 +27,15 @@
 #include <linux/irqflags.h>
 
 /* read interrupt enabled status */
-unsigned long arch_local_save_flags(void) {
+unsigned long arch_local_save_flags(void)
+{
 	return (mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE));
 }
 EXPORT_SYMBOL(arch_local_save_flags);
 
 /* set interrupt enabled status */
-void arch_local_irq_restore(unsigned long flags) {
+void arch_local_irq_restore(unsigned long flags)
+{
 	mtspr(SPR_SR, ((mfspr(SPR_SR) & ~(SPR_SR_IEE|SPR_SR_TEE)) | flags));
 }
 EXPORT_SYMBOL(arch_local_irq_restore);
@@ -155,18 +157,16 @@ void __irq_entry do_IRQ(struct pt_regs *regs)
 
 	irq_enter();
 
-	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ) {
+	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ)
 		generic_handle_irq(irq);
-	}
 
 	irq_exit();
 	set_irq_regs(old_regs);
 }
 
 unsigned int irq_create_of_mapping(struct device_node *controller,
-				   const u32 * intspec, unsigned int intsize)
+				   const u32 *intspec, unsigned int intsize)
 {
 	return intspec[0];
 }
-
 EXPORT_SYMBOL_GPL(irq_create_of_mapping);
