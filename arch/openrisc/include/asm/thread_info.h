@@ -46,12 +46,12 @@
 typedef unsigned long mm_segment_t;
 
 struct debug_entry {
-	unsigned long			address; /* Address of breakpoint */
-	unsigned long             	insn; /* Instruction replaced */
-	unsigned long                   set; /* Is BP active? */
-	unsigned long                   branch; /* BP is after a branch */
-	unsigned long                   branch_target; /* Branch address */
-	unsigned long                   branch_insn_address; /* PC of l.b/l.j */
+	unsigned long address;  /* Address of breakpoint */
+	unsigned long insn;     /* Instruction replaced */
+	unsigned long set;      /* Is BP active? */
+	unsigned long branch;   /* BP is after a branch */
+	unsigned long branch_target;       /* Branch address */
+	unsigned long branch_insn_address; /* PC of l.b/l.j */
 };
 
 struct debug_info {
@@ -65,10 +65,10 @@ struct thread_info {
 	__u32			cpu;		/* current CPU */
 	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 
-	mm_segment_t		addr_limit;	/* thread address space:
-						   0-0x7FFFFFFF for user-thead
-						   0-0xFFFFFFFF for kernel-thread
-						*/
+	mm_segment_t		addr_limit; /* thread address space:
+					       0-0x7FFFFFFF for user-thead
+					       0-0xFFFFFFFF for kernel-thread
+					     */
 	struct restart_block    restart_block;
 	__u8			supervisor_stack[0];
 
@@ -78,8 +78,6 @@ struct thread_info {
 	struct debug_info	debug;
 };
 #endif
-
-//#define PREEMPT_ACTIVE		0x4000000
 
 /*
  * macros/functions for gaining access to the thread information structure
@@ -98,31 +96,10 @@ struct thread_info {
 	.restart_block  = {				\
 		        .fn = do_no_restart_syscall,	\
 	},						\
-        .ksp            = 0,                            \
+	.ksp            = 0,                            \
 }
 
 #define init_thread_info	(init_thread_union.thread_info)
-
-#if 0
-/* how to get the thread information struct from C */
-static inline struct thread_info *current_thread_info(void)
-{
-	struct thread_info *ti;
-	__asm__("/* current_thread_info */"
-		"l.srli %0,r1,%1;"
-                "l.slli %0,%0,%1" : "=r" (ti) : "K" (PAGE_SHIFT));
-	return ti;
-}
-#endif
-#if 0
-/* how to get the thread information struct from C */
-static inline struct thread_info *current_thread_info(void)
-{
-	struct thread_info *ti;
-	__asm__("l.ori %0,r10,%1" : "=r" (ti) : "K" (0));
-	return ti;
-}
-#endif
 
 /* how to get the thread information struct from C */
 register struct thread_info *current_thread_info_reg asm("r10");
@@ -135,18 +112,22 @@ register struct thread_info *current_thread_info_reg asm("r10");
 
 /*
  * thread information flags
- * - these are process state flags that various assembly files may need to access
- * - pending work-to-be-done flags are in LSW
- * - other flags in MSW
+ *   these are process state flags that various assembly files may need to
+ *   access
+ *   - pending work-to-be-done flags are in LSW
+ *   - other flags in MSW
  */
 #define TIF_SYSCALL_TRACE	0	/* syscall trace active */
 #define TIF_NOTIFY_RESUME	1	/* resumption notification requested */
 #define TIF_SIGPENDING		2	/* signal pending */
 #define TIF_NEED_RESCHED	3	/* rescheduling necessary */
-#define TIF_SINGLESTEP		4	/* restore singlestep on return to user mode */
+#define TIF_SINGLESTEP		4	/* restore singlestep on return to user
+					 * mode
+					 */
 #define TIF_SYSCALL_TRACEPOINT  8       /* for ftrace syscall instrumentation */
 #define TIF_RESTORE_SIGMASK     9
-#define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling TIF_NEED_RESCHED */
+#define TIF_POLLING_NRFLAG	16	/* true if poll_idle() is polling						 * TIF_NEED_RESCHED
+					 */
 #define TIF_MEMDIE              17
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)

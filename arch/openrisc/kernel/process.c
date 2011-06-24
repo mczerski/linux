@@ -82,10 +82,9 @@ EXPORT_SYMBOL(enable_hlt);
 
 void machine_restart(void)
 {
-	printk("*** MACHINE RESTART ***\n");
+	printk(KERN_INFO "*** MACHINE RESTART ***\n");
 	__asm__("l.nop 1");
 }
-
 EXPORT_SYMBOL(machine_restart);
 
 /*
@@ -96,20 +95,18 @@ EXPORT_SYMBOL(machine_restart);
 
 void machine_halt(void)
 {
-	printk("*** MACHINE HALT ***\n");
+	printk(KERN_INFO "*** MACHINE HALT ***\n");
 	__asm__("l.nop 1");
 }
-
 EXPORT_SYMBOL(machine_halt);
 
 /* If or when software power-off is implemented, add code here.  */
 
 void machine_power_off(void)
 {
-	printk("*** MACHINE POWER OFF ***\n");
+	printk(KERN_INFO "*** MACHINE POWER OFF ***\n");
 	__asm__("l.nop 1");
 }
-
 EXPORT_SYMBOL(machine_power_off);
 
 void (*pm_power_off) (void) = machine_power_off;
@@ -200,16 +197,13 @@ copy_thread(unsigned long clone_flags, unsigned long usp,
 	ti = task_thread_info(p);
 	ti->ksp = sp;
 
-//      kregs->sr = regs->sr | SPR_SR_SM;
 	/* kregs->sp must store the location of the 'pre-switch' kernel stack
 	 * pointer... for a newly forked process, this is simply the top of
 	 * the kernel stack.
 	 */
 	kregs->sp = top_of_kernel_stack;
-//      kregs->sp = sp + sizeof(struct pt_regs) + STACK_FRAME_OVERHEAD;
 	kregs->gpr[3] = (unsigned long)current;	/* arg to schedule_tail */
 	kregs->gpr[10] = (unsigned long)task_thread_info(p);
-//        kregs->pc = (unsigned long)ret_from_fork;
 	kregs->gpr[9] = (unsigned long)ret_from_fork;
 
 	return 0;
@@ -302,9 +296,9 @@ int kernel_thread(int (*fn) (void *), void *arg, unsigned long flags)
 /*
  * sys_execve() executes a new program.
  */
-asmlinkage long _sys_execve(const char __user * name,
-			    const char __user * const __user * argv,
-			    const char __user * const __user * envp,
+asmlinkage long _sys_execve(const char __user *name,
+			    const char __user * const __user *argv,
+			    const char __user * const __user *envp,
 			    struct pt_regs *regs)
 {
 	int error;
@@ -336,8 +330,8 @@ int kernel_execve(const char *filename, char *const argv[], char *const envp[])
 	register long __a asm("r3") = (long)(filename);
 	register long __b asm("r4") = (long)(argv);
 	register long __c asm("r5") = (long)(envp);
-	__asm__ volatile ("l.sys 1":"=r" (__res), "=r"(__a), "=r"(__b),
-			  "=r"(__c)
+	__asm__ volatile ("l.sys 1"
+			  : "=r" (__res), "=r"(__a), "=r"(__b), "=r"(__c)
 			  : "0"(__res), "1"(__a), "2"(__b), "3"(__c)
 			  : "r6", "r7", "r8", "r12", "r13", "r15",
 			    "r17", "r19", "r21", "r23", "r25", "r27",
