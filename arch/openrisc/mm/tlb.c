@@ -59,12 +59,11 @@ void flush_tlb_all(void)
 	/* FIXME: Assumption is I & D nsets equal. */
 	num_tlb_sets = NUM_ITLB_SETS;
 
-	for(i = 0; i < num_tlb_sets; i++) {
+	for (i = 0; i < num_tlb_sets; i++) {
 		mtspr_off(SPR_DTLBMR_BASE(0), i, 0);
 		mtspr_off(SPR_ITLBMR_BASE(0), i, 0);
 	}
 }
-
 
 #define have_dtlbeir (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_TEIRI)
 #define have_itlbeir (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_TEIRI)
@@ -88,22 +87,19 @@ void flush_tlb_all(void)
 
 void flush_tlb_page(struct vm_area_struct *vma, unsigned long addr)
 {
-	if (have_dtlbeir) {
+	if (have_dtlbeir)
 		flush_dtlb_page_eir(addr);
-	} else {
+	else
 		flush_dtlb_page_no_eir(addr);
-	}
 
-	if (have_itlbeir) {
+	if (have_itlbeir)
 		flush_itlb_page_eir(addr);
-	} else {
+	else
 		flush_itlb_page_no_eir(addr);
-	}
 }
 
 void flush_tlb_range(struct vm_area_struct *vma,
-		     unsigned long start,
-		     unsigned long end)
+		     unsigned long start, unsigned long end)
 {
 	int addr;
 	bool dtlbeir;
@@ -141,15 +137,12 @@ void flush_tlb_mm(struct mm_struct *mm)
 	flush_tlb_all();
 }
 
-
-
-
 /* called in schedule() just before actually doing the switch_to */
 
 void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	       struct task_struct *next_tsk)
 {
-        /* remember the pgd for the fault handlers
+	/* remember the pgd for the fault handlers
 	 * this is similar to the pgd register in some other CPU's.
 	 * we need our own copy of it because current and active_mm
 	 * might be invalid at points where we still need to derefer
@@ -194,5 +187,5 @@ void __init tlb_init(void)
 {
 	/* Do nothing... */
 	/* invalidate the entire TLB */
-//	flush_tlb_all();
+	/* flush_tlb_all(); */
 }

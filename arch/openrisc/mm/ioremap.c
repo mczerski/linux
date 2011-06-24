@@ -27,7 +27,7 @@
 
 extern int mem_init_done;
 
-static unsigned int fixmaps_used __initdata = 0;
+static unsigned int fixmaps_used __initdata;
 
 /*
  * Remap an arbitrary physical address space into the kernel virtual
@@ -59,7 +59,7 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 	p = addr & PAGE_MASK;
 	size = PAGE_ALIGN(last_addr+1) - p;
 
-	if (likely(mem_init_done)) {
+	if (likely (mem_init_done)) {
 		area = get_vm_area(size, VM_IOREMAP);
 		if (!area)
 			return NULL;
