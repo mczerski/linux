@@ -32,8 +32,8 @@
  * in or32, a page is 8192 bytes, which seems like a sane size
  */
 
-#define THREAD_SIZE       PAGE_SIZE
-#define THREAD_SIZE_ORDER 1
+#define THREAD_SIZE_ORDER 0
+#define THREAD_SIZE       (PAGE_SIZE << THREAD_SIZE_ORDER)
 
 /*
  * low level task data that entry.S needs immediate access to
