@@ -39,7 +39,8 @@
  * low level task data that entry.S needs immediate access to
  * - this struct should fit entirely inside of one cache line
  * - this struct shares the supervisor stack pages
- * - if the contents of this structure are changed, the assembly constants must also be changed
+ * - if the contents of this structure are changed, the assembly constants
+ *   must also be changed
  */
 #ifndef __ASSEMBLY__
 
