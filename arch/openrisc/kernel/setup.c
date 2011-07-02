@@ -42,7 +42,6 @@
 
 #include <asm/segment.h>
 #include <asm/system.h>
-#include <asm/smp.h>
 #include <asm/pgtable.h>
 #include <asm/types.h>
 #include <asm/setup.h>
