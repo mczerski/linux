@@ -1,26 +1,11 @@
-/**
-Format:
-
-alias : name[@bus] {
-
-
-Note that size-cells and address-cells apply values of child nodes; furthermore,
-they are not inherited, so every container with children needs to specify these
-properties.
-
-}
-
-**/
-
 /dts-v1/;
 / {
-	compatible = "orsoc,development-board";
+	compatible = "digilent,atlys";
 	#size-cells = <1>;
 	#address-cells = <1>;
 
 	chosen {
-		bootargs = "console=tty0 console=uart,mmio,0x90000000,115200 lpj=500000 debug video=ocfb:640x480-16@60";
-/*		bootargs = "console=uart,mmio,0x90000000,115200 lpj=200000 root=/dev/nfs rw nfsroot=172.30.0.1:/home/jonas/local/opencores/linux-2.6/arch/or32/support/rootfs,rw,nolock ip=172.30.0.2::::::"; */
+		bootargs = "console=tty0 console=uart,mmio,0x90000000,115200 debug video=ocfb:640x480-16@60";
 	};
 
 	memory {
@@ -89,6 +74,5 @@ properties.
 			compatible = "opencores,ocfb", "ocfb";
 			reg = <0x97000000 0x1000>;
 		};
-
 	};
 };
