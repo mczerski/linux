@@ -49,20 +49,7 @@
 #include <asm/cpuinfo.h>
 #include <asm/delay.h>
 
-/*
- * Setup options
- */
-
-extern int root_mountflags;
-extern char _stext, _etext, _edata, _end;
-#ifdef CONFIG_BLK_DEV_INITRD
-extern char __initrd_start, __initrd_end;
-extern char __initramfs_start;
-#endif
-
-extern u32 __dtb_start[];
-
-extern const unsigned long text_start, edata; /* set by the linker script */
+#include "vmlinux.h"
 
 char __initdata cmd_line[COMMAND_LINE_SIZE] = CONFIG_CMDLINE;
 
@@ -179,9 +166,6 @@ static inline unsigned int fcpu(struct device_node *cpu, char *n)
         const int *val;
         return (val = of_get_property(cpu, n, NULL)) ? *val : 0;
 }
-
-extern void __ic_enable(u32 icache_size, u32 icache_block_size);
-extern void __dc_enable(u32 dcache_size, u32 dcache_block_size);
 
 void __init setup_cpuinfo(void)
 {
