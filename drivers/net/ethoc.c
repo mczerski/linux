@@ -228,12 +228,20 @@ struct ethoc_bd {
 
 static inline u32 ethoc_read(struct ethoc *dev, loff_t offset)
 {
+#ifdef CONFIG_WISHBONE_BUS_BIG_ENDIAN
+	return ioread32be(dev->iobase + offset);
+#else
 	return ioread32(dev->iobase + offset);
+#endif
 }
 
 static inline void ethoc_write(struct ethoc *dev, loff_t offset, u32 data)
 {
+#ifdef CONFIG_WISHBONE_BUS_BIG_ENDIAN
+	iowrite32be(data, dev->iobase + offset);
+#else
 	iowrite32(data, dev->iobase + offset);
+#endif
 }
 
 static inline void ethoc_read_bd(struct ethoc *dev, int index,
