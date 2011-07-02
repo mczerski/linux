@@ -62,7 +62,7 @@ void cpu_idle(void)
 			local_irq_disable();
 			/* Don't trace irqs off for idle */
 			stop_critical_timings();
-			if (powersave != NULL)
+			if (!need_resched() && powersave != NULL)
 				powersave();
 			start_critical_timings();
 			local_irq_enable();
