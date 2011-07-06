@@ -5,69 +5,49 @@
 	#address-cells = <1>;
 
 	chosen {
-		bootargs = "console=uart,mmio,0x90000000,115200 debug";
+		bootargs = "console=uart,mmio,0x90000000,115200";
 	};
 
-	memory {
+	memory@0 {
 		device_type = "memory";
-		reg = <0x00000000 0x2000000>;
+		reg = <0x00000000 0x02000000>;
 	};
 
 	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
 		cpu@0 {
 			compatible = "opencores,openrisc-1200";
+			reg = <0>;
 			clock-frequency = <20000000>;
 		};
 	};
 
-	/* The "soc" node */
+	interrupt-parent = <&pic>;
 
-	soc {
-		/* Every node with children must specify address-cells and
-		   size-cells; they are not inherited */
-		#address-cells = <1>;
-		#size-cells = <1>;
-		device_type = "soc";
+	/*
+	 * OR1K PIC is built into CPU and accessed via special purpose
+	 * registers.  It is not addressable and, hence, has no 'reg'
+	 * property.
+	 */
+	pic: pic {
+		compatible = "opencores,or1k-pic";
+		#interrupt-cells = <1>;
+		interrupt-controller;
+	};
 
-		/* This is also a 1:1 mapping but limits size of mappable
-		   region to 0x40000000 */
-		ranges = <0x80000000 0x80000000 0x40000000>;
+	ranges = <0x80000000 0x80000000 0x40000000>;
 
-		/* An alternative is to specify an empty ranges here to
-		   indicates 1:1 mapping of SOC addresses (device addresses)
-		   to CPU addresses */
-		/*ranges;*/
+	serial0: serial@90000000 {
+		compatible = "opencores,uart", "ns16550a";
+		reg = <0x90000000 0x100>;
+		interrupts = <2>;
+		clock-frequency = <20000000>;
+	};
 
-		/* This SOC has only a single, implicit PIC, so define it
-		   early and put the interrupt-parent property in the 'soc'
-		   node so that it's inherited by all the children using
-		   interrupts.
-		*/
-		interrupt-parent = <&pic>;
-
-		/* Devices with interrupts need a 'parent', so we need to
-		   define a controller */
-		pic: pic@0 {
-			compatible = "opencores,or1k-pic";
-			#interrupt-cells = <1>;
-			interrupt-controller;
-		};
-
-		serial0: serial@90000000 {
-			/* FIXME: device_type is still needed here...
-			   should remove requirement from of_serial driver */
-			device_type = "serial";
-			compatible = "opencores,uart", "ns16550a";
-			reg = <0x90000000 0x100>;
-			interrupts = <2>;
-			clock-frequency = <20000000>;
-		};
-
-		enet0: ethoc@92000000 {
-			compatible = "opencores,ethoc", "ethoc";
-			reg = <0x92000000 0x53>;
-			interrupts = <4>;
-			local-mac-address = [02 de ad be ef 02];
-		};
+	enet0: ethoc@92000000 {
+		compatible = "opencores,ethoc";
+		reg = <0x92000000 0x100>;
+		interrupts = <4>;
 	};
 };

@@ -8,71 +8,46 @@
 		bootargs = "console=tty0 console=uart,mmio,0x90000000,115200 debug video=ocfb:640x480-16@60";
 	};
 
-	memory {
+	memory@0 {
 		device_type = "memory";
-		reg = <0x00000000 0x8000000>;
+		reg = <0x00000000 0x08000000>;
 	};
 
 	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
 		cpu@0 {
 			compatible = "opencores,openrisc-1200";
+			reg = <0>;
 			clock-frequency = <50000000>;
 		};
 	};
 
-	/* The "soc" node */
+	ranges = <0x80000000 0x80000000 0x40000000>;
 
-	soc {
-		/* Every node with children must specify address-cells and
-		   size-cells; they are not inherited */
-		#address-cells = <1>;
-		#size-cells = <1>;
-		device_type = "soc";
+	interrupt-parent = <&pic>;
 
-		/* This is also a 1:1 mapping but limits size of mappable
-		   region to 0x40000000 */
-		ranges = <0x80000000 0x80000000 0x40000000>;
+	pic: pic {
+		compatible = "opencores,or1k-pic";
+		#interrupt-cells = <1>;
+		interrupt-controller;
+	};
 
-		/* An alternative is to specify an empty ranges here to
-		   indicates 1:1 mapping of SOC addresses (device addresses)
-		   to CPU addresses */
-		/*ranges;*/
+	serial0: serial@90000000 {
+		compatible = "opencores,uart", "ns16550a";
+		reg = <0x90000000 0x100>;
+		interrupts = <2>;
+		clock-frequency = <50000000>;
+	};
 
-		/* This SOC has only a single, implicit PIC, so define it
-		   early and put the interrupt-parent property in the 'soc'
-		   node so that it's inherited by all the children using
-		   interrupts.
-		*/
-		interrupt-parent = <&pic>;
+	enet0: ethoc@92000000 {
+		compatible = "opencores,ethoc";
+		reg = <0x92000000 0x100>;
+		interrupts = <4>;
+	};
 
-		/* Devices with interrupts need a 'parent', so we need to
-		   define a controller */
-		pic: pic@0 {
-			compatible = "opencores,or1k-pic";
-			#interrupt-cells = <1>;
-			interrupt-controller;
-		};
-
-		serial0: serial@90000000 {
-			/* FIXME: device_type is still needed here...
-			   should remove requirement from of_serial driver */
-			device_type = "serial";
-			compatible = "opencores,uart", "ns16550a";
-			reg = <0x90000000 0x100>;
-			interrupts = <2>;
-			clock-frequency = <50000000>;
-		};
-
-		enet0: ethoc@92000000 {
-			compatible = "opencores,ethoc", "ethoc";
-			reg = <0x92000000 0x53>;
-			interrupts = <4>;
-			local-mac-address = [02 de ad be ef 02];
-		};
-
-		fb0: ocfb@97000000 {
-			compatible = "opencores,ocfb", "ocfb";
-			reg = <0x97000000 0x1000>;
-		};
+	fb0: ocfb@97000000 {
+		compatible = "opencores,ocfb";
+		reg = <0x97000000 0x1000>;
 	};
 };
