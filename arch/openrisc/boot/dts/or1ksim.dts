@@ -1,8 +1,9 @@
 /dts-v1/;
 / {
 	compatible = "opencores,or1ksim";
-	#size-cells = <1>;
 	#address-cells = <1>;
+	#size-cells = <1>;
+	interrupt-parent = <&pic>;
 
 	chosen {
 		bootargs = "console=uart,mmio,0x90000000,115200";
@@ -23,8 +24,6 @@
 		};
 	};
 
-	interrupt-parent = <&pic>;
-
 	/*
 	 * OR1K PIC is built into CPU and accessed via special purpose
 	 * registers.  It is not addressable and, hence, has no 'reg'
@@ -35,8 +34,6 @@
 		#interrupt-cells = <1>;
 		interrupt-controller;
 	};
-
-	ranges = <0x80000000 0x80000000 0x40000000>;
 
 	serial0: serial@90000000 {
 		compatible = "opencores,uart", "ns16550a";
