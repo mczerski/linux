@@ -161,15 +161,9 @@ static void print_cpuinfo(void) {
 		printk(KERN_INFO "-- custom unit(s)\n");
 }
 
-static inline unsigned int fcpu(struct device_node *cpu, char *n)
-{
-        const int *val;
-        return (val = of_get_property(cpu, n, NULL)) ? *val : 0;
-}
-
 void __init setup_cpuinfo(void)
 {
-	struct device_node *cpu = NULL;
+	struct device_node *cpu;
 	unsigned long iccfgr,dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
@@ -190,7 +184,14 @@ void __init setup_cpuinfo(void)
 	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_CBS) >> 7);
 	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
 
-	cpuinfo.clock_frequency =  fcpu(cpu, "clock-frequency");
+	if (of_property_read_u32(cpu, "clock-frequency",
+				 &cpuinfo.clock_frequency))
+	{
+		printk(KERN_WARNING
+		       "Device tree missing CPU 'clock-frequency' parameter."
+		       "Assuming frequency 25MHZ"
+		       "This is probably not what you want.");
+	}
 
 	of_node_put(cpu);
 
@@ -211,10 +212,10 @@ void __init setup_cpuinfo(void)
 
 void __init or32_early_setup(void) {
 
-	early_init_devtree((void *) __dtb_start);
+	early_init_devtree(__dtb_start);
 
-	printk(KERN_INFO "Compiled-in FDT at 0x%08x\n",
-	       (unsigned int) __dtb_start);
+	printk(KERN_INFO "Compiled-in FDT at %p\n",
+	       __dtb_start);
 }
 
 const struct of_device_id openrisc_bus_ids[] = {
