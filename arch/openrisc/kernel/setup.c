@@ -214,19 +214,14 @@ void __init or32_early_setup(void) {
 
 	early_init_devtree(__dtb_start);
 
-	printk(KERN_INFO "Compiled-in FDT at %p\n",
+	printk(KERN_INFO "Compiled-in FDT at 0x%p\n",
 	       __dtb_start);
 }
 
-const struct of_device_id openrisc_bus_ids[] = {
-        { .type = "soc", },
-        { .compatible = "soc", },
-        {},
-};
-
 static int __init openrisc_device_probe(void)
 {
-        of_platform_bus_probe(NULL, openrisc_bus_ids, NULL);
+	of_platform_populate(NULL, NULL, NULL, NULL);
+
         return 0;
 }
 device_initcall(openrisc_device_probe);
