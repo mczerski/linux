@@ -27,38 +27,19 @@
 
 extern int mem_init_done;
 
-#if 1
 #define pmd_populate_kernel(mm, pmd, pte) \
                  set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)))
 
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, struct page *pte)
 {
 	set_pmd(pmd, __pmd(_KERNPG_TABLE +
-			   ((unsigned long)page_to_pfn(pte) <<
-			    (unsigned long) PAGE_SHIFT)));
+		     ((unsigned long)page_to_pfn(pte) <<
+		     (unsigned long) PAGE_SHIFT)));
 }
-#endif
 
-#if 0
-#define pmd_populate_kernel(mm, pmd, pte) \
-                 set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(pte)))
-#define pmd_populate(mm, pmd, pte) \
-                set_pmd(pmd, __pmd(__pa(pte)))
-
-#endif
-
-#if 0
-/* __PHX__ check */
-#define pmd_populate_kernel(mm, pmd, pte) pmd_set(pmd, pte)
-#define pmd_populate(mm, pmd, pte) pmd_set(pmd, page_address(pte))
-#endif
-
-
-#if 1
 /*
  * Allocate and free page tables.
  */
-
 static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
@@ -71,12 +52,11 @@ static inline pgd_t *pgd_alloc(struct mm_struct *mm)
 	}
 	return ret;
 }
-#endif
 
 #if 0
-/* __PHX__ check, this is supposed to be 2.6 style, but
- * we use current_pgd (from mm->pgd) to load kernel pages
- * so we need it initialized.
+/* FIXME: This seems to be the preferred style, but we are using
+ * current_pgd (from mm->pgd) to load kernel pages so we need it
+ * initialized.  This needs to be looked into.
  */
 extern inline pgd_t *pgd_alloc (struct mm_struct *mm)
 {
@@ -89,32 +69,10 @@ static inline void pgd_free (struct mm_struct *mm, pgd_t *pgd)
 	free_page((unsigned long)pgd);
 }
 
-/**
- * OK, this one's a bit tricky... ioremap can get called before memory is
- * initialized (early serial console does this) and will want to alloc a page
- * for its mapping.  No userspace pages will ever get allocated before memory
- * is initialized so this applies only to kernel pages.  In the event that
- * this is called before memory is initialized we allocate the page using
- * the memblock infrastructure.
- */
+extern pte_t* pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address);
 
-static inline pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
-{
-	pte_t* pte;
-
-	if (likely(mem_init_done)) {
-		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
-	} else {
-		pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-//		pte = (pte_t *) __va(memblock_alloc(PAGE_SIZE, PAGE_SIZE));
-	}
-
-	if (pte)
-		clear_page(pte);
-	return pte;
-}
-
-static inline struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline struct page *pte_alloc_one(struct mm_struct *mm,
+					 unsigned long address)
 {
 	struct page *pte;
 	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT, 0);

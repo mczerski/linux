@@ -107,3 +107,32 @@ void iounmap(void *addr)
 
 	return vfree((void *) (PAGE_MASK & (unsigned long) addr));
 }
+
+/**
+ * OK, this one's a bit tricky... ioremap can get called before memory is
+ * initialized (early serial console does this) and will want to alloc a page
+ * for its mapping.  No userspace pages will ever get allocated before memory
+ * is initialized so this applies only to kernel pages.  In the event that
+ * this is called before memory is initialized we allocate the page using
+ * the memblock infrastructure.
+ */
+
+pte_t __init_refok * pte_alloc_one_kernel(struct mm_struct *mm,
+					  unsigned long address)
+{
+	pte_t* pte;
+
+	if (likely(mem_init_done)) {
+		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_REPEAT);
+	} else {
+		pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
+#if 0
+		/* FIXME: use memblock... */
+		pte = (pte_t *) __va(memblock_alloc(PAGE_SIZE, PAGE_SIZE));
+#endif
+	}
+
+	if (pte)
+		clear_page(pte);
+	return pte;
+}
