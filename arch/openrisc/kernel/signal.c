@@ -31,8 +31,6 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 
-#include "ptrace.h"
-
 #define DEBUG_SIG 0
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
@@ -123,8 +121,6 @@ asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
 	do_sigaltstack(&st, NULL, regs->sp);
-
-	single_step_trap(current);
 
 	return regs->gpr[11];
 
@@ -312,8 +308,6 @@ void do_signal(struct pt_regs *regs)
 	if (!user_mode(regs))
 		return;
 
-	single_step_clear(current);
-
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 
 	/* If we are coming out of a syscall then we need
@@ -384,8 +378,6 @@ void do_signal(struct pt_regs *regs)
 		tracehook_signal_handler(signr, &info, &ka, regs,
 					 test_thread_flag(TIF_SINGLESTEP));
 	}
-
-	single_step_set(current);
 
 	return;
 }

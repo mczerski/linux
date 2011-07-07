@@ -305,8 +305,7 @@ asmlinkage void do_trap(struct pt_regs *regs, unsigned long address)
 	info.si_addr = (void *)address;
 	force_sig_info(SIGTRAP, &info, current);
 
-	if (!(test_tsk_thread_flag(current, TIF_SINGLESTEP)))
-		regs->pc += 4;
+	regs->pc += 4;
 }
 
 asmlinkage void do_unaligned_access(struct pt_regs *regs, unsigned long address)

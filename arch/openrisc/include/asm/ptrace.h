@@ -87,8 +87,6 @@ struct pt_regs {
 #define user_stack_pointer(regs)	((unsigned long)(regs)->sp)
 #define profile_pc(regs)		instruction_pointer(regs)
 
-#define arch_has_single_step()  (1)
-
 /*
  * Offsets used by 'ptrace' system call interface.
  */

@@ -8,7 +8,6 @@
  * Modifications for the OpenRISC architecture:
  * Copyright (C) 2003 Matjaz Breskvar <phoenix@bsemi.com>
  * Copyright (C) 2005 Gyorgy Jeney <nog@bsemi.com>
- * Copyright (C) 2010 Julius Baxter <julius.baxter@orsoc.se>
  * Copyright (C) 2010-2011 Jonas Bonn <jonas@southpole.se>
  *
  *      This program is free software; you can redistribute it and/or
@@ -35,8 +34,6 @@
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/system.h>
-
-#include "ptrace.h"
 
 /*
  * Copy the thread state to a regset that can be interpreted by userspace.
@@ -141,281 +138,11 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
 	return &user_or1k_native_view;
 }
 
-void user_enable_single_step(struct task_struct *child)
-{
-	set_tsk_thread_flag(child, TIF_SINGLESTEP);
-}
-
-void user_disable_single_step(struct task_struct *child)
-{
-	clear_tsk_thread_flag(child, TIF_SINGLESTEP);
-}
-
 /*
  * does not yet catch signals sent when the child dies.
  * in exit.c or in signal.c.
  */
 
-#define OPC_MASK 0x3f
-#define OPC_SHIFT 26
-#define OPC_J    0x00
-#define OPC_JAL  0x01
-#define OPC_BNF  0x03
-#define OPC_BF   0x04
-#define OPC_SYSC 0x08
-#define OPC_JR   0x11
-#define OPC_JALR 0x12
-
-#define JUMP_IMM_MASK 0x03ffffff
-#define JUMP_IMM_SIGN 0x02000000
-
-/* Trap instruction on bit 15 of SR, fixed one, unconditional */
-#define OR1K_TRAP 0x2100000f
-
-/* Macro to extract branch offset with sign extension of immediate. */
-#define BRANCH_OFFSET(insn) ((insn & JUMP_IMM_SIGN) ?			\
-			     ((insn & JUMP_IMM_MASK) << 2) | 0xf0000000 : \
-			     ((insn & JUMP_IMM_MASK) << 2))
-
-/* Get address of next instruction we can insert a breakpoint on */
-/* pc passed to function is address of instruction we've now just trapped on.
-   It is yet/next to be executed. We determine next instruction after PC to
-   place a l.trap on. If we should take a branch, we must remember this.
-*/
-static unsigned long
-get_next_address(struct task_struct *tsk, unsigned long pc, unsigned long insn)
-{
-	struct pt_regs *regs;
-	struct debug_info *dbg;
-	char opc;
-	unsigned long npc;
-	unsigned long rB;
-
-	dbg = &current_thread_info()->debug;
-
-	regs = task_pt_regs(tsk);
-	/* Extract opcode from instruction */
-	opc = (insn >> OPC_SHIFT) & OPC_MASK;
-
-	pr_debug(KERN_INFO
-		 "ptrace get_next_address: pc 0x%.8lx insn. 0x%.8lx opc. 0x%.2x\n",
-		 pc, insn, opc);
-
-	/*
-	   Will always proceed to next instruction if this function was called
-	   ie. we know we're not in a delay slot - the function calling this
-	   checks dbg->branch_taken.
-	 */
-	npc = pc + 4;
-
-	/* Check if we're to record a branch */
-	switch (opc) {
-	case OPC_BNF:
-		/* Check flag - we're branching if !flag */
-		if (!(((regs)->sr) & SPR_SR_F)) {
-			dbg->bp.branch = 1;
-			dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
-		}
-		break;
-	case OPC_BF:
-		/* Check flag - we're branching if flag */
-		if (((regs)->sr) & SPR_SR_F) {
-			dbg->bp.branch = 1;
-			dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
-		}
-		break;
-	case OPC_J:
-	case OPC_JAL:
-		/* PC-relative branch target encoded in instruction. Extract
-		   and add it. */
-		dbg->bp.branch = 1;
-		dbg->bp.branch_target = pc + BRANCH_OFFSET(insn);
-		break;
-	case OPC_JR:
-	case OPC_JALR:
-		/* Register number holding branch target is encoded in rB slot
-		   of instruction. Extract it. */
-		rB = (insn >> 11) & 0x1f;
-		pr_debug(KERN_INFO
-			 "ptrace get_next_address: jump reg from r%ld=0x%08lx\n",
-			 rB,
-			 /* *((unsigned long*)((char*)regs + (rB<<2) + 4)) */
-			 regs->gprs[rB - 2]);
-		if (rB < 2)
-			pr_debug(KERN_WARNING
-				 "ptrace get_next_address(): Warning, JR with GPR < 2");
-		dbg->bp.branch = 1;
-		dbg->bp.branch_target =
-		    /* *((unsigned long*)((char*)regs + (rB<<2) + 4)) */
-		    regs->gprs[rB - 2];
-		break;
-#if 0
-	case OPC_SYSC:
-		/* Not sure we want to do this */
-		/* Remember - l.sys has no delay slot. */
-		npc = 0x900;
-		break;
-#endif
-	default:
-		break;
-	}
-
-	/* If setting a branch target, remember where branch was */
-	if (dbg->bp.branch)
-		dbg->bp.branch_insn_address = pc;
-
-	if (dbg->bp.branch)
-		pr_debug(KERN_INFO
-			 "ptrace get_next_address: branch detected to 0x%.8lx\n",
-			 dbg->bp.branch_target);
-	pr_debug(KERN_INFO "ptrace get_next_address: returning 0x%.8lx\n", npc);
-
-	return npc;
-}
-
-static inline int
-read_instr(struct task_struct *tsk, unsigned long addr, u32 * res)
-{
-	int ret;
-	u32 val;
-	ret = access_process_vm(tsk, addr & ~3, &val, sizeof(val), 0);
-	ret = ret == sizeof(val) ? 0 : -EIO;
-	*res = val;
-	return ret;
-}
-
-static int
-swap_insn(struct task_struct *tsk, unsigned long addr,
-	  void *old_insn, void *new_insn, int size)
-{
-	int ret;
-
-	ret = access_process_vm(tsk, addr, old_insn, size, 0);
-	if (ret == size)
-		ret = access_process_vm(tsk, addr, new_insn, size, 1);
-	return ret;
-}
-
-static void
-add_breakpoint(struct task_struct *tsk, struct debug_info *dbg,
-	       unsigned long addr)
-{
-	u32 new_insn = OR1K_TRAP;
-	int res;
-
-	res = swap_insn(tsk, addr, &dbg->bp.insn, &new_insn, 4);
-
-	pr_debug(KERN_INFO
-		 "ptrace add_breakpoint: addr 0x%.8lx insn 0x%.8lx %d\n\n",
-		 addr, dbg->bp.insn, res);
-
-	if (res == 4) {
-		dbg->bp.address = addr;
-		dbg->bp.set = 1;
-	}
-}
-
-/*
- * Clear the breakpoint in the user program.
- */
-static void clear_breakpoint(struct task_struct *tsk, struct debug_entry *bp)
-{
-	u32 old_insn;
-	int ret;
-	struct pt_regs *regs;
-	unsigned long pc;
-
-	unsigned long addr = bp->address;
-
-	regs = task_pt_regs(tsk);
-	pc = instruction_pointer(regs);	/* This is NPC */
-
-	/* Either at the breakpoint, or in delay slot (pc will be at address of
-	 * branch instruction - OR1K exception handlers do that, for now.
-	 * Perhaps FIXME
-	 */
-	if ((pc == addr) || ((bp->branch_insn_address == pc) && bp->branch))
-		ret = swap_insn(tsk, addr & ~3, &old_insn, &bp->insn, 4);
-	else {
-		/* Trapped for some other reason. */
-		pr_debug(KERN_INFO
-			 "ptrace clear_breakpoint: not correct, pc 0x%.8lx bp 0x%.8lx\n",
-			 pc, addr);
-		pr_debug(KERN_INFO
-			 "ptrace clear_breakpoint: 0x%.8lx 0x%.8lx %ld\n",
-			 bp->branch_insn_address, bp->branch_target,
-			 bp->branch);
-		return;
-	}
-
-	pr_debug(KERN_INFO
-		 "ptrace clear_breakpoint: addr 0x%.8lx insn 0x%.8lx %d\n",
-		 addr, bp->insn, ret);
-
-	if (ret != 4 || old_insn != OR1K_TRAP)
-		pr_debug(KERN_ERR
-			 "%s:%d: corrupted breakpoint at 0x%08lx (0x%08x)\n",
-			 tsk->comm, task_pid_nr(tsk), addr, old_insn);
-
-	bp->set = 0;
-}
-
-void ptrace_set_bpt(struct task_struct *tsk)
-{
-	struct pt_regs *regs;
-	unsigned long pc;
-	u32 insn;
-	int res;
-
-	regs = task_pt_regs(tsk);
-	pc = instruction_pointer(regs);	/* This is NPC */
-
-	res = read_instr(tsk, pc, &insn);
-	if (!res) {
-		struct debug_info *dbg = &current_thread_info()->debug;
-		unsigned long npc;
-
-		/* First check if breakpoint is still set, if so, probably
-		   just let us run until we hit it.
-		   This can occur because perhaps we caused an exception before
-		   a jump or in a delay slot, and the OR1K exception handlers
-		   will rewind us to the branch before the delay slot or jump
-		   target.
-		   This way we skip everything that goes on during an exception
-		   and can hopefully just track the program's execution.
-		 */
-		if (dbg->bp.set)
-			return;
-
-		/* Are we in delay slot of branch we should take? */
-		if (dbg->bp.branch == 1) {
-			/* Branch target is already determined. Set l.trap. */
-			npc = dbg->bp.branch_target;
-
-			/* Reset NPC to branch instruction - should be one
-			 * before this one.
-			 */
-			instruction_pointer(regs) = dbg->bp.branch_insn_address;
-
-			/* Now mark this as no longer needing to be taken */
-			dbg->bp.branch = 0;
-		} else {
-			npc = get_next_address(tsk, pc, insn);
-		}
-
-		add_breakpoint(tsk, dbg, npc);
-	}
-}
-
-/*
- * Ensure no single-step breakpoint is pending.  Returns non-zero
- * value if child was being single-stepped.
- */
-void ptrace_cancel_bpt(struct task_struct *tsk)
-{
-	clear_breakpoint(tsk,
-			 (struct debug_entry *)&current_thread_info()->debug);
-}
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -424,7 +151,7 @@ void ptrace_cancel_bpt(struct task_struct *tsk)
  */
 void ptrace_disable(struct task_struct *child)
 {
-	pr_debug(KERN_WARNING "ptrace_disable(): TODO\n");
+	pr_debug("ptrace_disable(): TODO\n");
 
 	user_disable_single_step(child);
 	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
@@ -440,8 +167,6 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
-
-	single_step_set(current);
 
 	return ret;
 }
