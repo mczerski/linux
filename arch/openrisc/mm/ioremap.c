@@ -39,13 +39,12 @@ static unsigned int fixmaps_used __initdata;
  * caller shouldn't need to know that small detail.
  */
 void __iomem* __init_refok
-__ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
+__ioremap(phys_addr_t addr, unsigned long size, pgprot_t prot)
 {
 	phys_addr_t p;
 	unsigned long v;
 	unsigned long offset, last_addr;
 	struct vm_struct *area = NULL;
-	pgprot_t prot;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = addr + size - 1;
@@ -70,9 +69,6 @@ __ioremap(phys_addr_t addr, unsigned long size, unsigned long flags)
 		v = fix_to_virt(FIX_IOREMAP_BEGIN+fixmaps_used);
 		fixmaps_used += (size >> PAGE_SHIFT);
 	}
-
-	prot = __pgprot(_PAGE_ALL | _PAGE_SRE | _PAGE_SWE |
-			_PAGE_SHARED | _PAGE_DIRTY | _PAGE_EXEC | flags);
 
 	if (ioremap_page_range(v, v + size, p, prot)) {
 		if (likely(mem_init_done))
