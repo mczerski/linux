@@ -26,23 +26,6 @@
 
 #include <asm/syscalls.h>
 
-asmlinkage long sys_mmap2(unsigned long addr, unsigned long len,
-			  unsigned long prot, unsigned long flags,
-			  unsigned long fd, unsigned long pgoff)
-{
-	return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff);
-}
-
-asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
-			 unsigned long prot, unsigned long flags,
-			 unsigned long fd, off_t pgoff)
-{
-	if (pgoff & ~PAGE_MASK)
-		return -EINVAL;
-
-	return sys_mmap_pgoff(addr, len, prot, flags, fd, pgoff >> PAGE_SHIFT);
-}
-
 /* These are secondary entry points as the primary entry points are defined in
  * entry.S where we add the 'regs' parameter value
  */
