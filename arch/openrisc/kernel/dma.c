@@ -25,52 +25,98 @@
 #include <linux/dma-debug.h>
 #include <linux/io.h>
 #include <linux/vmalloc.h>
+#include <linux/sched.h>
+
+#include <asm/cpuinfo.h>
+#include <asm/spr_defs.h>
+#include <asm/tlbflush.h>
+
+static int page_set_nocache(pte_t* pte, unsigned long addr,
+			    unsigned long next, struct mm_walk* walk)
+{
+	unsigned long cl;
+
+	pte_val(*pte) |= _PAGE_CI;
+
+	/*
+	 * Flush the page out of the TLB so that the new page flags get
+	 * picked up next time there's an access
+	 */
+	flush_tlb_page(NULL, addr);
+
+	/* Flush page out of dcache */
+	for (cl = __pa(addr); cl < __pa(next); cl += cpuinfo.dcache_block_size)
+		mtspr(SPR_DCBFR, cl);
+
+	return 0;
+}
+
+static int page_clear_nocache(pte_t* pte, unsigned long addr,
+			    unsigned long next, struct mm_walk* walk)
+{
+	pte_val(*pte) &= ~_PAGE_CI;
+
+	/*
+	 * Flush the page out of the TLB so that the new page flags get
+	 * picked up next time there's an access
+	 */
+	flush_tlb_page(NULL, addr);
+
+	return 0;
+}
 
 /*
  * Alloc "coherent" memory, which for OpenRISC means simply uncached.
+ *
+ * This function effectively just calls __get_free_pages, sets the
+ * cache-inhibit bit on those pages, and makes sure that the pages are
+ * flushed out of the cache before they are used.
+ *
  */
 void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
-			      dma_addr_t *dma_handle, gfp_t flag)
+			      dma_addr_t *dma_handle, gfp_t gfp)
 {
-	int order;
-	unsigned long page, va;
-	pgprot_t prot;
-	struct vm_struct *area;
+	unsigned long va;
+	void* page;
+	struct mm_walk walk = {
+		.pte_entry = page_set_nocache,
+		.mm = &init_mm
+	};
 
-	/* Only allocate page size areas. */
-	size = PAGE_ALIGN(size);
-	order = get_order(size);
-
-	page = __get_free_pages(flag, order);
+	page = alloc_pages_exact(size, gfp);
 	if (!page)
 		return NULL;
-
-	/* Allocate some common virtual space to map the new pages. */
-	area = get_vm_area(size, VM_ALLOC);
-	if (area == NULL) {
-		free_pages(page, order);
-		return NULL;
-	}
-	va = (unsigned long)area->addr;
 
 	/* This gives us the real physical address of the first page. */
 	*dma_handle = __pa(page);
 
-	prot = PAGE_KERNEL_NOCACHE;
+	va = (unsigned long) page;
 
-	/* This isn't so much ioremap as just simply 'remap' */
-	if (ioremap_page_range(va, va + size, *dma_handle, prot)) {
-		vfree(area->addr);
+	/*
+	 * We need to iterate through the pages, clearing the dcache for
+	 * them and setting the cache-inhibit bit.
+	 */
+	if (walk_page_range(va, va+size, &walk)) {
+		free_pages_exact(page, size);
 		return NULL;
-	}
+	} 	
 
-	return (void *)va;
+	return (void*) va;
 }
 
 void or1k_dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 			    dma_addr_t dma_handle)
 {
-	vfree(vaddr);
+	unsigned long va = (unsigned long) vaddr;
+	struct mm_walk walk = {
+		.pte_entry = page_clear_nocache,
+		.mm = &init_mm
+	};
+
+	/* walk_page_range shouldn't be able to fail here */
+	WARN_ON(walk_page_range(va, va+size, &walk));
+
+	free_pages_exact(vaddr, size);
 }
 
 /* Number of entries preallocated for DMA-API debugging */
@@ -82,5 +128,4 @@ static int __init dma_init(void)
 
 	return 0;
 }
-
 fs_initcall(dma_init);
