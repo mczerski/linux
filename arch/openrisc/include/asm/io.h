@@ -32,20 +32,20 @@
 #include <asm-generic/io.h>
 
 extern void __iomem * __ioremap(phys_addr_t offset, unsigned long size,
-				unsigned long flags);
+				pgprot_t prot);
 
 static inline void __iomem * ioremap(phys_addr_t offset, unsigned long size)
 {
-	return __ioremap(offset, size, 0);
+	return __ioremap(offset, size, PAGE_KERNEL);
 }
 
 /* #define _PAGE_CI       0x002 */
 static inline void __iomem * ioremap_nocache(phys_addr_t offset,
 					     unsigned long size)
 {
-	return __ioremap(offset, size, 0x002);
+	return __ioremap(offset, size,
+			 __pgprot(pgprot_val(PAGE_KERNEL) | _PAGE_CI));
 }
 
 extern void iounmap(void *addr);
-
 #endif
