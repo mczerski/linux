@@ -55,3 +55,12 @@ asmlinkage int _sys_fork(struct pt_regs *regs)
 	return -EINVAL;
 #endif
 }
+
+asmlinkage int _sys_vfork(struct pt_regs *regs)
+{
+	/* This doesn't seem to work */
+//        return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->sp, regs, 0, NULL, NULL);
+
+	/* This works */
+	return do_fork(SIGCHLD, regs->sp, regs, 0, NULL, NULL);
+}

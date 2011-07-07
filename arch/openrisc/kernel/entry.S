@@ -1088,6 +1088,12 @@ ENTRY(sys_fork)
 	l.j	_fork_save_extra_regs_and_call
 	 l.addi	r3,r1,0
 
+ENTRY(sys_vfork)
+	l.movhi	r29,hi(_sys_vfork)
+	l.ori	r29,r29,lo(_sys_vfork)
+	l.j	_fork_save_extra_regs_and_call
+	 l.addi	r3,r1,0
+
 ENTRY(sys_execve)
 	l.j	_sys_execve
 	 l.addi	r6,r1,0
