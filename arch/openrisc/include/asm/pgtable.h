@@ -25,7 +25,6 @@
 #ifndef __ASM_OPENRISC_PGTABLE_H
 #define __ASM_OPENRISC_PGTABLE_H
 
-//#include <asm-generic/4level-fixup.h>
 #include <asm-generic/pgtable-nopmd.h>
 
 #ifndef __ASSEMBLY__
