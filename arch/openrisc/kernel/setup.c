@@ -167,7 +167,7 @@ void __init setup_cpuinfo(void)
 	unsigned long iccfgr,dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
-	cpu = of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
+	cpu = of_find_compatible_node(NULL, NULL, "opencores,or1200-rtlsvn481");
 	if (!cpu) {
 		panic("No compatible CPU found in device tree...\n");
 	}
@@ -271,7 +271,7 @@ void __cpuinit calibrate_delay(void)
 {
 	const int *val;
 	struct device_node *cpu = NULL;
-	cpu = of_find_compatible_node(NULL, NULL, "opencores,openrisc-1200");
+	cpu = of_find_compatible_node(NULL, NULL, "opencores,or1200-rtlsvn481");
 	val = of_get_property(cpu, "clock-frequency", NULL);
 	if (!val) {
 		panic("no cpu 'clock-frequency' parameter in device tree");
