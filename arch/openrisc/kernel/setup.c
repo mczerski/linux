@@ -168,12 +168,11 @@ void __init setup_cpuinfo(void)
 {
 	struct device_node *cpu;
 	unsigned long iccfgr, dccfgr;
-	unsigned long cache_set_size, cache_ways;;
+	unsigned long cache_set_size, cache_ways;
 
 	cpu = of_find_compatible_node(NULL, NULL, "opencores,or1200-rtlsvn481");
-	if (!cpu) {
+	if (!cpu)
 		panic("No compatible CPU found in device tree...\n");
-	}
 
 	iccfgr = mfspr(SPR_ICCFGR);
 	cache_ways = 1 << (iccfgr & SPR_ICCFGR_NCW);
@@ -234,7 +233,7 @@ device_initcall(openrisc_device_probe);
 static inline unsigned long extract_value_bits(unsigned long reg,
 					       short bit_nr, short width)
 {
-	return ((reg >> bit_nr) & (0 << width));
+	return (reg >> bit_nr) & (0 << width);
 }
 
 static inline unsigned long extract_value(unsigned long reg, unsigned long mask)
@@ -243,7 +242,7 @@ static inline unsigned long extract_value(unsigned long reg, unsigned long mask)
 		reg = reg >> 1;
 		mask = mask >> 1;
 	}
-	return (mask & reg);
+	return mask & reg;
 }
 
 void __init detect_unit_config(unsigned long upr, unsigned long mask,
@@ -275,9 +274,8 @@ void __cpuinit calibrate_delay(void)
 	struct device_node *cpu = NULL;
 	cpu = of_find_compatible_node(NULL, NULL, "opencores,or1200-rtlsvn481");
 	val = of_get_property(cpu, "clock-frequency", NULL);
-	if (!val) {
+	if (!val)
 		panic("no cpu 'clock-frequency' parameter in device tree");
-	}
 	loops_per_jiffy = *val / HZ;
 	pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
 		loops_per_jiffy / (500000 / HZ),
@@ -375,7 +373,7 @@ static void c_stop(struct seq_file *m, void *v)
 {
 }
 
-struct seq_operations cpuinfo_op = {
+const struct seq_operations cpuinfo_op = {
 	.start = c_start,
 	.next = c_next,
 	.stop = c_stop,
