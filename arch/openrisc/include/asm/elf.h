@@ -43,7 +43,7 @@ typedef unsigned long elf_greg_t;
  * Note that NGREG is defined to ELF_NGREG in include/linux/elfcore.h, and is
  * thus exposed to user-space.
  */
-#define ELF_NGREG (sizeof (struct user_regs_struct) / sizeof(elf_greg_t))
+#define ELF_NGREG (sizeof(struct user_regs_struct) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 /* A placeholder; OR32 does not have fp support yes, so no fp regs for now.  */

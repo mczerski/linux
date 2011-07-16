@@ -31,16 +31,16 @@
 
 #include <asm-generic/io.h>
 
-extern void __iomem * __ioremap(phys_addr_t offset, unsigned long size,
+extern void __iomem *__ioremap(phys_addr_t offset, unsigned long size,
 				pgprot_t prot);
 
-static inline void __iomem * ioremap(phys_addr_t offset, unsigned long size)
+static inline void __iomem *ioremap(phys_addr_t offset, unsigned long size)
 {
 	return __ioremap(offset, size, PAGE_KERNEL);
 }
 
 /* #define _PAGE_CI       0x002 */
-static inline void __iomem * ioremap_nocache(phys_addr_t offset,
+static inline void __iomem *ioremap_nocache(phys_addr_t offset,
 					     unsigned long size)
 {
 	return __ioremap(offset, size,
