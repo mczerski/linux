@@ -225,11 +225,17 @@ struct task_struct *__switch_to(struct task_struct *old,
 }
 
 /*
- * fill in the user structure for a core dump..
+ * Write out registers in core dump format, as defined by the
+ * struct user_regs_struct
  */
-void dump_thread(struct pt_regs *regs, struct user *dump)
+void dump_elf_thread(elf_greg_t *dest, struct pt_regs* regs)
 {
-	/* TODO */
+	dest[0] = 0; /* r0 */
+	memcpy(dest+1, regs->gpr+1, 31*sizeof(unsigned long));
+	dest[32] = regs->pc;
+	dest[33] = regs->sr;
+	dest[34] = 0;
+	dest[35] = 0;
 }
 
 extern void _kernel_thread_helper(void);
