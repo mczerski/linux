@@ -60,19 +60,19 @@ static unsigned long __init setup_memory(void)
 	unsigned long free_ram_start_pfn;
 	unsigned long ram_end_pfn;
 	phys_addr_t memory_start, memory_end;
-	struct memblock_region* region;
+	struct memblock_region *region;
 
 	memory_end = memory_start = 0;
 
-        /* Find main memory where is the kernel */
+	/* Find main memory where is the kernel */
 	for_each_memblock(memory, region) {
-                memory_start = region->base;
-                memory_end = region->base + region->size;
+		memory_start = region->base;
+		memory_end = region->base + region->size;
 		printk(KERN_INFO "%s: Memory: 0x%x-0x%x\n", __func__,
-			memory_start, memory_end);
+		       memory_start, memory_end);
 	}
 
-	if (! memory_end) {
+	if (!memory_end) {
 		panic("No memory!");
 	}
 
@@ -91,25 +91,25 @@ static unsigned long __init setup_memory(void)
 	 * init_bootmem sets the global values min_low_pfn, max_low_pfn.
 	 */
 	bootmap_size = init_bootmem(free_ram_start_pfn,
-				    ram_end_pfn-ram_start_pfn);
+				    ram_end_pfn - ram_start_pfn);
 	free_bootmem(PFN_PHYS(free_ram_start_pfn),
-		     (ram_end_pfn-free_ram_start_pfn)<< PAGE_SHIFT);
+		     (ram_end_pfn - free_ram_start_pfn) << PAGE_SHIFT);
 	reserve_bootmem(PFN_PHYS(free_ram_start_pfn), bootmap_size,
 			BOOTMEM_DEFAULT);
 
 	for_each_memblock(reserved, region) {
 		printk(KERN_INFO "Reserved - 0x%08x-0x%08x\n",
-			(u32) region->base, (u32) region->size);
+		       (u32) region->base, (u32) region->size);
 		reserve_bootmem(region->base, region->size, BOOTMEM_DEFAULT);
 	}
 
-	return(ram_end_pfn);
+	return (ram_end_pfn);
 }
-
 
 struct cpuinfo cpuinfo;
 
-static void print_cpuinfo(void) {
+static void print_cpuinfo(void)
+{
 	unsigned long upr = mfspr(SPR_UPR);
 	unsigned long vr = mfspr(SPR_VR);
 	unsigned int version;
@@ -119,32 +119,35 @@ static void print_cpuinfo(void) {
 	revision = (vr & SPR_VR_REV);
 
 	printk(KERN_INFO "CPU: OpenRISC-%x (revision %d) @%d MHz\n",
-		version, revision, cpuinfo.clock_frequency / 1000000);
+	       version, revision, cpuinfo.clock_frequency / 1000000);
 
 	if (!(upr & SPR_UPR_UP)) {
-		printk(KERN_INFO "-- no UPR register... unable to detect configuration\n");
+		printk(KERN_INFO
+		       "-- no UPR register... unable to detect configuration\n");
 		return;
 	}
 
 	if (upr & SPR_UPR_DCP)
-		printk(KERN_INFO "-- dcache: %4d bytes total, %2d bytes/line, %d way(s)\n",
-			cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
+		printk(KERN_INFO
+		       "-- dcache: %4d bytes total, %2d bytes/line, %d way(s)\n",
+		       cpuinfo.dcache_size, cpuinfo.dcache_block_size, 1);
 	else
 		printk(KERN_INFO "-- dcache disabled\n");
 	if (upr & SPR_UPR_ICP)
-		printk(KERN_INFO "-- icache: %4d bytes total, %2d bytes/line, %d way(s)\n",
-			cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
+		printk(KERN_INFO
+		       "-- icache: %4d bytes total, %2d bytes/line, %d way(s)\n",
+		       cpuinfo.icache_size, cpuinfo.icache_block_size, 1);
 	else
 		printk(KERN_INFO "-- icache disabled\n");
 
 	if (upr & SPR_UPR_DMP)
 		printk(KERN_INFO "-- dmmu: %4d entries, %lu way(s)\n",
-			1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
-			1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW));
+		       1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
+		       1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW));
 	if (upr & SPR_UPR_IMP)
 		printk(KERN_INFO "-- immu: %4d entries, %lu way(s)\n",
-			1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
-			1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW));
+		       1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
+		       1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW));
 
 	printk(KERN_INFO "-- additional features:\n");
 	if (upr & SPR_UPR_DUP)
@@ -164,7 +167,7 @@ static void print_cpuinfo(void) {
 void __init setup_cpuinfo(void)
 {
 	struct device_node *cpu;
-	unsigned long iccfgr,dccfgr;
+	unsigned long iccfgr, dccfgr;
 	unsigned long cache_set_size, cache_ways;;
 
 	cpu = of_find_compatible_node(NULL, NULL, "opencores,or1200-rtlsvn481");
@@ -176,17 +179,18 @@ void __init setup_cpuinfo(void)
 	cache_ways = 1 << (iccfgr & SPR_ICCFGR_NCW);
 	cache_set_size = 1 << ((iccfgr & SPR_ICCFGR_NCS) >> 3);
 	cpuinfo.icache_block_size = 16 << ((iccfgr & SPR_ICCFGR_CBS) >> 7);
-	cpuinfo.icache_size = cache_set_size * cache_ways * cpuinfo.icache_block_size;
+	cpuinfo.icache_size =
+	    cache_set_size * cache_ways * cpuinfo.icache_block_size;
 
 	dccfgr = mfspr(SPR_DCCFGR);
 	cache_ways = 1 << (dccfgr & SPR_DCCFGR_NCW);
 	cache_set_size = 1 << ((dccfgr & SPR_DCCFGR_NCS) >> 3);
 	cpuinfo.dcache_block_size = 16 << ((dccfgr & SPR_DCCFGR_CBS) >> 7);
-	cpuinfo.dcache_size = cache_set_size * cache_ways * cpuinfo.dcache_block_size;
+	cpuinfo.dcache_size =
+	    cache_set_size * cache_ways * cpuinfo.dcache_block_size;
 
 	if (of_property_read_u32(cpu, "clock-frequency",
-				 &cpuinfo.clock_frequency))
-	{
+				 &cpuinfo.clock_frequency)) {
 		printk(KERN_WARNING
 		       "Device tree missing CPU 'clock-frequency' parameter."
 		       "Assuming frequency 25MHZ"
@@ -210,52 +214,50 @@ void __init setup_cpuinfo(void)
  * bootloader, or discovered by some equally clever means...
  */
 
-void __init or32_early_setup(void) {
+void __init or32_early_setup(void)
+{
 
 	early_init_devtree(__dtb_start);
 
-	printk(KERN_INFO "Compiled-in FDT at 0x%p\n",
-	       __dtb_start);
+	printk(KERN_INFO "Compiled-in FDT at 0x%p\n", __dtb_start);
 }
 
 static int __init openrisc_device_probe(void)
 {
 	of_platform_populate(NULL, NULL, NULL, NULL);
 
-        return 0;
+	return 0;
 }
-device_initcall(openrisc_device_probe);
 
+device_initcall(openrisc_device_probe);
 
 static inline unsigned long extract_value_bits(unsigned long reg,
 					       short bit_nr, short width)
 {
-	return((reg >> bit_nr) & (0 << width));
+	return ((reg >> bit_nr) & (0 << width));
 }
 
-static inline unsigned long extract_value(unsigned long reg,
-					  unsigned long mask)
+static inline unsigned long extract_value(unsigned long reg, unsigned long mask)
 {
 	while (!(mask & 0x1)) {
-		reg  = reg  >> 1;
+		reg = reg >> 1;
 		mask = mask >> 1;
 	}
-	return(mask & reg);
+	return (mask & reg);
 }
 
 void __init detect_unit_config(unsigned long upr, unsigned long mask,
-			       char *text, void (*func)(void))
+			       char *text, void (*func) (void))
 {
-        if (text != NULL)
+	if (text != NULL)
 		printk("%s", text);
 
-	if ( upr & mask ) {
+	if (upr & mask) {
 		if (func != NULL)
 			func();
 		else
 			printk("present\n");
-	}
-	else
+	} else
 		printk("not present\n");
 }
 
@@ -278,8 +280,8 @@ void __cpuinit calibrate_delay(void)
 	}
 	loops_per_jiffy = *val / HZ;
 	pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
-	        loops_per_jiffy/(500000/HZ),
-	        (loops_per_jiffy/(5000/HZ)) % 100, loops_per_jiffy);
+		loops_per_jiffy / (500000 / HZ),
+		(loops_per_jiffy / (5000 / HZ)) % 100, loops_per_jiffy);
 }
 
 void __init setup_arch(char **cmdline_p)
@@ -291,10 +293,10 @@ void __init setup_arch(char **cmdline_p)
 	setup_cpuinfo();
 
 	/* process 1's initial memory region is the kernel code/data */
-	init_mm.start_code = (unsigned long) &_stext;
-	init_mm.end_code =   (unsigned long) &_etext;
-	init_mm.end_data =   (unsigned long) &_edata;
-	init_mm.brk =        (unsigned long) &_end;
+	init_mm.start_code = (unsigned long)&_stext;
+	init_mm.end_code = (unsigned long)&_etext;
+	init_mm.end_data = (unsigned long)&_edata;
+	init_mm.brk = (unsigned long)&_end;
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	initrd_start = (unsigned long)&__initrd_start;
@@ -306,14 +308,14 @@ void __init setup_arch(char **cmdline_p)
 	initrd_below_start_ok = 1;
 #endif
 
-        /* setup bootmem allocator */
+	/* setup bootmem allocator */
 	max_low_pfn = setup_memory();
 
 	/* paging_init() sets up the MMU and marks all pages as reserved */
 	paging_init();
 
 #if defined(CONFIG_VT) && defined(CONFIG_DUMMY_CONSOLE)
-	if(!conswitchp)
+	if (!conswitchp)
 		conswitchp = &dummy_con;
 #endif
 
@@ -332,39 +334,38 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	revision = vr & SPR_VR_REV;
 
 	return seq_printf(m,
-		"cpu\t\t: OpenRISC-%x\n"
-		"revision\t: %d\n"
-		"frequency\t: %ld\n"
-		"dcache size\t: %d bytes\n"
-		"dcache block size\t: %d bytes\n"
-		"icache size\t: %d bytes\n"
-		"icache block size\t: %d bytes\n"
-		"immu\t\t: %d entries, %lu ways\n"
-		"dmmu\t\t: %d entries, %lu ways\n"
-		"bogomips\t: %lu.%02lu\n",
-
-		version,
-		revision,
-		loops_per_jiffy * HZ,
-		cpuinfo.dcache_size,
-		cpuinfo.dcache_block_size,
-		cpuinfo.icache_size,
-		cpuinfo.icache_block_size,
-		1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
-		1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW),
-		1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
-		1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW),
-		(loops_per_jiffy * HZ) / 500000,
-		((loops_per_jiffy * HZ) / 5000) % 100);
+			  "cpu\t\t: OpenRISC-%x\n"
+			  "revision\t: %d\n"
+			  "frequency\t: %ld\n"
+			  "dcache size\t: %d bytes\n"
+			  "dcache block size\t: %d bytes\n"
+			  "icache size\t: %d bytes\n"
+			  "icache block size\t: %d bytes\n"
+			  "immu\t\t: %d entries, %lu ways\n"
+			  "dmmu\t\t: %d entries, %lu ways\n"
+			  "bogomips\t: %lu.%02lu\n",
+			  version,
+			  revision,
+			  loops_per_jiffy * HZ,
+			  cpuinfo.dcache_size,
+			  cpuinfo.dcache_block_size,
+			  cpuinfo.icache_size,
+			  cpuinfo.icache_block_size,
+			  1 << ((mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTS) >> 2),
+			  1 + (mfspr(SPR_DMMUCFGR) & SPR_DMMUCFGR_NTW),
+			  1 << ((mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTS) >> 2),
+			  1 + (mfspr(SPR_IMMUCFGR) & SPR_IMMUCFGR_NTW),
+			  (loops_per_jiffy * HZ) / 500000,
+			  ((loops_per_jiffy * HZ) / 5000) % 100);
 }
 
-static void *c_start(struct seq_file *m, loff_t *pos)
+static void *c_start(struct seq_file *m, loff_t * pos)
 {
 	/* We only have one CPU... */
 	return *pos < 1 ? (void *)1 : NULL;
 }
 
-static void *c_next(struct seq_file *m, void *v, loff_t *pos)
+static void *c_next(struct seq_file *m, void *v, loff_t * pos)
 {
 	++*pos;
 	return NULL;
