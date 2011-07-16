@@ -39,9 +39,11 @@
 
 typedef unsigned long elf_greg_t;
 
-/* Note that NGREG is defined to ELF_NGREG in include/linux/elfcore.h, and is
-   thus exposed to user-space. */
-#define ELF_NGREG (sizeof (struct pt_regs) / sizeof(elf_greg_t))
+/*
+ * Note that NGREG is defined to ELF_NGREG in include/linux/elfcore.h, and is
+ * thus exposed to user-space.
+ */
+#define ELF_NGREG (sizeof (struct user_regs_struct) / sizeof(elf_greg_t))
 typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 
 /* A placeholder; OR32 does not have fp support yes, so no fp regs for now.  */
@@ -82,11 +84,8 @@ typedef unsigned long elf_fpregset_t;
 
 #define ELF_EXEC_PAGESIZE	8192
 
-#define ELF_CORE_COPY_REGS(gregs, regs) \
-	memcpy(gregs, regs, \
-	       sizeof(struct pt_regs) < sizeof(elf_gregset_t) ? \
-	       sizeof(struct pt_regs) : sizeof(elf_gregset_t));
-
+extern void dump_elf_thread(elf_greg_t *dest, struct pt_regs *pt);
+#define ELF_CORE_COPY_REGS(dest, regs) dump_elf_thread(dest, regs);
 
 /* This yields a mask that user programs can use to figure out what
    instruction set this cpu supports.  This could be done in userspace,
