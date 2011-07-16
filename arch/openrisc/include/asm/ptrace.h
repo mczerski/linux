@@ -20,31 +20,40 @@
 #define __ASM_OPENRISC_PTRACE_H
 
 #include <asm/spr_defs.h>
-/*
- * This struct defines the way the registers are stored on the
- * kernel stack during a system call or other kernel entry.
- *
- * this should only contain volatile regs
- * since we can keep non-volatile in the thread_struct
- * should set this up when only volatiles are saved
- * by intr code.
- *
- * Since this is going on the stack, *CARE MUST BE TAKEN* to insure
- * that the overall structure is a multiple of 16 bytes in length.
- *
- * Note that the offsets of the fields in this struct correspond with
- * the values below.
- */
-
-/*
- * These are 'magic' values for PTRACE_PEEKUSR that return info about where a
- * process is located in memory.
- */
-#define PT_TEXT_ADDR            0x10000
-#define PT_DATA_ADDR            0x10004
-#define PT_TEXT_END_ADDR        0x10008
 
 #ifndef __ASSEMBLY__
+/*
+ * This is the layout of the regset returned by the GETREGSET ptrace call
+ */
+struct user_regs_struct {
+	/* GPR R0-R31... */
+	unsigned long gpr[32];
+	unsigned long pc;
+	unsigned long sr;
+	unsigned long pad1;
+	unsigned long pad2;
+};
+#endif
+
+#ifdef __KERNEL__
+
+/*
+ * Make kernel PTrace/register structures opaque to userspace... userspace can
+ * access thread state via the regset mechanism.  This allows us a bit of
+ * flexibility in how we order the registers on the stack, permitting some
+ * optimizations like packing call-clobbered registers together so that
+ * they share a cacheline (not done yet, though... future optimization).
+ */
+
+#ifndef __ASSEMBLY__
+/*
+ * This struct describes how the registers are laid out on the kernel stack
+ * during a syscall or other kernel entry.
+ *
+ * This structure should always be cacheline aligned on the stack.
+ * FIXME: I don't think that's the case right now.  The alignment is
+ * taken care of elsewhere... head.S, process.c, etc.
+ */
 
 struct pt_regs {
 	union {
@@ -64,14 +73,14 @@ struct pt_regs {
 		};
 	};
 	long  pc;
-	long  orig_gpr11;  /* Used for restarting system calls */
-	long  syscallno;  /* Syscall no. (used by strace) */
+	long  orig_gpr11;	/* For restarting system calls */
+	long  syscallno;	/* Syscall number (used by strace) */
+	long dummy;		/* Cheap alignment fix */
 };
 #endif /* __ASSEMBLY__ */
 
-#ifdef __KERNEL__
+/* TODO: Rename this to REDZONE because that's what it is */
 #define STACK_FRAME_OVERHEAD  128  /* size of minimum stack frame */
-//#define STACK_FRAME_OVERHEAD  0  /* size of minimum stack frame */
 
 #define instruction_pointer(regs)	((regs)->pc)
 #define user_mode(regs)			(((regs)->sr & SPR_SR_SM) == 0)
@@ -79,8 +88,6 @@ struct pt_regs {
 #define profile_pc(regs)		instruction_pointer(regs)
 
 #define arch_has_single_step()  (1)
-
-#endif /* __KERNEL__ */
 
 /*
  * Offsets used by 'ptrace' system call interface.
@@ -120,5 +127,7 @@ struct pt_regs {
 #define PT_PC	      128
 #define PT_ORIG_GPR11 132
 #define PT_SYSCALLNO  136
+
+#endif /* __KERNEL__ */
 
 #endif /* __ASM_OPENRISC_PTRACE_H */

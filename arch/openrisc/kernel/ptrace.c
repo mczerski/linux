@@ -39,7 +39,18 @@
 #include "ptrace.h"
 
 /*
- * retrieve the contents of OpenRISC userspace general registers
+ * Copy the thread state to a regset that can be interpreted by userspace.
+ *
+ * It doesn't matter what our internal pt_regs structure looks like.  The
+ * important thing is that we export a consistent view of the thread state
+ * to userspace.  As such, we need to make sure that the regset remains
+ * ABI compatible as defined by the struct user_regs_struct:
+ *
+ * (Each item is a 32-bit word)
+ * r0 = 0 (exported for clarity)
+ * 31 GPRS r1-r31
+ * PC (Program counter)
+ * SR (Supervision register)
  */
 static int genregs_get(struct task_struct *target,
 		       const struct user_regset *regset,
@@ -49,29 +60,27 @@ static int genregs_get(struct task_struct *target,
 	const struct pt_regs *regs = task_pt_regs(target);
 	int ret;
 
-#if 0
 	/* r0 */
-	ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
-				       0, offsetof(struct pt_regs, regs));
-#endif
+	ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf, 0, 4);
 
-	ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
-				  regs, 0, sizeof(*regs));
-
-/* put PPC here */
-
-#if 0
-	/* fill out rest of elf_gregset_t structure with zeroes */
+	if (!ret)
+		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+					  regs->gpr+1, 4, 4*32);
+	if (!ret)
+		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+				  &regs->pc, 4*32, 4*33);
+	if (!ret)
+		ret = user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+					  &regs->sr, 4*33, 4*34);
 	if (!ret)
 		ret = user_regset_copyout_zero(&pos, &count, &kbuf, &ubuf,
-					       sizeof(struct pt_regs), -1);
-#endif
+					       4*34, -1);
 
 	return ret;
 }
 
 /*
- * update the contents of the OpenRISC userspace general registers
+ * Set the thread state from a regset passed in via ptrace
  */
 static int genregs_set(struct task_struct *target,
 		       const struct user_regset *regset,
@@ -81,27 +90,23 @@ static int genregs_set(struct task_struct *target,
 	struct pt_regs *regs = task_pt_regs(target);
 	int ret;
 
+	/* ignore r0 */
+	ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf, 0, 4);
+	/* r1 - r31 */
+	if (!ret)
+		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+					 regs->gpr+1, 4, 4*32);
 	/* PC */
-	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-				 regs, 0, offsetof(struct pt_regs, sr));
-
-	/* skip SR */
-	ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
-					offsetof(struct pt_regs, sr),
-					offsetof(struct pt_regs, sp));
-
-	/* SP, r2 - r31 */
-	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
-				 regs,
-				 offsetof(struct pt_regs, sp),
-				 sizeof(struct pt_regs));
-
-#if 0
-	/* read out the rest of the elf_gregset_t structure */
+	if (!ret)
+		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf,
+				 &regs->pc, 4*32, 4*33);
+	/*
+	 * Skip SR and padding... userspace isn't allowed to changes bits in
+	 * the Supervision register
+	 */
 	if (!ret)
 		ret = user_regset_copyin_ignore(&pos, &count, &kbuf, &ubuf,
-						sizeof(struct pt_regs), -1);
-#endif
+						4*33, -1);
 
 	return ret;
 }
@@ -425,76 +430,12 @@ void ptrace_disable(struct task_struct *child)
 	clear_tsk_thread_flag(child, TIF_SYSCALL_TRACE);
 }
 
-/*
- * Read the word at offset "off" into the "struct user".  We
- * actually access the pt_regs stored on the kernel stack.
- */
-static int ptrace_read_user(struct task_struct *tsk, unsigned long off,
-			    unsigned long __user *ret)
-{
-	struct pt_regs *regs;
-	unsigned long tmp;
-
-	/*    if (off & 3 || off >= sizeof(struct user))
-	   return -EIO; */
-
-	regs = task_pt_regs(tsk);
-
-	tmp = 0;
-	if (off == PT_TEXT_ADDR)
-		tmp = tsk->mm->start_code;
-	else if (off == PT_DATA_ADDR)
-		tmp = tsk->mm->start_data;
-	else if (off == PT_TEXT_END_ADDR)
-		tmp = tsk->mm->end_code;
-	else if (off < sizeof(struct pt_regs))
-		tmp = *((unsigned long *)((char *)regs + off));
-
-	return put_user(tmp, ret);
-}
-
-/*
- * Write the word at offset "off" into "struct user".  We
- * actually access the pt_regs stored on the kernel stack.
- */
-static int ptrace_write_user(struct task_struct *tsk, unsigned long off,
-			     unsigned long val)
-{
-	struct pt_regs *regs;
-
-	/*if (off & 3 || off >= sizeof(struct user))
-	   return -EIO; */
-
-	if (off >= sizeof(struct pt_regs))
-		return 0;
-
-	regs = task_pt_regs(tsk);
-
-	if (off != offsetof(struct pt_regs, sr)) {
-		*((unsigned long *)((char *)regs + off)) = val;
-	} else {
-		/* Prevent any process from setting the SR flags and
-		 * thus elevating privileges
-		 */
-	}
-
-	return 0;
-}
-
 long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 		 unsigned long data)
 {
 	int ret;
-	unsigned long __user *datap = (unsigned long __user *)data;
 
 	switch (request) {
-		/* read the word at location addr in the USER area. */
-	case PTRACE_PEEKUSR:
-		ret = ptrace_read_user(child, addr, datap);
-		break;
-	case PTRACE_POKEUSR:
-		ret = ptrace_write_user(child, addr, data);
-		break;
 	default:
 		ret = ptrace_request(child, request, addr, data);
 		break;
