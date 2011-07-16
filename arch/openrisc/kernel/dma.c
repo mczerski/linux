@@ -31,8 +31,8 @@
 #include <asm/spr_defs.h>
 #include <asm/tlbflush.h>
 
-static int page_set_nocache(pte_t* pte, unsigned long addr,
-			    unsigned long next, struct mm_walk* walk)
+static int page_set_nocache(pte_t * pte, unsigned long addr,
+			    unsigned long next, struct mm_walk *walk)
 {
 	unsigned long cl;
 
@@ -51,8 +51,8 @@ static int page_set_nocache(pte_t* pte, unsigned long addr,
 	return 0;
 }
 
-static int page_clear_nocache(pte_t* pte, unsigned long addr,
-			    unsigned long next, struct mm_walk* walk)
+static int page_clear_nocache(pte_t * pte, unsigned long addr,
+			      unsigned long next, struct mm_walk *walk)
 {
 	pte_val(*pte) &= ~_PAGE_CI;
 
@@ -74,10 +74,10 @@ static int page_clear_nocache(pte_t* pte, unsigned long addr,
  *
  */
 void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
-			      dma_addr_t *dma_handle, gfp_t gfp)
+			      dma_addr_t * dma_handle, gfp_t gfp)
 {
 	unsigned long va;
-	void* page;
+	void *page;
 	struct mm_walk walk = {
 		.pte_entry = page_set_nocache,
 		.mm = &init_mm
@@ -90,31 +90,31 @@ void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
 	/* This gives us the real physical address of the first page. */
 	*dma_handle = __pa(page);
 
-	va = (unsigned long) page;
+	va = (unsigned long)page;
 
 	/*
 	 * We need to iterate through the pages, clearing the dcache for
 	 * them and setting the cache-inhibit bit.
 	 */
-	if (walk_page_range(va, va+size, &walk)) {
+	if (walk_page_range(va, va + size, &walk)) {
 		free_pages_exact(page, size);
 		return NULL;
 	}
 
-	return (void*) va;
+	return (void *)va;
 }
 
 void or1k_dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 			    dma_addr_t dma_handle)
 {
-	unsigned long va = (unsigned long) vaddr;
+	unsigned long va = (unsigned long)vaddr;
 	struct mm_walk walk = {
 		.pte_entry = page_clear_nocache,
 		.mm = &init_mm
 	};
 
 	/* walk_page_range shouldn't be able to fail here */
-	WARN_ON(walk_page_range(va, va+size, &walk));
+	WARN_ON(walk_page_range(va, va + size, &walk));
 
 	free_pages_exact(vaddr, size);
 }
@@ -128,4 +128,5 @@ static int __init dma_init(void)
 
 	return 0;
 }
+
 fs_initcall(dma_init);
