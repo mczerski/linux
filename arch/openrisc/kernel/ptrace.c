@@ -114,11 +114,11 @@ static int genregs_set(struct task_struct *target,
 /*
  * Define the register sets available on OpenRISC under Linux
  */
-enum openrisc_regset {
+enum or1k_regset {
 	REGSET_GENERAL,
 };
 
-static const struct user_regset openrisc_regsets[] = {
+static const struct user_regset or1k_regsets[] = {
 	[REGSET_GENERAL] = {
 			    .core_note_type = NT_PRSTATUS,
 			    .n = ELF_NGREG,
@@ -129,16 +129,16 @@ static const struct user_regset openrisc_regsets[] = {
 			    },
 };
 
-static const struct user_regset_view user_openrisc_native_view = {
-	.name = "OpenRISC",
+static const struct user_regset_view user_or1k_native_view = {
+	.name = "or1k",
 	.e_machine = EM_OPENRISC,
-	.regsets = openrisc_regsets,
-	.n = ARRAY_SIZE(openrisc_regsets),
+	.regsets = or1k_regsets,
+	.n = ARRAY_SIZE(or1k_regsets),
 };
 
 const struct user_regset_view *task_user_regset_view(struct task_struct *task)
 {
-	return &user_openrisc_native_view;
+	return &user_or1k_native_view;
 }
 
 void user_enable_single_step(struct task_struct *child)
