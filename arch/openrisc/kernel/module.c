@@ -18,10 +18,10 @@
 #include <linux/elf.h>
 
 int apply_relocate_add(Elf32_Shdr *sechdrs,
-                       const char *strtab,
-                       unsigned int symindex,
-                       unsigned int relsec,
-                       struct module *me)
+		       const char *strtab,
+		       unsigned int symindex,
+		       unsigned int relsec,
+		       struct module *me)
 {
 	unsigned int i;
 	Elf32_Rela *rel = (void *)sechdrs[relsec].sh_addr;
