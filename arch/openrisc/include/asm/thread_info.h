@@ -80,7 +80,7 @@ struct thread_info {
 	.preempt_count	= 1,				\
 	.addr_limit	= KERNEL_DS,			\
 	.restart_block  = {				\
-		        .fn = do_no_restart_syscall,	\
+			  .fn = do_no_restart_syscall,	\
 	},						\
 	.ksp            = 0,                            \
 }
