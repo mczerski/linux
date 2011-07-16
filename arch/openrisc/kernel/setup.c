@@ -103,7 +103,7 @@ static unsigned long __init setup_memory(void)
 		reserve_bootmem(region->base, region->size, BOOTMEM_DEFAULT);
 	}
 
-	return (ram_end_pfn);
+	return ram_end_pfn;
 }
 
 struct cpuinfo cpuinfo;
