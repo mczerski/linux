@@ -270,7 +270,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	local_irq_disable();
 
 	__asm__ __volatile__("l.nop   1");
-	do {} while(1);
+	do {} while (1);
 #endif
 	do_exit(SIGSEGV);
 }
