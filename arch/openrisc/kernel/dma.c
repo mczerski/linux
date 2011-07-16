@@ -31,7 +31,7 @@
 #include <asm/spr_defs.h>
 #include <asm/tlbflush.h>
 
-static int page_set_nocache(pte_t * pte, unsigned long addr,
+static int page_set_nocache(pte_t *pte, unsigned long addr,
 			    unsigned long next, struct mm_walk *walk)
 {
 	unsigned long cl;
@@ -51,7 +51,7 @@ static int page_set_nocache(pte_t * pte, unsigned long addr,
 	return 0;
 }
 
-static int page_clear_nocache(pte_t * pte, unsigned long addr,
+static int page_clear_nocache(pte_t *pte, unsigned long addr,
 			      unsigned long next, struct mm_walk *walk)
 {
 	pte_val(*pte) &= ~_PAGE_CI;
@@ -74,7 +74,7 @@ static int page_clear_nocache(pte_t * pte, unsigned long addr,
  *
  */
 void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
-			      dma_addr_t * dma_handle, gfp_t gfp)
+			      dma_addr_t *dma_handle, gfp_t gfp)
 {
 	unsigned long va;
 	void *page;
