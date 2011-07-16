@@ -446,7 +446,8 @@ long arch_ptrace(struct task_struct *child, long request, unsigned long addr,
 	return ret;
 }
 
-/* notification of system call entry/exit
+/*
+ * Notification of system call entry/exit
  * - triggered by current->work.syscall_trace
  */
 asmlinkage long do_syscall_trace_enter(struct pt_regs *regs)
@@ -462,10 +463,6 @@ asmlinkage long do_syscall_trace_enter(struct pt_regs *regs)
 		 */
 		ret = -1L;
 
-/*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
-		trace_sys_enter(regs, regs->syscallno);
-*/
-
 	/* Are these regs right??? */
 	if (unlikely(current->audit_context))
 		audit_syscall_entry(audit_arch(), regs->syscallno,
@@ -473,28 +470,6 @@ asmlinkage long do_syscall_trace_enter(struct pt_regs *regs)
 				    regs->gpr[5], regs->gpr[6]);
 
 	return ret ? : regs->syscallno;
-
-#if 0
-/*FIXME : audit the rest of this */
-
-	/*
-	 * this isn't the same as continuing with a signal, but it will do
-	 * for normal use.  strace only continues with a signal if the
-	 * stopping signal is not SIGTRAP.  -brl
-	 */
-	if (current->exit_code) {
-		send_sig(current->exit_code, current, 1);
-		current->exit_code = 0;
-	}
-out:
-	/*FIXME: audit_arch isn't even defined for openrisc */
-	/*FIXME:  What's with the register numbers here... makes no sense */
-	if (unlikely(current->audit_context) && !entryexit)
-		audit_syscall_entry(audit_arch(), regs->regs[2],
-				    regs->regs[4], regs->regs[5],
-				    regs->regs[6], regs->regs[7]);
-	/*RGD*/
-#endif
 }
 
 asmlinkage void do_syscall_trace_leave(struct pt_regs *regs)
@@ -504,10 +479,6 @@ asmlinkage void do_syscall_trace_leave(struct pt_regs *regs)
 	if (unlikely(current->audit_context))
 		audit_syscall_exit(AUDITSC_RESULT(regs->gpr[11]),
 				   regs->gpr[11]);
-
-/*	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
-		trace_sys_exit(regs, regs->gprs[9]);
-*/
 
 	step = test_thread_flag(TIF_SINGLESTEP);
 	if (step || test_thread_flag(TIF_SYSCALL_TRACE))
