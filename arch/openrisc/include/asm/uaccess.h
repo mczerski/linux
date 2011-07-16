@@ -40,8 +40,6 @@
  * For historical reasons, these macros are grossly misnamed.
  */
 
-//#define MAKE_MM_SEG(s)	((mm_segment_t) s)
-
 /* addr_limit is the maximum accessible address for the task. we misuse
  * the KERNEL_DS and USER_DS values to both assign and compare the
  * addr_limit values through the equally misnamed get/set_fs macros.
@@ -57,26 +55,15 @@
 
 #define segment_eq(a,b)	((a) == (b))
 
-#if 0
-
-#define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
-#define __user_ok(addr,size) (((size) <= TASK_SIZE)&&((addr) <= TASK_SIZE-(size)))
-#endif
-
 /* Ensure that the range from addr to addr+size is all within the process'
  * address space
  */
-//#define __range_ok(addr,size) (size <= TASK_SIZE && addr <= (TASK_SIZE-size))
 #define __range_ok(addr,size) (size <= get_fs() && addr <= (get_fs()-size))
 
 /* Ensure that addr is below task's addr_limit */
 #define __addr_ok(addr) ((unsigned long) addr < get_fs())
 
-//#define __access_ok(addr,size) (__kernel_ok || __user_ok((addr),(size)))
-//#define __access_ok(addr,size) (__range_ok(addr,size))
-//#define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
 #define access_ok(type,addr,size) __range_ok((unsigned long)addr,(unsigned long)size)
-
 
 /*
  * The exception table consists of pairs of addresses: the first is the
@@ -91,8 +78,7 @@
  * on our cache or tlb entries.
  */
 
-struct exception_table_entry
-{
+struct exception_table_entry {
 	unsigned long insn, fixup;
 };
 
@@ -158,7 +144,9 @@ do {								\
 	}							\
 } while (0)
 
-struct __large_struct { unsigned long buf[100]; };
+struct __large_struct {
+	unsigned long buf[100];
+};
 #define __m(x) (*(struct __large_struct *)(x))
 
 /*
@@ -274,20 +262,6 @@ do {								\
 extern unsigned long __must_check
 __copy_tofrom_user(void *to, const void *from, unsigned long size);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #define __copy_from_user(to, from, size) \
 	__copy_tofrom_user(to, from, size)
 #define __copy_to_user(to, from, size) \
@@ -324,7 +298,6 @@ copy_to_user(void *to, const void *from, unsigned long n)
 	return n;
 }
 
-
 extern unsigned long __clear_user(void *addr, unsigned long size);
 
 static inline __must_check unsigned long
@@ -342,8 +315,7 @@ clear_user(void *addr, unsigned long size)
 
 extern int __strncpy_from_user(char *dst, const char *src, long count);
 
-static inline long
-strncpy_from_user(char *dst, const char *src, long count)
+static inline long strncpy_from_user(char *dst, const char *src, long count)
 {
 	if (access_ok(VERIFY_READ, src, 1))
 		return __strncpy_from_user(dst, src, count);
@@ -366,11 +338,9 @@ extern int __strnlen_user(const char *str, long len, unsigned long top);
  * The `top' parameter to __strnlen_user is to make sure that
  * we can never overflow from the user area into kernel space.
  */
-static inline long strnlen_user(const char __user *str, long len)
+static inline long strnlen_user(const char __user * str, long len)
 {
-//	unsigned long top = __kernel_ok? ~0UL: TASK_SIZE - 1;
-
-	unsigned long top = (unsigned long) get_fs();
+	unsigned long top = (unsigned long)get_fs();
 	unsigned long res = 0;
 
 	if (__addr_ok(str))
@@ -379,7 +349,6 @@ static inline long strnlen_user(const char __user *str, long len)
 	return res;
 }
 
-//#define strlen_user(str) strnlen_user(str, 0x7ffffffe)
 #define strlen_user(str) strnlen_user(str, TASK_SIZE-1)
 
-#endif	/* __ASM_OPENRISC_UACCESS_H */
+#endif /* __ASM_OPENRISC_UACCESS_H */
