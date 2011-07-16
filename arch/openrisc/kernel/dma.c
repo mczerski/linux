@@ -99,7 +99,7 @@ void *or1k_dma_alloc_coherent(struct device *dev, size_t size,
 	if (walk_page_range(va, va+size, &walk)) {
 		free_pages_exact(page, size);
 		return NULL;
-	} 	
+	}
 
 	return (void*) va;
 }
