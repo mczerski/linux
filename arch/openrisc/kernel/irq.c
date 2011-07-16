@@ -29,7 +29,7 @@
 /* read interrupt enabled status */
 unsigned long arch_local_save_flags(void)
 {
-	return (mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE));
+	return mfspr(SPR_SR) & (SPR_SR_IEE|SPR_SR_TEE);
 }
 EXPORT_SYMBOL(arch_local_save_flags);
 
