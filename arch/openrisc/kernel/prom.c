@@ -63,7 +63,7 @@ void * __init early_init_dt_alloc_memory_arch(u64 size, u64 align)
 
 void __init early_init_devtree(void *params)
 {
-	u8 *alloc;
+	void *alloc;
 
 	/* Setup flat device-tree pointer */
 	initial_boot_params = params;
@@ -94,7 +94,7 @@ void __init early_init_devtree(void *params)
 
 	memcpy(alloc, initial_boot_params, initial_boot_params->totalsize);
 
-	initial_boot_params = (void *) alloc;
+	initial_boot_params = alloc;
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD
