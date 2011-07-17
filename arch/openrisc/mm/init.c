@@ -45,7 +45,7 @@
 #include <asm/fixmap.h>
 #include <asm/tlbflush.h>
 
-int mem_init_done = 0;
+int mem_init_done;
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -100,8 +100,8 @@ static void __init map_ram(void)
 			pme = pmd_offset(pue, v);
 
 			if ((u32) pue != (u32) pge || (u32) pme != (u32) pge) {
-				panic
-				    ("%s: OR1K kernel hardcoded for two-level page tables",
+				panic("%s: OR1K kernel hardcoded for "
+				      "two-level page tables",
 				     __func__);
 			}
 
@@ -136,7 +136,7 @@ void __init paging_init(void)
 	unsigned long end;
 	int i;
 
-	printk("Setting up paging and PTEs.\n");
+	printk(KERN_INFO "Setting up paging and PTEs.\n");
 
 	/* clear out the init_mm.pgd that will contain the kernel's mappings */
 
@@ -168,11 +168,11 @@ void __init paging_init(void)
 		unsigned long *dtlb_vector = __va(0x900);
 		unsigned long *itlb_vector = __va(0xa00);
 
-		printk("dtlb_miss_handler %p\n", &dtlb_miss_handler);
+		printk(KERN_INFO "dtlb_miss_handler %p\n", &dtlb_miss_handler);
 		*dtlb_vector = ((unsigned long)&dtlb_miss_handler -
 				(unsigned long)dtlb_vector) >> 2;
 
-		printk("itlb_miss_handler %p\n", &itlb_miss_handler);
+		printk(KERN_INFO "itlb_miss_handler %p\n", &itlb_miss_handler);
 		*itlb_vector = ((unsigned long)&itlb_miss_handler -
 				(unsigned long)itlb_vector) >> 2;
 	}
