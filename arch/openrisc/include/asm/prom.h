@@ -24,7 +24,7 @@
 
 #include <linux/types.h>
 #include <asm/irq.h>
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include <linux/of_irq.h>
 #include <linux/of_fdt.h>
 #include <linux/of_address.h>
