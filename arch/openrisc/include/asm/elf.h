@@ -22,8 +22,8 @@
 /*
  * ELF register definitions..
  */
-#include <asm/types.h>
-#include <asm/ptrace.h>
+#include <linux/types.h>
+#include <linux/ptrace.h>
 
 
 /* The OR1K relocation types... not all relevant for module loader */

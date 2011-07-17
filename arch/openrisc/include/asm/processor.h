@@ -22,6 +22,7 @@
 #include <asm/spr_defs.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
+
 #define STACK_TOP       TASK_SIZE
 #define STACK_TOP_MAX	STACK_TOP
 /* Kernel and user SR register setting */
