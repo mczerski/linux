@@ -27,7 +27,6 @@
 #define FIXADDR_TOP	((unsigned long) (-2*PAGE_SIZE))
 
 #include <linux/kernel.h>
-//#include <linux/threads.h>
 #include <asm/page.h>
 
 /*
@@ -76,7 +75,7 @@ static __always_inline unsigned long fix_to_virt(const unsigned int idx)
 	if (idx >= __end_of_fixed_addresses)
 		BUG();
 
-        return __fix_to_virt(idx);
+	return __fix_to_virt(idx);
 }
 
 static inline unsigned long virt_to_fix(const unsigned long vaddr)

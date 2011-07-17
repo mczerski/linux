@@ -26,8 +26,8 @@
 #include <linux/thread_info.h>
 #include <linux/prefetch.h>
 #include <linux/string.h>
+#include <linux/thread_info.h>
 #include <asm/page.h>
-#include <asm/thread_info.h>
 
 #define VERIFY_READ	0
 #define VERIFY_WRITE	1
@@ -53,17 +53,18 @@
 #define get_fs()	(current_thread_info()->addr_limit)
 #define set_fs(x)	(current_thread_info()->addr_limit = (x))
 
-#define segment_eq(a,b)	((a) == (b))
+#define segment_eq(a, b)	((a) == (b))
 
 /* Ensure that the range from addr to addr+size is all within the process'
  * address space
  */
-#define __range_ok(addr,size) (size <= get_fs() && addr <= (get_fs()-size))
+#define __range_ok(addr, size) (size <= get_fs() && addr <= (get_fs()-size))
 
 /* Ensure that addr is below task's addr_limit */
 #define __addr_ok(addr) ((unsigned long) addr < get_fs())
 
-#define access_ok(type,addr,size) __range_ok((unsigned long)addr,(unsigned long)size)
+#define access_ok(type, addr, size) \
+	__range_ok((unsigned long)addr, (unsigned long)size)
 
 /*
  * The exception table consists of pairs of addresses: the first is the
@@ -104,44 +105,44 @@ extern void sort_exception_table(void);
  * PowerPC, we can just do these as direct assignments.  (Of course, the
  * exception handling means that it's no longer "just"...)
  */
-#define get_user(x,ptr) \
-  __get_user_check((x),(ptr),sizeof(*(ptr)))
-#define put_user(x,ptr) \
-  __put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define get_user(x, ptr) \
+	__get_user_check((x), (ptr), sizeof(*(ptr)))
+#define put_user(x, ptr) \
+	__put_user_check((__typeof__(*(ptr)))(x), (ptr), sizeof(*(ptr)))
 
-#define __get_user(x,ptr) \
-  __get_user_nocheck((x),(ptr),sizeof(*(ptr)))
-#define __put_user(x,ptr) \
-  __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+#define __get_user(x, ptr) \
+	__get_user_nocheck((x), (ptr), sizeof(*(ptr)))
+#define __put_user(x, ptr) \
+	__put_user_nocheck((__typeof__(*(ptr)))(x), (ptr), sizeof(*(ptr)))
 
 extern long __put_user_bad(void);
 
-#define __put_user_nocheck(x,ptr,size)			\
+#define __put_user_nocheck(x, ptr, size)		\
 ({							\
 	long __pu_err;					\
-	__put_user_size((x),(ptr),(size),__pu_err);	\
+	__put_user_size((x), (ptr), (size), __pu_err);	\
 	__pu_err;					\
 })
 
-#define __put_user_check(x,ptr,size)				\
-({								\
-	long __pu_err = -EFAULT;				\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
-	if (access_ok(VERIFY_WRITE,__pu_addr,size))		\
-		__put_user_size((x),__pu_addr,(size),__pu_err);	\
-	__pu_err;						\
+#define __put_user_check(x, ptr, size)					\
+({									\
+	long __pu_err = -EFAULT;					\
+	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	if (access_ok(VERIFY_WRITE, __pu_addr, size))			\
+		__put_user_size((x), __pu_addr, (size), __pu_err);	\
+	__pu_err;							\
 })
 
-#define __put_user_size(x,ptr,size,retval)			\
-do {								\
-	retval = 0;						\
-	switch (size) {						\
-	  case 1: __put_user_asm(x,ptr,retval,"l.sb"); break;	\
-	  case 2: __put_user_asm(x,ptr,retval,"l.sh"); break;	\
-	  case 4: __put_user_asm(x,ptr,retval,"l.sw"); break;	\
-	  case 8: __put_user_asm2(x,ptr,retval); break;		\
-	  default: __put_user_bad();				\
-	}							\
+#define __put_user_size(x, ptr, size, retval)				\
+do {									\
+	retval = 0;							\
+	switch (size) {							\
+	case 1: __put_user_asm(x, ptr, retval, "l.sb"); break;		\
+	case 2: __put_user_asm(x, ptr, retval, "l.sh"); break;		\
+	case 4: __put_user_asm(x, ptr, retval, "l.sw"); break;		\
+	case 8: __put_user_asm2(x, ptr, retval); break;			\
+	default: __put_user_bad();					\
+	}								\
 } while (0)
 
 struct __large_struct {
@@ -161,7 +162,7 @@ struct __large_struct {
 		".section .fixup,\"ax\"\n"			\
 		"3:	l.addi %0,r0,%3\n"			\
 		"	l.j 2b\n"				\
-		"	l.nop \n"				\
+		"	l.nop\n"				\
 		".previous\n"					\
 		".section __ex_table,\"a\"\n"			\
 		"	.align 2\n"				\
@@ -178,7 +179,7 @@ struct __large_struct {
 		".section .fixup,\"ax\"\n"			\
 		"4:	l.addi %0,r0,%3\n"			\
 		"	l.j 3b\n"				\
-		"	l.nop \n"				\
+		"	l.nop\n"				\
 		".previous\n"					\
 		".section __ex_table,\"a\"\n"			\
 		"	.align 2\n"				\
@@ -188,36 +189,36 @@ struct __large_struct {
 		: "=r"(err)					\
 		: "r"(x), "r"(addr), "i"(-EFAULT), "0"(err))
 
-#define __get_user_nocheck(x,ptr,size)				\
+#define __get_user_nocheck(x, ptr, size)			\
 ({								\
 	long __gu_err, __gu_val;				\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size(__gu_val, (ptr), (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
 
-#define __get_user_check(x,ptr,size)					\
+#define __get_user_check(x, ptr, size)					\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
-	if (access_ok(VERIFY_READ,__gu_addr,size))			\
-		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
+	if (access_ok(VERIFY_READ, __gu_addr, size))			\
+		__get_user_size(__gu_val, __gu_addr, (size), __gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 	__gu_err;							\
 })
 
 extern long __get_user_bad(void);
 
-#define __get_user_size(x,ptr,size,retval)			\
-do {								\
-	retval = 0;						\
-	switch (size) {						\
-	  case 1: __get_user_asm(x,ptr,retval,"l.lbz"); break;	\
-	  case 2: __get_user_asm(x,ptr,retval,"l.lhz"); break;	\
-	  case 4: __get_user_asm(x,ptr,retval,"l.lwz"); break;	\
-	  case 8: __get_user_asm2(x, ptr, retval);		\
-	  default: (x) = __get_user_bad();			\
-	}							\
+#define __get_user_size(x, ptr, size, retval)				\
+do {									\
+	retval = 0;							\
+	switch (size) {							\
+	case 1: __get_user_asm(x, ptr, retval, "l.lbz"); break;		\
+	case 2: __get_user_asm(x, ptr, retval, "l.lhz"); break;		\
+	case 4: __get_user_asm(x, ptr, retval, "l.lwz"); break;		\
+	case 8: __get_user_asm2(x, ptr, retval);			\
+	default: (x) = __get_user_bad();				\
+	}								\
 } while (0)
 
 #define __get_user_asm(x, addr, err, op)		\
@@ -228,7 +229,7 @@ do {								\
 		"3:	l.addi %0,r0,%3\n"		\
 		"	l.addi %1,r0,0\n"		\
 		"	l.j 2b\n"			\
-		"	l.nop \n"			\
+		"	l.nop\n"			\
 		".previous\n"				\
 		".section __ex_table,\"a\"\n"		\
 		"	.align 2\n"			\
@@ -247,7 +248,7 @@ do {								\
 		"	l.addi %1,r0,0\n"		\
 		"	l.addi %H1,r0,0\n"		\
 		"	l.j 3b\n"			\
-		"	l.nop \n"			\
+		"	l.nop\n"			\
 		".previous\n"				\
 		".section __ex_table,\"a\"\n"		\
 		"	.align 2\n"			\
@@ -338,7 +339,7 @@ extern int __strnlen_user(const char *str, long len, unsigned long top);
  * The `top' parameter to __strnlen_user is to make sure that
  * we can never overflow from the user area into kernel space.
  */
-static inline long strnlen_user(const char __user * str, long len)
+static inline long strnlen_user(const char __user *str, long len)
 {
 	unsigned long top = (unsigned long)get_fs();
 	unsigned long res = 0;

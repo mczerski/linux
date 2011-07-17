@@ -30,10 +30,8 @@
 #endif
 #define PAGE_MASK       (~(PAGE_SIZE-1))
 
-#define PAGE_OFFSET		0xc0000000
-#define KERNELBASE  		PAGE_OFFSET
-
-/* #define ARCH_PFN_OFFSET	(PAGE_OFFSET >> PAGE_SHIFT) */
+#define PAGE_OFFSET	0xc0000000
+#define KERNELBASE	PAGE_OFFSET
 
 /* This is not necessarily the right place for this, but it's needed by
  * drivers/of/fdt.c
@@ -45,8 +43,8 @@
 #define get_user_page(vaddr)            __get_free_page(GFP_KERNEL)
 #define free_user_page(page, addr)      free_page(addr)
 
-#define clear_page(page)        memset((page), 0, PAGE_SIZE)
-#define copy_page(to,from)      memcpy((to), (from), PAGE_SIZE)
+#define clear_page(page)	memset((page), 0, PAGE_SIZE)
+#define copy_page(to, from)	memcpy((to), (from), PAGE_SIZE)
 
 #define clear_user_page(page, vaddr, pg)        clear_page(page)
 #define copy_user_page(to, from, vaddr, pg)     copy_page(to, from)
@@ -55,13 +53,13 @@
  * These are used to make use of C type-checking..
  */
 typedef struct {
-        unsigned long pte;
+	unsigned long pte;
 } pte_t;
 typedef struct {
-        unsigned long pgd;
+	unsigned long pgd;
 } pgd_t;
 typedef struct {
-        unsigned long pgprot;
+	unsigned long pgprot;
 } pgprot_t;
 typedef struct page *pgtable_t;
 
@@ -69,9 +67,9 @@ typedef struct page *pgtable_t;
 #define pgd_val(x)	((x).pgd)
 #define pgprot_val(x)	((x).pgprot)
 
-#define __pte(x)	((pte_t) { (x) } )
-#define __pgd(x)	((pgd_t) { (x) } )
-#define __pgprot(x)	((pgprot_t) { (x) } )
+#define __pte(x)	((pte_t) { (x) })
+#define __pgd(x)	((pgd_t) { (x) })
+#define __pgprot(x)	((pgprot_t) { (x) })
 
 extern unsigned long memory_start;
 extern unsigned long memory_end;
@@ -81,23 +79,23 @@ extern unsigned long memory_end;
 
 #ifndef __ASSEMBLY__
 
-/* from linker script */
-
 #define __va(x) ((void *)((unsigned long)(x) + PAGE_OFFSET))
 #define __pa(x) ((unsigned long) (x) - PAGE_OFFSET)
 
 #define virt_to_pfn(kaddr)      (__pa(kaddr) >> PAGE_SHIFT)
 #define pfn_to_virt(pfn)        __va((pfn) << PAGE_SHIFT)
 
-#define virt_to_page(addr)      (mem_map + (((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT))
-#define page_to_virt(page)      ((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
+#define virt_to_page(addr) \
+	(mem_map + (((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT))
+#define page_to_virt(page) \
+	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
 
 #define page_to_phys(page)      ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
 
 #define pfn_valid(pfn)          ((pfn) < max_mapnr)
 
 #define virt_addr_valid(kaddr)  (((void *)(kaddr) >= (void *)PAGE_OFFSET) && \
-                                ((void *)(kaddr) < (void *)memory_end))
+				((void *)(kaddr) < (void *)memory_end))
 
 #endif /* __ASSEMBLY__ */
 
