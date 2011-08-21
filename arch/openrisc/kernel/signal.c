@@ -56,11 +56,14 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	/* Alwys make any pending restarted system call return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
-	/* restore the regs from &sc->regs (same as sc, since regs is first)
+	/*
+	 * Restore the regs from &sc->regs.
 	 * (sc is already checked for VERIFY_READ since the sigframe was
 	 *  checked in sys_sigreturn previously)
 	 */
-	if (__copy_from_user(regs, sc->regs.gpr, 33*sizeof(unsigned long)))
+	if (__copy_from_user(regs, sc->regs.gpr, 32 * sizeof(unsigned long)))
+		goto badframe;
+	if (__copy_from_user(&regs->pc, &sc->regs.pc, sizeof(unsigned long)))
 		goto badframe;
 	if (__copy_from_user(&regs->sr, &sc->regs.sr, sizeof(unsigned long)))
 		goto badframe;
@@ -129,9 +132,10 @@ static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 {
 	int err = 0;
 
-	/* copy the regs. they are first in sc so we can use sc directly */
+	/* copy the regs */
 
-	err |= __copy_to_user(sc->regs.gpr, regs, 33*sizeof(unsigned long));
+	err |= __copy_to_user(sc->regs.gpr, regs, 32 * sizeof(unsigned long));
+	err |= __copy_to_user(&sc->regs.pc, &regs->pc, sizeof(unsigned long));
 	err |= __copy_to_user(&sc->regs.sr, &regs->sr, sizeof(unsigned long));
 
 	/* then some other stuff */
