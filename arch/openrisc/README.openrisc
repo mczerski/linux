@@ -4,14 +4,11 @@ OpenRISC Linux
 This is a port of Linux to the OpenRISC class of microprocessors; the initial
 target architecture, specifically, is the 32-bit OpenRISC 1000 family (or1k).
 
-For more information about OpenRISC processors and ongoing development:
+For information about OpenRISC processors and ongoing development:
 
 	website		http://openrisc.net
 
-Additional information, though not kept up to date by the site maintainers,
-can be found at http://opencores.org/openrisc
-
-For information about Linux on OpenRISC, please contact South Pole AB.
+For more information about Linux on OpenRISC, please contact South Pole AB.
 
 	email:		info@southpole.se
 
@@ -53,8 +50,8 @@ Build the kernel as usual
 
 4)  Run in architectural simulator
 
-There's a configuration file for the architectural simulator (or1ksim) in the
-arch/openrisc directory, allowing you to run your kernel with the following
+Grab the or1ksim platform configuration file (from the or1ksim source) and
+together with your freshly built vmlinux, run your kernel with the following
 incantation:
 
 	sim -f arch/openrisc/or1ksim.cfg vmlinux

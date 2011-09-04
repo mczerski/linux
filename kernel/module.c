@@ -545,9 +545,9 @@ static void setup_modinfo_##field(struct module *mod, const char *s)  \
 	mod->field = kstrdup(s, GFP_KERNEL);                          \
 }                                                                     \
 static ssize_t show_modinfo_##field(struct module_attribute *mattr,   \
-	                struct module *mod, char *buffer)             \
+			struct module_kobject *mk, char *buffer)      \
 {                                                                     \
-	return sprintf(buffer, "%s\n", mod->field);                   \
+	return sprintf(buffer, "%s\n", mk->mod->field);               \
 }                                                                     \
 static int modinfo_##field##_exists(struct module *mod)               \
 {                                                                     \
@@ -902,9 +902,9 @@ void symbol_put_addr(void *addr)
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
 static ssize_t show_refcnt(struct module_attribute *mattr,
-			   struct module *mod, char *buffer)
+			   struct module_kobject *mk, char *buffer)
 {
-	return sprintf(buffer, "%u\n", module_refcount(mod));
+	return sprintf(buffer, "%u\n", module_refcount(mk->mod));
 }
 
 static struct module_attribute refcnt = {
@@ -952,11 +952,11 @@ static inline int module_unload_init(struct module *mod)
 #endif /* CONFIG_MODULE_UNLOAD */
 
 static ssize_t show_initstate(struct module_attribute *mattr,
-			   struct module *mod, char *buffer)
+			      struct module_kobject *mk, char *buffer)
 {
 	const char *state = "unknown";
 
-	switch (mod->state) {
+	switch (mk->mod->state) {
 	case MODULE_STATE_LIVE:
 		state = "live";
 		break;
@@ -975,10 +975,27 @@ static struct module_attribute initstate = {
 	.show = show_initstate,
 };
 
+static ssize_t store_uevent(struct module_attribute *mattr,
+			    struct module_kobject *mk,
+			    const char *buffer, size_t count)
+{
+	enum kobject_action action;
+
+	if (kobject_action_type(buffer, count, &action) == 0)
+		kobject_uevent(&mk->kobj, action);
+	return count;
+}
+
+struct module_attribute module_uevent = {
+	.attr = { .name = "uevent", .mode = 0200 },
+	.store = store_uevent,
+};
+
 static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_version,
 	&modinfo_srcversion,
 	&initstate,
+	&module_uevent,
 #ifdef CONFIG_MODULE_UNLOAD
 	&refcnt,
 #endif
@@ -1187,7 +1204,7 @@ struct module_sect_attrs
 };
 
 static ssize_t module_sect_show(struct module_attribute *mattr,
-				struct module *mod, char *buf)
+				struct module_kobject *mk, char *buf)
 {
 	struct module_sect_attr *sattr =
 		container_of(mattr, struct module_sect_attr, mattr);

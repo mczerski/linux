@@ -6,7 +6,6 @@ CONFIG_INITRAMFS_SOURCE="arch/openrisc/support/initramfs arch/openrisc/support/i
 CONFIG_EXPERT=y
 # CONFIG_SYSCTL_SYSCALL is not set
 # CONFIG_KALLSYMS is not set
-# CONFIG_ELF_CORE is not set
 # CONFIG_EPOLL is not set
 # CONFIG_TIMERFD is not set
 # CONFIG_EVENTFD is not set
@@ -58,7 +57,6 @@ CONFIG_SERIAL_OF_PLATFORM=y
 # CONFIG_HW_RANDOM is not set
 # CONFIG_HWMON is not set
 # CONFIG_MFD_SUPPORT is not set
-# CONFIG_FB_OC_SHMEM is not set
 # CONFIG_USB_SUPPORT is not set
 # CONFIG_DNOTIFY is not set
 CONFIG_TMPFS=y

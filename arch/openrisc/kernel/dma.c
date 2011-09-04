@@ -19,13 +19,8 @@
  * the only thing implemented properly.  The rest need looking into...
  */
 
-#include <linux/device.h>
 #include <linux/dma-mapping.h>
-#include <linux/gfp.h>
 #include <linux/dma-debug.h>
-#include <linux/io.h>
-#include <linux/vmalloc.h>
-#include <linux/sched.h>
 
 #include <asm/cpuinfo.h>
 #include <asm/spr_defs.h>
@@ -117,6 +112,70 @@ void or1k_dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 	WARN_ON(walk_page_range(va, va + size, &walk));
 
 	free_pages_exact(vaddr, size);
+}
+
+dma_addr_t or1k_map_page(struct device *dev, struct page *page,
+			 unsigned long offset, size_t size,
+			 enum dma_data_direction dir,
+			 struct dma_attrs *attrs)
+{
+	unsigned long cl;
+	dma_addr_t addr = page_to_phys(page) + offset;
+
+	switch (dir) {
+	case DMA_TO_DEVICE:
+		/* Flush the dcache for the requested range */
+		for (cl = addr; cl < addr + size;
+		     cl += cpuinfo.dcache_block_size)
+			mtspr(SPR_DCBFR, cl);
+		break;
+	case DMA_FROM_DEVICE:
+		/* Invalidate the dcache for the requested range */
+		for (cl = addr; cl < addr + size;
+		     cl += cpuinfo.dcache_block_size)
+			mtspr(SPR_DCBIR, cl);
+		break;
+	default:
+		/*
+		 * NOTE: If dir == DMA_BIDIRECTIONAL then there's no need to
+		 * flush nor invalidate the cache here as the area will need
+		 * to be manually synced anyway.
+		 */
+		break;
+	}
+
+	return addr;
+}
+
+void or1k_unmap_page(struct device *dev, dma_addr_t dma_handle,
+		     size_t size, enum dma_data_direction dir,
+		     struct dma_attrs *attrs)
+{
+	/* Nothing special to do here... */
+}
+
+void or1k_sync_single_for_cpu(struct device *dev,
+			      dma_addr_t dma_handle, size_t size,
+			      enum dma_data_direction dir)
+{
+	unsigned long cl;
+	dma_addr_t addr = dma_handle;
+
+	/* Invalidate the dcache for the requested range */
+	for (cl = addr; cl < addr + size; cl += cpuinfo.dcache_block_size)
+		mtspr(SPR_DCBIR, cl);
+}
+
+void or1k_sync_single_for_device(struct device *dev,
+			         dma_addr_t dma_handle, size_t size,
+			         enum dma_data_direction dir)
+{
+	unsigned long cl;
+	dma_addr_t addr = dma_handle;
+
+	/* Flush the dcache for the requested range */
+	for (cl = addr; cl < addr + size; cl += cpuinfo.dcache_block_size)
+		mtspr(SPR_DCBFR, cl);
 }
 
 /* Number of entries preallocated for DMA-API debugging */
