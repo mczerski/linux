@@ -28,6 +28,7 @@
 #include <linux/tracehook.h>
 
 #include <asm/processor.h>
+#include <asm/syscall.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 
@@ -42,18 +43,17 @@ _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 }
 
 struct rt_sigframe {
-	struct siginfo *pinfo;
-	void *puc;
 	struct siginfo info;
 	struct ucontext uc;
 	unsigned char retcode[16];	/* trampoline code */
 };
 
-static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
+static int restore_sigcontext(struct pt_regs *regs,
+			      struct sigcontext __user *sc)
 {
-	unsigned int err = 0;
+	int err = 0;
 
-	/* Alwys make any pending restarted system call return -EINTR */
+	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	/*
@@ -61,12 +61,9 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	 * (sc is already checked for VERIFY_READ since the sigframe was
 	 *  checked in sys_sigreturn previously)
 	 */
-	if (__copy_from_user(regs, sc->regs.gpr, 32 * sizeof(unsigned long)))
-		goto badframe;
-	if (__copy_from_user(&regs->pc, &sc->regs.pc, sizeof(unsigned long)))
-		goto badframe;
-	if (__copy_from_user(&regs->sr, &sc->regs.sr, sizeof(unsigned long)))
-		goto badframe;
+	err |= __copy_from_user(regs, sc->regs.gpr, 32 * sizeof(unsigned long));
+	err |= __copy_from_user(&regs->pc, &sc->regs.pc, sizeof(unsigned long));
+	err |= __copy_from_user(&regs->sr, &sc->regs.sr, sizeof(unsigned long));
 
 	/* make sure the SM-bit is cleared so user-mode cannot fool us */
 	regs->sr &= ~SPR_SR_SM;
@@ -77,16 +74,13 @@ static int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 	 */
 
 	return err;
-
-badframe:
-	return 1;
 }
 
 asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe __user *)regs->sp;
 	sigset_t set;
-	stack_t st;
+	int ret;
 
 	/*
 	 * Since we stacked the signal on a dword boundary,
@@ -107,11 +101,9 @@ asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
-		goto badframe;
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
-	do_sigaltstack(&st, NULL, regs->sp);
+	ret = do_sigaltstack(&frame->uc.uc_stack, NULL, regs->sp);
 
 	return regs->gpr[11];
 
@@ -124,20 +116,14 @@ badframe:
  * Set up a signal frame.
  */
 
-static int setup_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
-			    unsigned long mask)
+static int setup_sigcontext(struct pt_regs *regs, struct sigcontext __user *sc)
 {
 	int err = 0;
 
 	/* copy the regs */
-
 	err |= __copy_to_user(sc->regs.gpr, regs, 32 * sizeof(unsigned long));
 	err |= __copy_to_user(&sc->regs.pc, &regs->pc, sizeof(unsigned long));
 	err |= __copy_to_user(&sc->regs.sr, &regs->sr, sizeof(unsigned long));
-
-	/* then some other stuff */
-
-	err |= __put_user(mask, &sc->oldmask);
 
 	return err;
 }
@@ -194,28 +180,23 @@ static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	int err = 0;
 
 	frame = get_sigframe(ka, regs, sizeof(*frame));
-
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
-	err |= __put_user(&frame->info, &frame->pinfo);
-	err |= __put_user(&frame->uc, &frame->puc);
-
+	/* Create siginfo.  */
 	if (ka->sa.sa_flags & SA_SIGINFO)
 		err |= copy_siginfo_to_user(&frame->info, info);
-	if (err)
-		goto give_sigsegv;
 
-	/* Clear all the bits of the ucontext we don't use.  */
-	err |= __clear_user(&frame->uc, offsetof(struct ucontext, uc_mcontext));
+	/* Create the ucontext.  */
 	err |= __put_user(0, &frame->uc.uc_flags);
 	err |= __put_user(NULL, &frame->uc.uc_link);
-	err |= __put_user((void *)current->sas_ss_sp,
-			  &frame->uc.uc_stack.ss_sp);
-	err |= __put_user(sas_ss_flags(regs->sp), &frame->uc.uc_stack.ss_flags);
-	err |= __put_user(current->sas_ss_size, &frame->uc.uc_stack.ss_size);
-	err |= setup_sigcontext(&frame->uc.uc_mcontext, regs, set->sig[0]);
-
+	err |= __put_user((void __user *)current->sas_ss_sp,
+	                  &frame->uc.uc_stack.ss_sp);
+	err |= __put_user(sas_ss_flags(regs->sp),
+	                  &frame->uc.uc_stack.ss_flags);
+	err |= __put_user(current->sas_ss_size,
+	                  &frame->uc.uc_stack.ss_size);
+	err |= setup_sigcontext(regs, &frame->uc.uc_mcontext);
 	err |= __copy_to_user(&frame->uc.uc_sigmask, set, sizeof(*set));
 
 	if (err)
@@ -223,9 +204,12 @@ static int setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	/* trampoline - the desired return ip is the retcode itself */
 	return_ip = (unsigned long)&frame->retcode;
-	/* This is l.ori r11,r0,__NR_sigreturn, l.sys 1 */
-	err |= __put_user(0xa960, (short *)(frame->retcode + 0));
-	err |= __put_user(__NR_rt_sigreturn, (short *)(frame->retcode + 2));
+	/* This is:
+		l.ori r11,r0,__NR_sigreturn
+		l.sys 1
+	 */
+	err |= __put_user(0xa960,             (short *)(frame->retcode + 0));
+	err |= __put_user(__NR_rt_sigreturn,  (short *)(frame->retcode + 2));
 	err |= __put_user(0x20000001, (unsigned long *)(frame->retcode + 4));
 	err |= __put_user(0x15000000, (unsigned long *)(frame->retcode + 8));
 
@@ -258,6 +242,27 @@ handle_signal(unsigned long sig,
 {
 	int ret;
 
+	/* Are we from a system call? */
+	if (syscall_get_nr(current, regs) >= 0) {
+		/* If so, check system call retarting.. */
+		switch (syscall_get_error(current, regs)) {
+		case -ERESTART_RESTARTBLOCK:
+		case -ERESTARTNOHAND:
+			regs->gpr[11] = -EINTR;
+			break;
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
+				regs->gpr[11] = -EINTR;
+				break;
+			}
+		/* fallthrough */
+		case -ERESTARTNOINTR:
+			regs->gpr[11] = regs->orig_gpr11;
+			regs->pc -= 4;
+			break;
+		}
+	}
+
 	ret = setup_rt_frame(sig, ka, info, oldset, regs);
 	if (ret)
 		return ret;
@@ -284,6 +289,7 @@ void do_signal(struct pt_regs *regs)
 	siginfo_t info;
 	int signr;
 	struct k_sigaction ka;
+	sigset_t *oldset;
 
 	/*
 	 * We want the common case to go fast, which
@@ -294,83 +300,57 @@ void do_signal(struct pt_regs *regs)
 	if (!user_mode(regs))
 		return;
 
+	if (test_thread_flag(TIF_RESTORE_SIGMASK))
+		oldset = &current->saved_sigmask;
+	else
+		oldset = &current->blocked;
+
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
-
-	/* If we are coming out of a syscall then we need
-	 * to check if the syscall was interrupted and wants to be
-	 * restarted after handling the signal.  If so, the original
-	 * syscall number is put back into r11 and the PC rewound to
-	 * point at the l.sys instruction that resulted in the
-	 * original syscall.  Syscall results other than the four
-	 * below mean that the syscall executed to completion and no
-	 * restart is necessary.
-	 */
-	if (regs->orig_gpr11) {
-		int restart = 0;
-
-		switch (regs->gpr[11]) {
-		case -ERESTART_RESTARTBLOCK:
-		case -ERESTARTNOHAND:
-			/* Restart if there is no signal handler */
-			restart = (signr <= 0);
-			break;
-		case -ERESTARTSYS:
-			/* Restart if there no signal handler or
-			 * SA_RESTART flag is set */
-			restart = (signr <= 0 || (ka.sa.sa_flags & SA_RESTART));
-			break;
-		case -ERESTARTNOINTR:
-			/* Always restart */
-			restart = 1;
-			break;
-		}
-
-		if (restart) {
-			if (regs->gpr[11] == -ERESTART_RESTARTBLOCK)
-				regs->gpr[11] = __NR_restart_syscall;
-			else
-				regs->gpr[11] = regs->orig_gpr11;
-			regs->pc -= 4;
-		} else {
-			regs->gpr[11] = -EINTR;
-		}
-	}
-
-	if (signr <= 0) {
-		/* no signal to deliver so we just put the saved sigmask
-		 * back */
-		if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
-			clear_thread_flag(TIF_RESTORE_SIGMASK);
-			sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
-		}
-
-	} else {		/* signr > 0 */
-		sigset_t *oldset;
-
-		if (current_thread_info()->flags & _TIF_RESTORE_SIGMASK)
-			oldset = &current->saved_sigmask;
-		else
-			oldset = &current->blocked;
-
-		/* Whee!  Actually deliver the signal.  */
+	if (signr > 0) {
 		if (!handle_signal(signr, &info, &ka, oldset, regs)) {
-			/* a signal was successfully delivered; the saved
+			/*
+			 * A signal was successfully delivered; the saved
 			 * sigmask will have been stored in the signal frame,
 			 * and will be restored by sigreturn, so we can simply
-			 * clear the TIF_RESTORE_SIGMASK flag */
+			 * clear the TIF_RESTORE_SIGMASK flag.
+			 */
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
 		}
-
-		tracehook_signal_handler(signr, &info, &ka, regs,
-					 test_thread_flag(TIF_SINGLESTEP));
+		return;
 	}
 
-	return;
+	/* Did we come from a system call? */
+	if (syscall_get_nr(current, regs) >= 0) {
+		/* Restart the system call */
+		switch (syscall_get_error(current, regs)) {
+		case -ERESTARTNOHAND:
+		case -ERESTARTSYS:
+		case -ERESTARTNOINTR:
+			regs->gpr[11] = regs->orig_gpr11;
+			regs->pc -= 4;
+			break;
+
+		case -ERESTART_RESTARTBLOCK:
+			regs->gpr[11] = __NR_restart_syscall;
+			regs->pc -= 4;
+			break;
+		}
+	}
+
+	/*
+	 * If there's no signal to deliver, we just put the saved sigmask
+	 * back.
+	 */
+	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
+		clear_thread_flag(TIF_RESTORE_SIGMASK);
+		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
+	}
 }
 
 asmlinkage void do_notify_resume(struct pt_regs *regs)
 {
-	if (current_thread_info()->flags & _TIF_SIGPENDING)
+	if (current_thread_info()->flags
+				& (_TIF_SIGPENDING | _TIF_RESTORE_SIGMASK))
 		do_signal(regs);
 
 	if (current_thread_info()->flags & _TIF_NOTIFY_RESUME) {
