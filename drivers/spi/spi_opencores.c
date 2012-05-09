@@ -182,9 +182,11 @@ static inline int
 ocspi_wait_till_ready(struct ocspi *ocspi)
 {
 	int i;
+	u8 reg;
 
 	for (i = 0; i < OCSPI_WAIT_RDY_MAX_LOOP; i++) {
-		if (ocspi_read(ocspi, OCSPI_REG_SPSR) & OCSPI_SPSR_WFEMPTY)
+		reg = ocspi_read(ocspi, OCSPI_REG_SPSR);
+		if (!(reg & OCSPI_SPSR_RFEMPTY))
 			return 1;
 		else
 			usleep_range(1,1);
