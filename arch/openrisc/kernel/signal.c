@@ -284,7 +284,7 @@ handle_signal(unsigned long sig,
  * mode below.
  */
 
-void do_signal(struct pt_regs *regs)
+static void do_signal(struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
