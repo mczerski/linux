@@ -454,6 +454,8 @@ static int __init ocspi_reset(struct ocspi *ocspi)
 	/* Verify that the CS is deasserted */
 	ocspi_set_cs(ocspi, 0);
 
+	/* Disable controller */
+	ocspi_write(ocspi, OCSPI_REG_SPCR, OCSPI_SPCR_MSTR);
 	/* Enable controller */
 	ocspi_write(ocspi, OCSPI_REG_SPCR, OCSPI_SPCR_SPE | OCSPI_SPCR_MSTR);
 
