@@ -19,6 +19,7 @@
 #include <linux/io.h>
 #include <linux/spi/spi.h>
 #include <asm/unaligned.h>
+#include <asm/cpuinfo.h>
 
 #define DRIVER_NAME			"oc_spi_simple"
 
