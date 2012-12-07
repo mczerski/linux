@@ -647,6 +647,9 @@ static int ethoc_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
 	struct ethoc *priv = bus->priv;
 	int i;
 
+	if (reg == 0)
+		val &= 0xCFBF;
+
 	ethoc_write(priv, MIIADDRESS, MIIADDRESS_ADDR(phy, reg));
 	ethoc_write(priv, MIITX_DATA, val);
 	ethoc_write(priv, MIICOMMAND, MIICOMMAND_WRITE);
