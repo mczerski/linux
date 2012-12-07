@@ -1,0 +1,60 @@
+/dts-v1/;
+/ {
+	compatible = "opencores,de0_nano";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	interrupt-parent = <&pic>;
+
+	chosen {
+		bootargs = "console=uart,mmio,0x90000000,115200 ip=::::de0_nano::dhcp root=/dev/nfs rw nfsroot=192.168.0.101:/nfsroot/root";
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00000000 0x02000000>;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cpu@0 {
+			compatible = "opencores,or1200-rtlsvn481";
+			reg = <0>;
+			clock-frequency = <50000000>;
+		};
+	};
+
+	/*
+	 * OR1K PIC is built into CPU and accessed via special purpose
+	 * registers.  It is not addressable and, hence, has no 'reg'
+	 * property.
+	 */
+	pic: pic {
+		compatible = "opencores,or1k-pic";
+		#interrupt-cells = <1>;
+		interrupt-controller;
+	};
+
+	serial0: serial@90000000 {
+		compatible = "opencores,uart16550-rtlsvn105", "ns16550a";
+		reg = <0x90000000 0x100>;
+		interrupts = <2>;
+		clock-frequency = <50000000>;
+	};
+
+	enet0: ethoc@92000000 {
+		compatible = "opencores,ethmac-rtlsvn338";
+		reg = <0x92000000 0x100>;
+		interrupts = <4>;
+	};
+	
+//	ohs900: ocores@9c000000 {
+//		compatible = "opencores,ohs900-ocores";
+//		reg = <0x9c000000 0x100>;
+//		interrupts = <20 21>;
+//		can_wakeup = <1>;
+//		potpg = <10>;
+//		power = <250>;
+//	};
+	
+};
