@@ -56,8 +56,22 @@ static char *mode_option = NULL;
 
 static const struct fb_videomode default_mode = {
 	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
-	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
-	0, FB_VMODE_NONINTERLACED
+//	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
+//	0, FB_VMODE_NONINTERLACED
+//};
+	.name = NULL,
+	.refresh = 72,
+	.xres = 640,
+	.yres = 480,
+	.pixclock = 25000,
+	.left_margin = 16,
+	.right_margin = 48,
+	.upper_margin = 11,
+	.lower_margin = 31,
+	.hsync_len = 96,
+	.vsync_len = 2,
+	.sync = 0,
+	.vmode = FB_VMODE_NONINTERLACED
 };
 
 struct ocfb_dev {
@@ -101,12 +115,12 @@ static int __init ocfb_setup(char *options)
 
 static inline u32 ocfb_readreg(void __iomem *base, loff_t offset)
 {
-	return ioread32(base + offset);
+	return ioread32be(base + offset);
 }
 
 static inline void ocfb_writereg(void __iomem *base, loff_t offset, u32 data)
 {
-	iowrite32(data, base + offset);
+	iowrite32be(data, base + offset);
 }
 
 static int ocfb_setupfb(struct ocfb_dev *fbdev)
@@ -325,9 +339,10 @@ static int ocfb_probe(struct platform_device *pdev)
 		goto err_iomap;
 	}
 	par->pal_adr = (fbdev->regs + VGA_PALETTE);
-
-	/* Allocate framebuffer memory */
 	fbsize = fbdev->info.fix.smem_len;
+
+#if defined(CONFIG_FB_OC_SHMEM)
+	/* Allocate framebuffer memory */
 	fbdev->fb_virt = dma_alloc_coherent(&pdev->dev, PAGE_ALIGN(fbsize),
 					    &fbdev->fb_phys, GFP_KERNEL);
 	if (!fbdev->fb_virt) {
@@ -335,6 +350,41 @@ static int ocfb_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_dma;
 	}
+#else
+	/* obtain framebuffer memory space */
+	//if (!res->sibling) {
+	//	dev_err(&pdev->dev, "cannot obtain framebuffer memory space\n");
+	//	ret = -ENXIO;
+	//	goto err_mem;
+	//}
+	//res = res->sibling;
+
+	//if (fbsize > resource_size(res)) {
+	//	dev_err(&pdev->dev, "requested framebuffer memory is to large\n");
+	//	ret = -ENXIO;
+	//	goto err_mem;
+	//}
+	res->start = 0xe0000000;
+
+	mmio = devm_request_mem_region(&pdev->dev, res->start,
+			fbsize, res->name);
+	if (!mmio) {
+		dev_err(&pdev->dev, "cannot request framebuffer memory space\n");
+		ret = -ENXIO;
+		goto err_mem;
+	}
+
+	fbdev->fb_phys = mmio->start;
+
+	fbdev->fb_virt = devm_ioremap_nocache(&pdev->dev, mmio->start,
+			resource_size(mmio));
+
+	if (!fbdev->fb_virt) {
+		dev_err(&pdev->dev, "cannot remap framebuffer memory space\n");
+		ret = -ENXIO;
+		goto err_mem_iomap;
+	}
+#endif
 	fbdev->info.fix.smem_start = fbdev->fb_phys;
 	fbdev->info.screen_base    = (void __iomem*)fbdev->fb_virt;
 	fbdev->info.pseudo_palette = fbdev->pseudo_palette;
@@ -365,8 +415,16 @@ err_regfb:
 err_cmap:
 	dma_free_coherent(&pdev->dev, PAGE_ALIGN(fbsize),
 			  fbdev->fb_virt, fbdev->fb_phys);
+#if !defined(CONFIG_FB_OC_SHMEM)
+	iounmap(fbdev->fb_virt);
+err_mem_iomap:
+	devm_release_region(&pdev->dev, mmio->start, resource_size(mmio));
+err_mem:
+	iounmap(fbdev->regs);
+#else
 err_dma:
 	iounmap(fbdev->regs);
+#endif
 err_iomap:
 	release_mem_region(fbdev->regs_phys, fbdev->regs_phys_size);
 err_free:

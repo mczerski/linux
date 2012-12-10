@@ -48,6 +48,34 @@
 		interrupts = <4>;
 	};
 	
+	fb0: ocfb@97000000 {
+		compatible = "opencores,ocfb", "ocfb";
+		reg = <0x97000000 0x1000>;
+	};
+	
+	i2c0: ocores@a0000000 {
+		compatible = "opencores,i2c-ocores";
+		reg = <0xa0000000 0x8>;
+		interrupts = <10>;
+
+		regstep = <1>;
+		clock-frequency = <50000000>;
+
+		/* Devices connected on this I2C bus get 
+		 * defined here; address- and size-cells
+		 * apply to these child devices
+		 */	
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		adxl34x@1D {
+			compatible = "adxl34x";
+			reg = <0x1D>;
+			interrupts = <26>;
+		}; 
+	}; 
+	
 //	ohs900: ocores@9c000000 {
 //		compatible = "opencores,ohs900-ocores";
 //		reg = <0x9c000000 0x100>;
