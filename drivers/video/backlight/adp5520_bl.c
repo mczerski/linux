@@ -160,7 +160,7 @@ static ssize_t adp5520_store(struct device *dev, const char *buf,
 	unsigned long val;
 	int ret;
 
-	ret = strict_strtoul(buf, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
@@ -214,7 +214,7 @@ static ssize_t adp5520_bl_daylight_max_store(struct device *dev,
 	struct adp5520_bl *data = dev_get_drvdata(dev);
 	int ret;
 
-	ret = strict_strtoul(buf, 10, &data->cached_daylight_max);
+	ret = kstrtoul(buf, 10, &data->cached_daylight_max);
 	if (ret < 0)
 		return ret;
 
@@ -282,7 +282,7 @@ static const struct attribute_group adp5520_bl_attr_group = {
 	.attrs = adp5520_bl_attributes,
 };
 
-static int __devinit adp5520_bl_probe(struct platform_device *pdev)
+static int adp5520_bl_probe(struct platform_device *pdev)
 {
 	struct backlight_properties props;
 	struct backlight_device *bl;
@@ -333,7 +333,7 @@ static int __devinit adp5520_bl_probe(struct platform_device *pdev)
 	return ret;
 }
 
-static int __devexit adp5520_bl_remove(struct platform_device *pdev)
+static int adp5520_bl_remove(struct platform_device *pdev)
 {
 	struct backlight_device *bl = platform_get_drvdata(pdev);
 	struct adp5520_bl *data = bl_get_data(bl);
@@ -375,7 +375,7 @@ static struct platform_driver adp5520_bl_driver = {
 		.owner	= THIS_MODULE,
 	},
 	.probe		= adp5520_bl_probe,
-	.remove		= __devexit_p(adp5520_bl_remove),
+	.remove		= adp5520_bl_remove,
 	.suspend	= adp5520_bl_suspend,
 	.resume		= adp5520_bl_resume,
 };

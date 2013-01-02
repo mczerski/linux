@@ -235,7 +235,7 @@ static int adp8870_led_setup(struct adp8870_led *led)
 	return ret;
 }
 
-static int __devinit adp8870_led_probe(struct i2c_client *client)
+static int adp8870_led_probe(struct i2c_client *client)
 {
 	struct adp8870_backlight_platform_data *pdata =
 		client->dev.platform_data;
@@ -244,8 +244,8 @@ static int __devinit adp8870_led_probe(struct i2c_client *client)
 	struct led_info *cur_led;
 	int ret, i;
 
-
-	led = kcalloc(pdata->num_leds, sizeof(*led), GFP_KERNEL);
+	led = devm_kzalloc(&client->dev, pdata->num_leds * sizeof(*led),
+				GFP_KERNEL);
 	if (led == NULL) {
 		dev_err(&client->dev, "failed to alloc memory\n");
 		return -ENOMEM;
@@ -253,17 +253,17 @@ static int __devinit adp8870_led_probe(struct i2c_client *client)
 
 	ret = adp8870_write(client, ADP8870_ISCLAW, pdata->led_fade_law);
 	if (ret)
-		goto err_free;
+		return ret;
 
 	ret = adp8870_write(client, ADP8870_ISCT1,
 			(pdata->led_on_time & 0x3) << 6);
 	if (ret)
-		goto err_free;
+		return ret;
 
 	ret = adp8870_write(client, ADP8870_ISCF,
 			FADE_VAL(pdata->led_fade_in, pdata->led_fade_out));
 	if (ret)
-		goto err_free;
+		return ret;
 
 	for (i = 0; i < pdata->num_leds; ++i) {
 		cur_led = &pdata->leds[i];
@@ -317,13 +317,10 @@ static int __devinit adp8870_led_probe(struct i2c_client *client)
 		cancel_work_sync(&led[i].work);
 	}
 
- err_free:
-	kfree(led);
-
 	return ret;
 }
 
-static int __devexit adp8870_led_remove(struct i2c_client *client)
+static int adp8870_led_remove(struct i2c_client *client)
 {
 	struct adp8870_backlight_platform_data *pdata =
 		client->dev.platform_data;
@@ -335,16 +332,15 @@ static int __devexit adp8870_led_remove(struct i2c_client *client)
 		cancel_work_sync(&data->led[i].work);
 	}
 
-	kfree(data->led);
 	return 0;
 }
 #else
-static int __devinit adp8870_led_probe(struct i2c_client *client)
+static int adp8870_led_probe(struct i2c_client *client)
 {
 	return 0;
 }
 
-static int __devexit adp8870_led_remove(struct i2c_client *client)
+static int adp8870_led_remove(struct i2c_client *client)
 {
 	return 0;
 }
@@ -572,7 +568,7 @@ static ssize_t adp8870_store(struct device *dev, const char *buf,
 	unsigned long val;
 	int ret;
 
-	ret = strict_strtoul(buf, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
@@ -652,7 +648,7 @@ static ssize_t adp8870_bl_l1_daylight_max_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct adp8870_bl *data = dev_get_drvdata(dev);
-	int ret = strict_strtoul(buf, 10, &data->cached_daylight_max);
+	int ret = kstrtoul(buf, 10, &data->cached_daylight_max);
 	if (ret)
 		return ret;
 
@@ -794,7 +790,7 @@ static ssize_t adp8870_bl_ambient_light_zone_store(struct device *dev,
 	uint8_t reg_val;
 	int ret;
 
-	ret = strict_strtoul(buf, 10, &val);
+	ret = kstrtoul(buf, 10, &val);
 	if (ret)
 		return ret;
 
@@ -843,7 +839,7 @@ static const struct attribute_group adp8870_bl_attr_group = {
 	.attrs = adp8870_bl_attributes,
 };
 
-static int __devinit adp8870_probe(struct i2c_client *client,
+static int adp8870_probe(struct i2c_client *client,
 					const struct i2c_device_id *id)
 {
 	struct backlight_properties props;
@@ -874,7 +870,7 @@ static int __devinit adp8870_probe(struct i2c_client *client,
 		return -ENODEV;
 	}
 
-	data = kzalloc(sizeof(*data), GFP_KERNEL);
+	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
 	if (data == NULL)
 		return -ENOMEM;
 
@@ -894,8 +890,7 @@ static int __devinit adp8870_probe(struct i2c_client *client,
 			&client->dev, data, &adp8870_bl_ops, &props);
 	if (IS_ERR(bl)) {
 		dev_err(&client->dev, "failed to register backlight\n");
-		ret = PTR_ERR(bl);
-		goto out2;
+		return PTR_ERR(bl);
 	}
 
 	data->bl = bl;
@@ -930,13 +925,11 @@ out:
 			&adp8870_bl_attr_group);
 out1:
 	backlight_device_unregister(bl);
-out2:
-	kfree(data);
 
 	return ret;
 }
 
-static int __devexit adp8870_remove(struct i2c_client *client)
+static int adp8870_remove(struct i2c_client *client)
 {
 	struct adp8870_bl *data = i2c_get_clientdata(client);
 
@@ -950,7 +943,6 @@ static int __devexit adp8870_remove(struct i2c_client *client)
 			&adp8870_bl_attr_group);
 
 	backlight_device_unregister(data->bl);
-	kfree(data);
 
 	return 0;
 }
@@ -985,7 +977,7 @@ static struct i2c_driver adp8870_driver = {
 		.name = KBUILD_MODNAME,
 	},
 	.probe    = adp8870_probe,
-	.remove   = __devexit_p(adp8870_remove),
+	.remove   = adp8870_remove,
 	.suspend = adp8870_i2c_suspend,
 	.resume  = adp8870_i2c_resume,
 	.id_table = adp8870_id,

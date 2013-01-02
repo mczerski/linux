@@ -32,7 +32,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
-#include <plat/dma.h>
+#include <linux/of_device.h>
 
 #include <sound/core.h>
 #include <sound/pcm.h>
@@ -62,8 +62,6 @@ struct omap_dmic {
  */
 static struct omap_pcm_dma_data omap_dmic_dai_dma_params = {
 	.name		= "DMIC capture",
-	.data_type	= OMAP_DMA_DATA_TYPE_S32,
-	.sync_mode	= OMAP_DMA_SYNC_PACKET,
 };
 
 static inline void omap_dmic_write(struct omap_dmic *dmic, u16 reg, u32 val)
@@ -120,6 +118,7 @@ static int omap_dmic_dai_startup(struct snd_pcm_substream *substream,
 
 	mutex_unlock(&dmic->mutex);
 
+	snd_soc_dai_set_dma_data(dai, substream, &omap_dmic_dai_dma_params);
 	return ret;
 }
 
@@ -204,6 +203,7 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
 {
 	struct omap_dmic *dmic = snd_soc_dai_get_drvdata(dai);
+	struct omap_pcm_dma_data *dma_data;
 	int channels;
 
 	dmic->clk_div = omap_dmic_select_divider(dmic, params_rate(params));
@@ -229,8 +229,8 @@ static int omap_dmic_dai_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* packet size is threshold * channels */
-	omap_dmic_dai_dma_params.packet_size = dmic->threshold * channels;
-	snd_soc_dai_set_dma_data(dai, substream, &omap_dmic_dai_dma_params);
+	dma_data = snd_soc_dai_get_dma_data(dai, substream);
+	dma_data->packet_size = dmic->threshold * channels;
 
 	return 0;
 }
@@ -448,7 +448,7 @@ static struct snd_soc_dai_driver omap_dmic_dai = {
 	.ops = &omap_dmic_dai_ops,
 };
 
-static __devinit int asoc_dmic_probe(struct platform_device *pdev)
+static int asoc_dmic_probe(struct platform_device *pdev)
 {
 	struct omap_dmic *dmic;
 	struct resource *res;
@@ -464,9 +464,9 @@ static __devinit int asoc_dmic_probe(struct platform_device *pdev)
 
 	mutex_init(&dmic->mutex);
 
-	dmic->fclk = clk_get(dmic->dev, "dmic_fck");
+	dmic->fclk = clk_get(dmic->dev, "fck");
 	if (IS_ERR(dmic->fclk)) {
-		dev_err(dmic->dev, "cant get dmic_fck\n");
+		dev_err(dmic->dev, "cant get fck\n");
 		return -ENODEV;
 	}
 
@@ -518,7 +518,7 @@ err_put_clk:
 	return ret;
 }
 
-static int __devexit asoc_dmic_remove(struct platform_device *pdev)
+static int asoc_dmic_remove(struct platform_device *pdev)
 {
 	struct omap_dmic *dmic = platform_get_drvdata(pdev);
 
@@ -528,13 +528,20 @@ static int __devexit asoc_dmic_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct of_device_id omap_dmic_of_match[] = {
+	{ .compatible = "ti,omap4-dmic", },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, omap_dmic_of_match);
+
 static struct platform_driver asoc_dmic_driver = {
 	.driver = {
 		.name = "omap-dmic",
 		.owner = THIS_MODULE,
+		.of_match_table = omap_dmic_of_match,
 	},
 	.probe = asoc_dmic_probe,
-	.remove = __devexit_p(asoc_dmic_remove),
+	.remove = asoc_dmic_remove,
 };
 
 module_platform_driver(asoc_dmic_driver);

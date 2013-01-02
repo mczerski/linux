@@ -13,14 +13,14 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fb.h>
+#include <linux/dma-buf.h>
 
-#include "drmP.h"
-#include "drm.h"
-#include "drm_crtc.h"
-#include "drm_crtc_helper.h"
+#include <drm/drmP.h>
+#include <drm/drm_crtc.h>
+#include <drm/drm_crtc_helper.h>
 #include "udl_drv.h"
 
-#include "drm_fb_helper.h"
+#include <drm/drm_fb_helper.h>
 
 #define DL_DEFIO_WRITE_DELAY    5 /* fb_deferred_io.delay in jiffies */
 
@@ -114,9 +114,10 @@ static void udlfb_dpy_deferred_io(struct fb_info *info,
 	list_for_each_entry(cur, &fbdefio->pagelist, lru) {
 
 		if (udl_render_hline(dev, (ufbdev->ufb.base.bits_per_pixel / 8),
-				  &urb, (char *) info->fix.smem_start,
-				  &cmd, cur->index << PAGE_SHIFT,
-				  PAGE_SIZE, &bytes_identical, &bytes_sent))
+				     &urb, (char *) info->fix.smem_start,
+				     &cmd, cur->index << PAGE_SHIFT,
+				     cur->index << PAGE_SHIFT,
+				     PAGE_SIZE, &bytes_identical, &bytes_sent))
 			goto error;
 		bytes_rendered += PAGE_SIZE;
 	}
@@ -156,8 +157,17 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 	if (!fb->active_16)
 		return 0;
 
-	if (!fb->obj->vmapping)
-		udl_gem_vmap(fb->obj);
+	if (!fb->obj->vmapping) {
+		ret = udl_gem_vmap(fb->obj);
+		if (ret == -ENOMEM) {
+			DRM_ERROR("failed to vmap fb\n");
+			return 0;
+		}
+		if (!fb->obj->vmapping) {
+			DRM_ERROR("failed to vmapping\n");
+			return 0;
+		}
+	}
 
 	start_cycles = get_cycles();
 
@@ -178,10 +188,11 @@ int udl_handle_damage(struct udl_framebuffer *fb, int x, int y,
 	for (i = y; i < y + height ; i++) {
 		const int line_offset = fb->base.pitches[0] * i;
 		const int byte_offset = line_offset + (x * bpp);
-
+		const int dev_byte_offset = (fb->base.width * bpp * i) + (x * bpp);
 		if (udl_render_hline(dev, bpp, &urb,
 				     (char *) fb->obj->vmapping,
-				     &cmd, byte_offset, width * bpp,
+				     &cmd, byte_offset, dev_byte_offset,
+				     width * bpp,
 				     &bytes_identical, &bytes_sent))
 			goto error;
 	}
@@ -234,7 +245,7 @@ static int udl_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 			size = 0;
 	}
 
-	vma->vm_flags |= VM_RESERVED;	/* avoid to swap out this VMA */
+	/* VM_IO | VM_DONTEXPAND | VM_DONTDUMP are set by remap_pfn_range() */
 	return 0;
 }
 
@@ -347,12 +358,12 @@ static struct fb_ops udlfb_ops = {
 	.fb_release = udl_fb_release,
 };
 
-void udl_crtc_fb_gamma_set(struct drm_crtc *crtc, u16 red, u16 green,
+static void udl_crtc_fb_gamma_set(struct drm_crtc *crtc, u16 red, u16 green,
 			   u16 blue, int regno)
 {
 }
 
-void udl_crtc_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
+static void udl_crtc_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
 			     u16 *blue, int regno)
 {
 	*red = 0;
@@ -368,16 +379,33 @@ static int udl_user_framebuffer_dirty(struct drm_framebuffer *fb,
 {
 	struct udl_framebuffer *ufb = to_udl_fb(fb);
 	int i;
+	int ret = 0;
 
 	if (!ufb->active_16)
 		return 0;
 
+	if (ufb->obj->base.import_attach) {
+		ret = dma_buf_begin_cpu_access(ufb->obj->base.import_attach->dmabuf,
+					       0, ufb->obj->base.size,
+					       DMA_FROM_DEVICE);
+		if (ret)
+			return ret;
+	}
+
 	for (i = 0; i < num_clips; i++) {
-		udl_handle_damage(ufb, clips[i].x1, clips[i].y1,
+		ret = udl_handle_damage(ufb, clips[i].x1, clips[i].y1,
 				  clips[i].x2 - clips[i].x1,
 				  clips[i].y2 - clips[i].y1);
+		if (ret)
+			break;
 	}
-	return 0;
+
+	if (ufb->obj->base.import_attach) {
+		dma_buf_end_cpu_access(ufb->obj->base.import_attach->dmabuf,
+				       0, ufb->obj->base.size,
+				       DMA_FROM_DEVICE);
+	}
+	return ret;
 }
 
 static void udl_user_framebuffer_destroy(struct drm_framebuffer *fb)
@@ -593,10 +621,19 @@ udl_fb_user_fb_create(struct drm_device *dev,
 	struct drm_gem_object *obj;
 	struct udl_framebuffer *ufb;
 	int ret;
+	uint32_t size;
 
 	obj = drm_gem_object_lookup(dev, file, mode_cmd->handles[0]);
 	if (obj == NULL)
 		return ERR_PTR(-ENOENT);
+
+	size = mode_cmd->pitches[0] * mode_cmd->height;
+	size = ALIGN(size, PAGE_SIZE);
+
+	if (size > obj->size) {
+		DRM_ERROR("object size not sufficient for fb %d %zu %d %d\n", size, obj->size, mode_cmd->pitches[0], mode_cmd->height);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	ufb = kzalloc(sizeof(*ufb), GFP_KERNEL);
 	if (ufb == NULL)

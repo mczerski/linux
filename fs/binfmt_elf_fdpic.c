@@ -39,7 +39,6 @@
 #include <asm/uaccess.h>
 #include <asm/param.h>
 #include <asm/pgalloc.h>
-#include <asm/exec.h>
 
 typedef char *elf_caddr_t;
 
@@ -57,7 +56,7 @@ typedef char *elf_caddr_t;
 
 MODULE_LICENSE("GPL");
 
-static int load_elf_fdpic_binary(struct linux_binprm *, struct pt_regs *);
+static int load_elf_fdpic_binary(struct linux_binprm *);
 static int elf_fdpic_fetch_phdrs(struct elf_fdpic_params *, struct file *);
 static int elf_fdpic_map_file(struct elf_fdpic_params *, struct file *,
 			      struct mm_struct *, const char *);
@@ -165,10 +164,10 @@ static int elf_fdpic_fetch_phdrs(struct elf_fdpic_params *params,
 /*
  * load an fdpic binary into various bits of memory
  */
-static int load_elf_fdpic_binary(struct linux_binprm *bprm,
-				 struct pt_regs *regs)
+static int load_elf_fdpic_binary(struct linux_binprm *bprm)
 {
 	struct elf_fdpic_params exec_params, interp_params;
+	struct pt_regs *regs = current_pt_regs();
 	struct elf_phdr *phdr;
 	unsigned long stack_size, entryaddr;
 #ifdef ELF_FDPIC_PLAT_INIT
@@ -627,10 +626,10 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 	NEW_AUX_ENT(AT_BASE,	interp_params->elfhdr_addr);
 	NEW_AUX_ENT(AT_FLAGS,	0);
 	NEW_AUX_ENT(AT_ENTRY,	exec_params->entry_addr);
-	NEW_AUX_ENT(AT_UID,	(elf_addr_t) cred->uid);
-	NEW_AUX_ENT(AT_EUID,	(elf_addr_t) cred->euid);
-	NEW_AUX_ENT(AT_GID,	(elf_addr_t) cred->gid);
-	NEW_AUX_ENT(AT_EGID,	(elf_addr_t) cred->egid);
+	NEW_AUX_ENT(AT_UID,	(elf_addr_t) from_kuid_munged(cred->user_ns, cred->uid));
+	NEW_AUX_ENT(AT_EUID,	(elf_addr_t) from_kuid_munged(cred->user_ns, cred->euid));
+	NEW_AUX_ENT(AT_GID,	(elf_addr_t) from_kgid_munged(cred->user_ns, cred->gid));
+	NEW_AUX_ENT(AT_EGID,	(elf_addr_t) from_kgid_munged(cred->user_ns, cred->egid));
 	NEW_AUX_ENT(AT_SECURE,	security_bprm_secureexec(bprm));
 	NEW_AUX_ENT(AT_EXECFN,	bprm->exec);
 
@@ -1205,7 +1204,7 @@ static int maydump(struct vm_area_struct *vma, unsigned long mm_flags)
 	int dump_ok;
 
 	/* Do not dump I/O mapped devices or special mappings */
-	if (vma->vm_flags & (VM_IO | VM_RESERVED)) {
+	if (vma->vm_flags & VM_IO) {
 		kdcore("%08lx: %08lx: no (IO)", vma->vm_start, vma->vm_flags);
 		return 0;
 	}
@@ -1421,8 +1420,8 @@ static int fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_flag = p->flags;
 	rcu_read_lock();
 	cred = __task_cred(p);
-	SET_UID(psinfo->pr_uid, cred->uid);
-	SET_GID(psinfo->pr_gid, cred->gid);
+	SET_UID(psinfo->pr_uid, from_kuid_munged(cred->user_ns, cred->uid));
+	SET_GID(psinfo->pr_gid, from_kgid_munged(cred->user_ns, cred->gid));
 	rcu_read_unlock();
 	strncpy(psinfo->pr_fname, p->comm, sizeof(psinfo->pr_fname));
 
@@ -1642,7 +1641,7 @@ static int elf_fdpic_core_dump(struct coredump_params *cprm)
 		goto cleanup;
 #endif
 
-	if (cprm->signr) {
+	if (cprm->siginfo->si_signo) {
 		struct core_thread *ct;
 		struct elf_thread_status *tmp;
 
@@ -1661,13 +1660,13 @@ static int elf_fdpic_core_dump(struct coredump_params *cprm)
 			int sz;
 
 			tmp = list_entry(t, struct elf_thread_status, list);
-			sz = elf_dump_thread_status(cprm->signr, tmp);
+			sz = elf_dump_thread_status(cprm->siginfo->si_signo, tmp);
 			thread_status_size += sz;
 		}
 	}
 
 	/* now collect the dump for the current */
-	fill_prstatus(prstatus, current, cprm->signr);
+	fill_prstatus(prstatus, current, cprm->siginfo->si_signo);
 	elf_core_copy_regs(&prstatus->pr_reg, cprm->regs);
 
 	segs = current->mm->map_count;

@@ -46,40 +46,61 @@ struct vmbus_channel_message_table_entry {
  *
  * @icmsghdrp is of type &struct icmsg_hdr.
  * @negop is of type &struct icmsg_negotiate.
- * Set up and fill in default negotiate response message. This response can
- * come from both the vmbus driver and the hv_utils driver. The current api
- * will respond properly to both Windows 2008 and Windows 2008-R2 operating
- * systems.
+ * Set up and fill in default negotiate response message.
+ *
+ * The max_fw_version specifies the maximum framework version that
+ * we can support and max _srv_version specifies the maximum service
+ * version we can support. A special value MAX_SRV_VER can be
+ * specified to indicate that we can handle the maximum version
+ * exposed by the host.
  *
  * Mainly used by Hyper-V drivers.
  */
 void vmbus_prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
-			       struct icmsg_negotiate *negop, u8 *buf)
+				struct icmsg_negotiate *negop, u8 *buf,
+				int max_fw_version, int max_srv_version)
 {
-	if (icmsghdrp->icmsgtype == ICMSGTYPE_NEGOTIATE) {
-		icmsghdrp->icmsgsize = 0x10;
+	int icframe_vercnt;
+	int icmsg_vercnt;
+	int i;
 
-		negop = (struct icmsg_negotiate *)&buf[
-			sizeof(struct vmbuspipe_hdr) +
-			sizeof(struct icmsg_hdr)];
+	icmsghdrp->icmsgsize = 0x10;
 
-		if (negop->icframe_vercnt == 2 &&
-		   negop->icversion_data[1].major == 3) {
-			negop->icversion_data[0].major = 3;
-			negop->icversion_data[0].minor = 0;
-			negop->icversion_data[1].major = 3;
-			negop->icversion_data[1].minor = 0;
-		} else {
-			negop->icversion_data[0].major = 1;
-			negop->icversion_data[0].minor = 0;
-			negop->icversion_data[1].major = 1;
-			negop->icversion_data[1].minor = 0;
-		}
+	negop = (struct icmsg_negotiate *)&buf[
+		sizeof(struct vmbuspipe_hdr) +
+		sizeof(struct icmsg_hdr)];
 
-		negop->icframe_vercnt = 1;
-		negop->icmsg_vercnt = 1;
+	icframe_vercnt = negop->icframe_vercnt;
+	icmsg_vercnt = negop->icmsg_vercnt;
+
+	/*
+	 * Select the framework version number we will
+	 * support.
+	 */
+
+	for (i = 0; i < negop->icframe_vercnt; i++) {
+		if (negop->icversion_data[i].major <= max_fw_version)
+			icframe_vercnt = negop->icversion_data[i].major;
 	}
+
+	for (i = negop->icframe_vercnt;
+		 (i < negop->icframe_vercnt + negop->icmsg_vercnt); i++) {
+		if (negop->icversion_data[i].major <= max_srv_version)
+			icmsg_vercnt = negop->icversion_data[i].major;
+	}
+
+	/*
+	 * Respond with the maximum framework and service
+	 * version numbers we can support.
+	 */
+	negop->icframe_vercnt = 1;
+	negop->icmsg_vercnt = 1;
+	negop->icversion_data[0].major = icframe_vercnt;
+	negop->icversion_data[0].minor = 0;
+	negop->icversion_data[1].major = icmsg_vercnt;
+	negop->icversion_data[1].minor = 0;
 }
+
 EXPORT_SYMBOL_GPL(vmbus_prep_negotiate_resp);
 
 /*
@@ -244,13 +265,8 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 {
 	struct vmbus_channel_offer_channel *offer;
 	struct vmbus_channel *newchannel;
-	uuid_le *guidtype;
-	uuid_le *guidinstance;
 
 	offer = (struct vmbus_channel_offer_channel *)hdr;
-
-	guidtype = &offer->offer.if_type;
-	guidinstance = &offer->offer.if_instance;
 
 	/* Allocate the channel object and save this offer. */
 	newchannel = alloc_channel();
@@ -449,7 +465,6 @@ static void vmbus_onversion_response(
 {
 	struct vmbus_channel_msginfo *msginfo;
 	struct vmbus_channel_message_header *requestheader;
-	struct vmbus_channel_initiate_contact *initiate;
 	struct vmbus_channel_version_response *version_response;
 	unsigned long flags;
 
@@ -463,8 +478,6 @@ static void vmbus_onversion_response(
 
 		if (requestheader->msgtype ==
 		    CHANNELMSG_INITIATE_CONTACT) {
-			initiate =
-			(struct vmbus_channel_initiate_contact *)requestheader;
 			memcpy(&msginfo->response.version_response,
 			      version_response,
 			      sizeof(struct vmbus_channel_version_response));

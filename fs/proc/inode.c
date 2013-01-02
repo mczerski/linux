@@ -31,9 +31,10 @@ static void proc_evict_inode(struct inode *inode)
 	struct proc_dir_entry *de;
 	struct ctl_table_header *head;
 	const struct proc_ns_operations *ns_ops;
+	void *ns;
 
 	truncate_inode_pages(&inode->i_data, 0);
-	end_writeback(inode);
+	clear_inode(inode);
 
 	/* Stop tracking associated processes */
 	put_pid(PROC_I(inode)->pid);
@@ -49,8 +50,9 @@ static void proc_evict_inode(struct inode *inode)
 	}
 	/* Release any associated namespace */
 	ns_ops = PROC_I(inode)->ns_ops;
-	if (ns_ops && ns_ops->put)
-		ns_ops->put(PROC_I(inode)->ns);
+	ns = PROC_I(inode)->ns;
+	if (ns_ops && ns)
+		ns_ops->put(ns);
 }
 
 static struct kmem_cache * proc_inode_cachep;
@@ -108,8 +110,8 @@ static int proc_show_options(struct seq_file *seq, struct dentry *root)
 	struct super_block *sb = root->d_sb;
 	struct pid_namespace *pid = sb->s_fs_info;
 
-	if (pid->pid_gid)
-		seq_printf(seq, ",gid=%lu", (unsigned long)pid->pid_gid);
+	if (!gid_eq(pid->pid_gid, GLOBAL_ROOT_GID))
+		seq_printf(seq, ",gid=%u", from_kgid_munged(&init_user_ns, pid->pid_gid));
 	if (pid->hide_pid != 0)
 		seq_printf(seq, ",hidepid=%u", pid->hide_pid);
 
@@ -450,7 +452,6 @@ struct inode *proc_get_inode(struct super_block *sb, struct proc_dir_entry *de)
 		return NULL;
 	if (inode->i_state & I_NEW) {
 		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-		PROC_I(inode)->fd = 0;
 		PROC_I(inode)->pde = de;
 
 		if (de->mode) {

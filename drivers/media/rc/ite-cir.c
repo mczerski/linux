@@ -1473,6 +1473,7 @@ static int ite_probe(struct pnp_dev *pdev, const struct pnp_device_id
 	rdev = rc_allocate_device();
 	if (!rdev)
 		goto failure;
+	itdev->rdev = rdev;
 
 	ret = -ENODEV;
 
@@ -1562,7 +1563,7 @@ static int ite_probe(struct pnp_dev *pdev, const struct pnp_device_id
 	/* set up ir-core props */
 	rdev->priv = itdev;
 	rdev->driver_type = RC_DRIVER_IR_RAW;
-	rdev->allowed_protos = RC_TYPE_ALL;
+	rdev->allowed_protos = RC_BIT_ALL;
 	rdev->open = ite_open;
 	rdev->close = ite_close;
 	rdev->s_idle = ite_s_idle;
@@ -1598,24 +1599,21 @@ static int ite_probe(struct pnp_dev *pdev, const struct pnp_device_id
 
 	if (request_irq(itdev->cir_irq, ite_cir_isr, IRQF_SHARED,
 			ITE_DRIVER_NAME, (void *)itdev))
-		goto failure;
+		goto failure2;
 
 	ret = rc_register_device(rdev);
 	if (ret)
-		goto failure;
+		goto failure3;
 
-	itdev->rdev = rdev;
 	ite_pr(KERN_NOTICE, "driver has been successfully loaded\n");
 
 	return 0;
 
+failure3:
+	free_irq(itdev->cir_irq, itdev);
+failure2:
+	release_region(itdev->cir_addr, itdev->params.io_region_size);
 failure:
-	if (itdev->cir_irq)
-		free_irq(itdev->cir_irq, itdev);
-
-	if (itdev->cir_addr)
-		release_region(itdev->cir_addr, itdev->params.io_region_size);
-
 	rc_free_device(rdev);
 	kfree(itdev);
 
@@ -1710,12 +1708,12 @@ static struct pnp_driver ite_driver = {
 	.shutdown	= ite_shutdown,
 };
 
-int ite_init(void)
+static int ite_init(void)
 {
 	return pnp_register_driver(&ite_driver);
 }
 
-void ite_exit(void)
+static void ite_exit(void)
 {
 	pnp_unregister_driver(&ite_driver);
 }

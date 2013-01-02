@@ -76,7 +76,6 @@ static void abort_queued(struct go7007 *go)
 
 static int go7007_streamoff(struct go7007 *go)
 {
-	int retval = -EINVAL;
 	unsigned long flags;
 
 	mutex_lock(&go->hw_lock);
@@ -87,7 +86,6 @@ static int go7007_streamoff(struct go7007 *go)
 		abort_queued(go);
 		spin_unlock_irqrestore(&go->spinlock, flags);
 		go7007_reset_encoder(go);
-		retval = 0;
 	}
 	mutex_unlock(&go->hw_lock);
 	return 0;
@@ -814,7 +812,7 @@ static int vidioc_qbuf(struct file *file, void *priv, struct v4l2_buffer *buf)
 		return retval;
 
 	mutex_lock(&gofh->lock);
-	if (buf->index < 0 || buf->index >= gofh->buf_count)
+	if (buf->index >= gofh->buf_count)
 		goto unlock_and_return;
 
 	gobuf = &gofh->bufs[buf->index];
@@ -1374,7 +1372,7 @@ static int vidioc_g_crop(struct file *file, void *priv, struct v4l2_crop *crop)
 
 /* FIXME: vidioc_s_crop is not really implemented!!!
  */
-static int vidioc_s_crop(struct file *file, void *priv, struct v4l2_crop *crop)
+static int vidioc_s_crop(struct file *file, void *priv, const struct v4l2_crop *crop)
 {
 	if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		return -EINVAL;
@@ -1394,7 +1392,7 @@ static int vidioc_g_jpegcomp(struct file *file, void *priv,
 }
 
 static int vidioc_s_jpegcomp(struct file *file, void *priv,
-			 struct v4l2_jpegcompression *params)
+			 const struct v4l2_jpegcompression *params)
 {
 	if (params->quality != 50 ||
 			params->jpeg_markers != (V4L2_JPEG_MARKER_DHT |

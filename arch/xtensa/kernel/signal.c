@@ -19,7 +19,7 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/personality.h>
-#include <linux/freezer.h>
+#include <linux/tracehook.h>
 
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
@@ -28,10 +28,6 @@
 #include <asm/unistd.h>
 
 #define DEBUG_SIG  0
-
-#define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
-asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
 
 extern struct task_struct *coproc_owners[];
 
@@ -216,7 +212,7 @@ restore_sigcontext(struct pt_regs *regs, struct rt_sigframe __user *frame)
 	if (err)
 		return err;
 
- 	/* The signal handler may have used coprocessors in which
+	/* The signal handler may have used coprocessors in which
 	 * case they are still enabled.  We disable them to force a
 	 * reloading of the original task's CP state by the lazy
 	 * context-switching mechanisms of CP exception handling.
@@ -248,6 +244,9 @@ asmlinkage long xtensa_rt_sigreturn(long a0, long a1, long a2, long a3,
 	sigset_t set;
 	int ret;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	if (regs->depc > 64)
 		panic("rt_sigreturn in double exception!\n");
 
@@ -259,7 +258,6 @@ asmlinkage long xtensa_rt_sigreturn(long a0, long a1, long a2, long a3,
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
 
-	sigdelsetmask(&set, ~_BLOCKABLE);
 	set_current_blocked(&set);
 
 	if (restore_sigcontext(regs, frame))
@@ -398,7 +396,7 @@ static int setup_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	 */
 
 	/* Set up registers for signal handler */
-	start_thread(regs, (unsigned long) ka->sa.sa_handler, 
+	start_thread(regs, (unsigned long) ka->sa.sa_handler,
 		     (unsigned long) frame);
 
 	/* Set up a stack frame for a call4
@@ -426,40 +424,9 @@ give_sigsegv:
 	return -EFAULT;
 }
 
-/*
- * Atomically swap in the new signal mask, and wait for a signal.
- */
-
-asmlinkage long xtensa_rt_sigsuspend(sigset_t __user *unewset, 
-    				     size_t sigsetsize,
-    				     long a2, long a3, long a4, long a5, 
-				     struct pt_regs *regs)
-{
-	sigset_t saveset, newset;
-
-	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset_t))
-		return -EINVAL;
-
-	if (copy_from_user(&newset, unewset, sizeof(newset)))
-		return -EFAULT;
-
-	sigdelsetmask(&newset, ~_BLOCKABLE);
-	saveset = current->blocked;
-	set_current_blocked(&newset);
-
-	regs->areg[2] = -EINTR;
-	while (1) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule();
-		if (do_signal(regs, &saveset))
-			return -EINTR;
-	}
-}
-
-asmlinkage long xtensa_sigaltstack(const stack_t __user *uss, 
+asmlinkage long xtensa_sigaltstack(const stack_t __user *uss,
 				   stack_t __user *uoss,
-    				   long a2, long a3, long a4, long a5,
+				   long a2, long a3, long a4, long a5,
 				   struct pt_regs *regs)
 {
 	return do_sigaltstack(uss, uoss, regs->areg[1]);
@@ -476,20 +443,11 @@ asmlinkage long xtensa_sigaltstack(const stack_t __user *uss,
  * the kernel can handle, and then we build all the user-level signal handling
  * stack-frames in one go after that.
  */
-int do_signal(struct pt_regs *regs, sigset_t *oldset)
+static void do_signal(struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
 	struct k_sigaction ka;
-
-	if (!user_mode(regs))
-		return 0;
-
-	if (try_to_freeze())
-		goto no_signal;
-
-	if (!oldset)
-		oldset = &current->blocked;
 
 	task_pt_regs(current)->icountlevel = 0;
 
@@ -530,18 +488,17 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 		/* Whee!  Actually deliver the signal.  */
 		/* Set up the stack frame */
-		ret = setup_frame(signr, &ka, &info, oldset, regs);
+		ret = setup_frame(signr, &ka, &info, sigmask_to_save(), regs);
 		if (ret)
-			return ret;
+			return;
 
-		block_sigmask(&ka, signr);
+		signal_delivered(signr, &info, &ka, regs, 0);
 		if (current->ptrace & PT_SINGLESTEP)
 			task_pt_regs(current)->icountlevel = 1;
 
-		return 1;
+		return;
 	}
 
-no_signal:
 	/* Did we come from a system call? */
 	if ((signed) regs->syscall >= 0) {
 		/* Restart the system call - no handlers present */
@@ -558,8 +515,20 @@ no_signal:
 			break;
 		}
 	}
+
+	/* If there's no signal to deliver, we just restore the saved mask.  */
+	restore_saved_sigmask();
+
 	if (current->ptrace & PT_SINGLESTEP)
 		task_pt_regs(current)->icountlevel = 1;
-	return 0;
+	return;
 }
 
+void do_notify_resume(struct pt_regs *regs)
+{
+	if (test_thread_flag(TIF_SIGPENDING))
+		do_signal(regs);
+
+	if (test_and_clear_thread_flag(TIF_NOTIFY_RESUME))
+		tracehook_notify_resume(regs);
+}

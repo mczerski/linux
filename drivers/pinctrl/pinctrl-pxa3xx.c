@@ -25,20 +25,18 @@ static struct pinctrl_gpio_range pxa3xx_pinctrl_gpio_range = {
 	.pin_base	= 0,
 };
 
-static int pxa3xx_list_groups(struct pinctrl_dev *pctrldev, unsigned selector)
+static int pxa3xx_get_groups_count(struct pinctrl_dev *pctrldev)
 {
 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
-	if (selector >= info->num_grps)
-		return -EINVAL;
-	return 0;
+
+	return info->num_grps;
 }
 
 static const char *pxa3xx_get_group_name(struct pinctrl_dev *pctrldev,
 					 unsigned selector)
 {
 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
-	if (selector >= info->num_grps)
-		return NULL;
+
 	return info->grps[selector].name;
 }
 
@@ -48,25 +46,23 @@ static int pxa3xx_get_group_pins(struct pinctrl_dev *pctrldev,
 				 unsigned *num_pins)
 {
 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
-	if (selector >= info->num_grps)
-		return -EINVAL;
+
 	*pins = info->grps[selector].pins;
 	*num_pins = info->grps[selector].npins;
 	return 0;
 }
 
 static struct pinctrl_ops pxa3xx_pctrl_ops = {
-	.list_groups	= pxa3xx_list_groups,
+	.get_groups_count = pxa3xx_get_groups_count,
 	.get_group_name	= pxa3xx_get_group_name,
 	.get_group_pins	= pxa3xx_get_group_pins,
 };
 
-static int pxa3xx_pmx_list_func(struct pinctrl_dev *pctrldev, unsigned func)
+static int pxa3xx_pmx_get_funcs_count(struct pinctrl_dev *pctrldev)
 {
 	struct pxa3xx_pinmux_info *info = pinctrl_dev_get_drvdata(pctrldev);
-	if (func >= info->num_funcs)
-		return -EINVAL;
-	return 0;
+
+	return info->num_funcs;
 }
 
 static const char *pxa3xx_pmx_get_func_name(struct pinctrl_dev *pctrldev,
@@ -142,11 +138,6 @@ static int pxa3xx_pmx_enable(struct pinctrl_dev *pctrldev, unsigned func,
 	return 0;
 }
 
-static void pxa3xx_pmx_disable(struct pinctrl_dev *pctrldev, unsigned func,
-			       unsigned group)
-{
-}
-
 static int pxa3xx_pmx_request_gpio(struct pinctrl_dev *pctrldev,
 				   struct pinctrl_gpio_range *range,
 				   unsigned pin)
@@ -170,11 +161,10 @@ static int pxa3xx_pmx_request_gpio(struct pinctrl_dev *pctrldev,
 }
 
 static struct pinmux_ops pxa3xx_pmx_ops = {
-	.list_functions		= pxa3xx_pmx_list_func,
+	.get_functions_count	= pxa3xx_pmx_get_funcs_count,
 	.get_function_name	= pxa3xx_pmx_get_func_name,
 	.get_function_groups	= pxa3xx_pmx_get_groups,
 	.enable			= pxa3xx_pmx_enable,
-	.disable		= pxa3xx_pmx_disable,
 	.gpio_request_enable	= pxa3xx_pmx_request_gpio,
 };
 
@@ -183,7 +173,6 @@ int pxa3xx_pinctrl_register(struct platform_device *pdev,
 {
 	struct pinctrl_desc *desc;
 	struct resource *res;
-	int ret = 0;
 
 	if (!info || !info->cputype)
 		return -EINVAL;
@@ -198,23 +187,17 @@ int pxa3xx_pinctrl_register(struct platform_device *pdev,
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
 		return -ENOENT;
-	info->phy_base = res->start;
-	info->phy_size = resource_size(res);
-	info->virt_base = ioremap(info->phy_base, info->phy_size);
+	info->virt_base = devm_request_and_ioremap(&pdev->dev, res);
 	if (!info->virt_base)
 		return -ENOMEM;
 	info->pctrl = pinctrl_register(desc, &pdev->dev, info);
 	if (!info->pctrl) {
 		dev_err(&pdev->dev, "failed to register PXA pinmux driver\n");
-		ret = -EINVAL;
-		goto err;
+		return -EINVAL;
 	}
 	pinctrl_add_gpio_range(info->pctrl, &pxa3xx_pinctrl_gpio_range);
 	platform_set_drvdata(pdev, info);
 	return 0;
-err:
-	iounmap(info->virt_base);
-	return ret;
 }
 
 int pxa3xx_pinctrl_unregister(struct platform_device *pdev)
@@ -222,7 +205,6 @@ int pxa3xx_pinctrl_unregister(struct platform_device *pdev)
 	struct pxa3xx_pinmux_info *info = platform_get_drvdata(pdev);
 
 	pinctrl_unregister(info->pctrl);
-	iounmap(info->virt_base);
 	platform_set_drvdata(pdev, NULL);
 	return 0;
 }

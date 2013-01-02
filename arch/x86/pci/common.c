@@ -11,11 +11,13 @@
 #include <linux/dmi.h>
 #include <linux/slab.h>
 
+#include <asm-generic/pci-bridge.h>
 #include <asm/acpi.h>
 #include <asm/segment.h>
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/pci_x86.h>
+#include <asm/setup.h>
 
 unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2 |
 				PCI_PROBE_MMCONF;
@@ -229,6 +231,14 @@ static int __devinit assign_all_busses(const struct dmi_system_id *d)
 }
 #endif
 
+static int __devinit set_scan_all(const struct dmi_system_id *d)
+{
+	printk(KERN_INFO "PCI: %s detected, enabling pci=pcie_scan_all\n",
+	       d->ident);
+	pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
+	return 0;
+}
+
 static const struct dmi_system_id __devinitconst pciprobe_dmi_table[] = {
 #ifdef __i386__
 /*
@@ -420,6 +430,13 @@ static const struct dmi_system_id __devinitconst pciprobe_dmi_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "ProLiant DL585 G2"),
 		},
 	},
+	{
+		.callback = set_scan_all,
+		.ident = "Stratus/NEC ftServer",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ftServer"),
+		},
+	},
 	{}
 };
 
@@ -430,9 +447,7 @@ void __init dmi_check_pciprobe(void)
 
 struct pci_bus * __devinit pcibios_scan_root(int busnum)
 {
-	LIST_HEAD(resources);
 	struct pci_bus *bus = NULL;
-	struct pci_sysdata *sd;
 
 	while ((bus = pci_find_next_bus(bus)) != NULL) {
 		if (bus->number == busnum) {
@@ -441,28 +456,10 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 		}
 	}
 
-	/* Allocate per-root-bus (not per bus) arch-specific data.
-	 * TODO: leak; this memory is never freed.
-	 * It's arguable whether it's worth the trouble to care.
-	 */
-	sd = kzalloc(sizeof(*sd), GFP_KERNEL);
-	if (!sd) {
-		printk(KERN_ERR "PCI: OOM, not probing PCI bus %02x\n", busnum);
-		return NULL;
-	}
-
-	sd->node = get_mp_bus_to_node(busnum);
-
-	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busnum);
-	x86_pci_root_bus_resources(busnum, &resources);
-	bus = pci_scan_root_bus(NULL, busnum, &pci_root_ops, sd, &resources);
-	if (!bus) {
-		pci_free_resource_list(&resources);
-		kfree(sd);
-	}
-
-	return bus;
+	return pci_scan_bus_on_node(busnum, &pci_root_ops,
+					get_mp_bus_to_node(busnum));
 }
+
 void __init pcibios_set_cache_line_size(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -498,7 +495,7 @@ int __init pcibios_init(void)
 	return 0;
 }
 
-char * __devinit  pcibios_setup(char *str)
+char * __init pcibios_setup(char *str)
 {
 	if (!strcmp(str, "off")) {
 		pci_probe = 0;
@@ -612,6 +609,35 @@ unsigned int pcibios_assign_all_busses(void)
 	return (pci_probe & PCI_ASSIGN_ALL_BUSSES) ? 1 : 0;
 }
 
+int pcibios_add_device(struct pci_dev *dev)
+{
+	struct setup_data *data;
+	struct pci_setup_rom *rom;
+	u64 pa_data;
+
+	pa_data = boot_params.hdr.setup_data;
+	while (pa_data) {
+		data = phys_to_virt(pa_data);
+
+		if (data->type == SETUP_PCI) {
+			rom = (struct pci_setup_rom *)data;
+
+			if ((pci_domain_nr(dev->bus) == rom->segment) &&
+			    (dev->bus->number == rom->bus) &&
+			    (PCI_SLOT(dev->devfn) == rom->device) &&
+			    (PCI_FUNC(dev->devfn) == rom->function) &&
+			    (dev->vendor == rom->vendor) &&
+			    (dev->device == rom->devid)) {
+				dev->rom = pa_data +
+				      offsetof(struct pci_setup_rom, romdata);
+				dev->romlen = rom->pcilen;
+			}
+		}
+		pa_data = data->next;
+	}
+	return 0;
+}
+
 int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	int err;
@@ -630,7 +656,7 @@ void pcibios_disable_device (struct pci_dev *dev)
 		pcibios_disable_irq(dev);
 }
 
-int pci_ext_cfg_avail(struct pci_dev *dev)
+int pci_ext_cfg_avail(void)
 {
 	if (raw_pci_ext_ops)
 		return 1;
@@ -656,6 +682,7 @@ struct pci_bus * __devinit pci_scan_bus_on_node(int busno, struct pci_ops *ops, 
 	}
 	sd->node = node;
 	x86_pci_root_bus_resources(busno, &resources);
+	printk(KERN_DEBUG "PCI: Probing PCI hardware (bus %02x)\n", busno);
 	bus = pci_scan_root_bus(NULL, busno, ops, sd, &resources);
 	if (!bus) {
 		pci_free_resource_list(&resources);

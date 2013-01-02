@@ -80,14 +80,12 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 	int maj = imajor(inode);
 	int ret;
 
-	if (f->f_flags & O_WRONLY)
+	if ((f->f_flags & O_ACCMODE) == O_WRONLY)
 		dirn = SND_COMPRESS_PLAYBACK;
-	else if (f->f_flags & O_RDONLY)
+	else if ((f->f_flags & O_ACCMODE) == O_RDONLY)
 		dirn = SND_COMPRESS_CAPTURE;
-	else {
-		pr_err("invalid direction\n");
+	else
 		return -EINVAL;
-	}
 
 	if (maj == snd_major)
 		compr = snd_lookup_minor_data(iminor(inode),
@@ -102,12 +100,15 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 
 	if (dirn != compr->direction) {
 		pr_err("this device doesn't support this direction\n");
+		snd_card_unref(compr->card);
 		return -EINVAL;
 	}
 
 	data = kzalloc(sizeof(*data), GFP_KERNEL);
-	if (!data)
+	if (!data) {
+		snd_card_unref(compr->card);
 		return -ENOMEM;
+	}
 	data->stream.ops = compr->ops;
 	data->stream.direction = dirn;
 	data->stream.private_data = compr->private_data;
@@ -115,6 +116,7 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 	runtime = kzalloc(sizeof(*runtime), GFP_KERNEL);
 	if (!runtime) {
 		kfree(data);
+		snd_card_unref(compr->card);
 		return -ENOMEM;
 	}
 	runtime->state = SNDRV_PCM_STATE_OPEN;
@@ -128,7 +130,8 @@ static int snd_compr_open(struct inode *inode, struct file *f)
 		kfree(runtime);
 		kfree(data);
 	}
-	return ret;
+	snd_card_unref(compr->card);
+	return 0;
 }
 
 static int snd_compr_free(struct inode *inode, struct file *f)
@@ -427,6 +430,26 @@ static int snd_compr_allocate_buffer(struct snd_compr_stream *stream,
 	return 0;
 }
 
+static int snd_compress_check_input(struct snd_compr_params *params)
+{
+	/* first let's check the buffer parameter's */
+	if (params->buffer.fragment_size == 0 ||
+			params->buffer.fragments > SIZE_MAX / params->buffer.fragment_size)
+		return -EINVAL;
+
+	/* now codec parameters */
+	if (params->codec.id == 0 || params->codec.id > SND_AUDIOCODEC_MAX)
+		return -EINVAL;
+
+	if (params->codec.ch_in == 0 || params->codec.ch_out == 0)
+		return -EINVAL;
+
+	if (!(params->codec.sample_rate & SNDRV_PCM_RATE_8000_192000))
+		return -EINVAL;
+
+	return 0;
+}
+
 static int
 snd_compr_set_params(struct snd_compr_stream *stream, unsigned long arg)
 {
@@ -445,11 +468,17 @@ snd_compr_set_params(struct snd_compr_stream *stream, unsigned long arg)
 			retval = -EFAULT;
 			goto out;
 		}
+
+		retval = snd_compress_check_input(params);
+		if (retval)
+			goto out;
+
 		retval = snd_compr_allocate_buffer(stream, params);
 		if (retval) {
 			retval = -ENOMEM;
 			goto out;
 		}
+
 		retval = stream->ops->set_params(stream, params);
 		if (retval)
 			goto out;
@@ -502,10 +531,8 @@ static int snd_compr_pause(struct snd_compr_stream *stream)
 	if (stream->runtime->state != SNDRV_PCM_STATE_RUNNING)
 		return -EPERM;
 	retval = stream->ops->trigger(stream, SNDRV_PCM_TRIGGER_PAUSE_PUSH);
-	if (!retval) {
+	if (!retval)
 		stream->runtime->state = SNDRV_PCM_STATE_PAUSED;
-		wake_up(&stream->runtime->sleep);
-	}
 	return retval;
 }
 
@@ -544,6 +571,10 @@ static int snd_compr_stop(struct snd_compr_stream *stream)
 	if (!retval) {
 		stream->runtime->state = SNDRV_PCM_STATE_SETUP;
 		wake_up(&stream->runtime->sleep);
+		stream->runtime->hw_pointer = 0;
+		stream->runtime->app_pointer = 0;
+		stream->runtime->total_bytes_available = 0;
+		stream->runtime->total_bytes_transferred = 0;
 	}
 	return retval;
 }

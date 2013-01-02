@@ -23,12 +23,10 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
 
-#include <mach/common.h>
-#include <mach/hardware.h>
-#include <mach/iomux-mx1.h>
-#include <mach/irqs.h>
-
+#include "common.h"
 #include "devices-imx1.h"
+#include "hardware.h"
+#include "iomux-mx1.h"
 
 static const int mx1ads_pins[] __initconst = {
 	/* UART1 */
@@ -134,7 +132,7 @@ static void __init mx1ads_timer_init(void)
 	mx1_clocks_init(32000);
 }
 
-struct sys_timer mx1ads_timer = {
+static struct sys_timer mx1ads_timer = {
 	.init	= mx1ads_timer_init,
 };
 

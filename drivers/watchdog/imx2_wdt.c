@@ -33,7 +33,6 @@
 #include <linux/uaccess.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
-#include <mach/hardware.h>
 
 #define DRIVER_NAME "imx2-wdt"
 
@@ -121,7 +120,7 @@ static void imx2_wdt_start(void)
 {
 	if (!test_and_set_bit(IMX2_WDT_STATUS_STARTED, &imx2_wdt.status)) {
 		/* at our first start we enable clock and do initialisations */
-		clk_enable(imx2_wdt.clk);
+		clk_prepare_enable(imx2_wdt.clk);
 
 		imx2_wdt_setup();
 	} else	/* delete the timer that pings the watchdog after close */

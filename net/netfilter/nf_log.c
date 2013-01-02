@@ -32,7 +32,7 @@ static struct nf_logger *__find_logger(int pf, const char *str_logger)
 	return NULL;
 }
 
-/* return EEXIST if the same logger is registred, 0 on success. */
+/* return EEXIST if the same logger is registered, 0 on success. */
 int nf_log_register(u_int8_t pf, struct nf_logger *logger)
 {
 	const struct nf_logger *llog;
@@ -214,13 +214,6 @@ static const struct file_operations nflog_file_ops = {
 #endif /* PROC_FS */
 
 #ifdef CONFIG_SYSCTL
-static struct ctl_path nf_log_sysctl_path[] = {
-	{ .procname = "net", },
-	{ .procname = "netfilter", },
-	{ .procname = "nf_log", },
-	{ }
-};
-
 static char nf_log_sysctl_fnames[NFPROTO_NUMPROTO-NFPROTO_UNSPEC][3];
 static struct ctl_table nf_log_sysctl_table[NFPROTO_NUMPROTO+1];
 static struct ctl_table_header *nf_log_dir_header;
@@ -283,7 +276,7 @@ static __init int netfilter_log_sysctl_init(void)
 		nf_log_sysctl_table[i].extra1 = (void *)(unsigned long) i;
 	}
 
-	nf_log_dir_header = register_sysctl_paths(nf_log_sysctl_path,
+	nf_log_dir_header = register_net_sysctl(&init_net, "net/netfilter/nf_log",
 				       nf_log_sysctl_table);
 	if (!nf_log_dir_header)
 		return -ENOMEM;

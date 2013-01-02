@@ -59,7 +59,7 @@ static void __devinit pcibios_scanbus(struct pci_channel *hose)
 	need_domain_info = need_domain_info || hose->index;
 	hose->need_domain_info = need_domain_info;
 	if (bus) {
-		next_busno = bus->subordinate + 1;
+		next_busno = bus->busn_res.end + 1;
 		/* Don't allow 8-bit bus number overflow inside the hose -
 		   reserve some space for bridges. */
 		if (next_busno > 224) {
@@ -192,16 +192,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 	return pci_enable_resources(dev, mask);
 }
 
-void __init pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
-}
-
-char * __devinit __weak pcibios_setup(char *str)
-{
-	return str;
-}
-
 static void __init
 pcibios_bus_report_status_early(struct pci_channel *hose,
 				int top_bus, int current_bus,
@@ -329,7 +319,5 @@ EXPORT_SYMBOL(pci_iounmap);
 
 #endif /* CONFIG_GENERIC_IOMAP */
 
-#ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(PCIBIOS_MIN_IO);
 EXPORT_SYMBOL(PCIBIOS_MIN_MEM);
-#endif

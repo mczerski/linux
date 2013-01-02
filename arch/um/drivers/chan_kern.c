@@ -7,7 +7,8 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include "chan.h"
-#include "os.h"
+#include <os.h>
+#include <irq_kern.h>
 
 #ifdef CONFIG_NOCONFIG_CHAN
 static void *not_configged_init(char *str, int device,
@@ -82,21 +83,8 @@ static const struct chan_ops not_configged_ops = {
 
 static void tty_receive_char(struct tty_struct *tty, char ch)
 {
-	if (tty == NULL)
-		return;
-
-	if (I_IXON(tty) && !I_IXOFF(tty) && !tty->raw) {
-		if (ch == STOP_CHAR(tty)) {
-			stop_tty(tty);
-			return;
-		}
-		else if (ch == START_CHAR(tty)) {
-			start_tty(tty);
-			return;
-		}
-	}
-
-	tty_insert_flip_char(tty, ch, TTY_NORMAL);
+	if (tty)
+		tty_insert_flip_char(tty, ch, TTY_NORMAL);
 }
 
 static int open_one_chan(struct chan *chan)
@@ -149,9 +137,11 @@ void chan_enable_winch(struct chan *chan, struct tty_struct *tty)
 static void line_timer_cb(struct work_struct *work)
 {
 	struct line *line = container_of(work, struct line, task.work);
+	struct tty_struct *tty = tty_port_tty_get(&line->port);
 
 	if (!line->throttled)
-		chan_interrupt(line, line->tty, line->driver->read_irq);
+		chan_interrupt(line, tty, line->driver->read_irq);
+	tty_kref_put(tty);
 }
 
 int enable_chan(struct line *line)
@@ -213,9 +203,9 @@ void free_irqs(void)
 		chan = list_entry(ele, struct chan, free_list);
 
 		if (chan->input && chan->enabled)
-			free_irq(chan->line->driver->read_irq, chan);
+			um_free_irq(chan->line->driver->read_irq, chan);
 		if (chan->output && chan->enabled)
-			free_irq(chan->line->driver->write_irq, chan);
+			um_free_irq(chan->line->driver->write_irq, chan);
 		chan->enabled = 0;
 	}
 }
@@ -234,9 +224,9 @@ static void close_one_chan(struct chan *chan, int delay_free_irq)
 	}
 	else {
 		if (chan->input && chan->enabled)
-			free_irq(chan->line->driver->read_irq, chan);
+			um_free_irq(chan->line->driver->read_irq, chan);
 		if (chan->output && chan->enabled)
-			free_irq(chan->line->driver->write_irq, chan);
+			um_free_irq(chan->line->driver->write_irq, chan);
 		chan->enabled = 0;
 	}
 	if (chan->ops->close != NULL)

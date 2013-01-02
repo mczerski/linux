@@ -162,12 +162,12 @@ static void vhci_recv_ret_unlink(struct vhci_device *vdev,
 		 * already received the result of its submit result and gave
 		 * back the URB.
 		 */
-		pr_info("the urb (seqnum %d) was already given backed\n",
+		pr_info("the urb (seqnum %d) was already given back\n",
 			pdu->base.seqnum);
 	} else {
 		usbip_dbg_vhci_rx("now giveback urb %p\n", urb);
 
-		/* If unlink is succeed, status is -ECONNRESET */
+		/* If unlink is successful, status is -ECONNRESET */
 		urb->status = pdu->u.ret_unlink.status;
 		pr_info("urb->status %d\n", urb->status);
 

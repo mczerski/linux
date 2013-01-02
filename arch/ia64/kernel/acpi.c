@@ -497,7 +497,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
 	srat_num_cpus++;
 }
 
-void __init
+int __init
 acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 {
 	unsigned long paddr, size;
@@ -512,7 +512,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 
 	/* Ignore disabled entries */
 	if (!(ma->flags & ACPI_SRAT_MEM_ENABLED))
-		return;
+		return -1;
 
 	/* record this node in proximity bitmap */
 	pxm_bit_set(pxm);
@@ -531,6 +531,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	p->size = size;
 	p->nid = pxm;
 	num_node_memblks++;
+	return 0;
 }
 
 void __init acpi_numa_arch_fixup(void)
@@ -632,6 +633,7 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int triggering, int polarity)
 				      ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE :
 				     IOSAPIC_LEVEL);
 }
+EXPORT_SYMBOL_GPL(acpi_register_gsi);
 
 void acpi_unregister_gsi(u32 gsi)
 {
@@ -643,6 +645,7 @@ void acpi_unregister_gsi(u32 gsi)
 
 	iosapic_unregister_intr(gsi);
 }
+EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
 
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {

@@ -50,7 +50,6 @@
 #include "drv_types.h"
 #include "recv_osdep.h"
 #include "mlme_osdep.h"
-#include "rtl871x_byteorder.h"
 
 /*
 Caller and the r8712_cmd_thread can protect cmd_q by spin_lock.
@@ -815,7 +814,7 @@ u8 r8712_setassocsta_cmd(struct _adapter *padapter, u8 *mac_addr)
 	struct cmd_priv			*pcmdpriv = &padapter->cmdpriv;
 	struct cmd_obj			*ph2c;
 	struct set_assocsta_parm	*psetassocsta_para;
-	struct set_stakey_rsp		*psetassocsta_rsp = NULL;
+	struct set_assocsta_rsp		*psetassocsta_rsp = NULL;
 
 	ph2c = (struct cmd_obj *)_malloc(sizeof(struct cmd_obj));
 	if (ph2c == NULL)
@@ -826,7 +825,7 @@ u8 r8712_setassocsta_cmd(struct _adapter *padapter, u8 *mac_addr)
 		kfree((u8 *) ph2c);
 		return _FAIL;
 	}
-	psetassocsta_rsp = (struct set_stakey_rsp *)_malloc(
+	psetassocsta_rsp = (struct set_assocsta_rsp *)_malloc(
 			    sizeof(struct set_assocsta_rsp));
 	if (psetassocsta_rsp == NULL) {
 		kfree((u8 *)ph2c);

@@ -19,7 +19,6 @@
 #include "xfs_fs.h"
 #include "xfs_bit.h"
 #include "xfs_log.h"
-#include "xfs_inum.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
@@ -249,7 +248,59 @@ xfs_qm_init_dquot_blk(
 	xfs_trans_log_buf(tp, bp, 0, BBTOB(q->qi_dqchunklen) - 1);
 }
 
+static void
+xfs_dquot_buf_verify(
+	struct xfs_buf		*bp)
+{
+	struct xfs_mount	*mp = bp->b_target->bt_mount;
+	struct xfs_dqblk	*d = (struct xfs_dqblk *)bp->b_addr;
+	struct xfs_disk_dquot	*ddq;
+	xfs_dqid_t		id = 0;
+	int			i;
 
+	/*
+	 * On the first read of the buffer, verify that each dquot is valid.
+	 * We don't know what the id of the dquot is supposed to be, just that
+	 * they should be increasing monotonically within the buffer. If the
+	 * first id is corrupt, then it will fail on the second dquot in the
+	 * buffer so corruptions could point to the wrong dquot in this case.
+	 */
+	for (i = 0; i < mp->m_quotainfo->qi_dqperchunk; i++) {
+		int	error;
+
+		ddq = &d[i].dd_diskdq;
+
+		if (i == 0)
+			id = be32_to_cpu(ddq->d_id);
+
+		error = xfs_qm_dqcheck(mp, ddq, id + i, 0, XFS_QMOPT_DOWARN,
+					"xfs_dquot_read_verify");
+		if (error) {
+			XFS_CORRUPTION_ERROR(__func__, XFS_ERRLEVEL_LOW, mp, d);
+			xfs_buf_ioerror(bp, EFSCORRUPTED);
+			break;
+		}
+	}
+}
+
+static void
+xfs_dquot_buf_read_verify(
+	struct xfs_buf	*bp)
+{
+	xfs_dquot_buf_verify(bp);
+}
+
+void
+xfs_dquot_buf_write_verify(
+	struct xfs_buf	*bp)
+{
+	xfs_dquot_buf_verify(bp);
+}
+
+const struct xfs_buf_ops xfs_dquot_buf_ops = {
+	.verify_read = xfs_dquot_buf_read_verify,
+	.verify_write = xfs_dquot_buf_write_verify,
+};
 
 /*
  * Allocate a block and fill it with dquots.
@@ -316,6 +367,7 @@ xfs_qm_dqalloc(
 	error = xfs_buf_geterror(bp);
 	if (error)
 		goto error1;
+	bp->b_ops = &xfs_dquot_buf_ops;
 
 	/*
 	 * Make a chunk of dquots out of this buffer and log
@@ -360,6 +412,51 @@ xfs_qm_dqalloc(
 
 	return (error);
 }
+STATIC int
+xfs_qm_dqrepair(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	struct xfs_dquot	*dqp,
+	xfs_dqid_t		firstid,
+	struct xfs_buf		**bpp)
+{
+	int			error;
+	struct xfs_disk_dquot	*ddq;
+	struct xfs_dqblk	*d;
+	int			i;
+
+	/*
+	 * Read the buffer without verification so we get the corrupted
+	 * buffer returned to us. make sure we verify it on write, though.
+	 */
+	error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp, dqp->q_blkno,
+				   mp->m_quotainfo->qi_dqchunklen,
+				   0, bpp, NULL);
+
+	if (error) {
+		ASSERT(*bpp == NULL);
+		return XFS_ERROR(error);
+	}
+	(*bpp)->b_ops = &xfs_dquot_buf_ops;
+
+	ASSERT(xfs_buf_islocked(*bpp));
+	d = (struct xfs_dqblk *)(*bpp)->b_addr;
+
+	/* Do the actual repair of dquots in this buffer */
+	for (i = 0; i < mp->m_quotainfo->qi_dqperchunk; i++) {
+		ddq = &d[i].dd_diskdq;
+		error = xfs_qm_dqcheck(mp, ddq, firstid + i,
+				       dqp->dq_flags & XFS_DQ_ALLTYPES,
+				       XFS_QMOPT_DQREPAIR, "xfs_qm_dqrepair");
+		if (error) {
+			/* repair failed, we're screwed */
+			xfs_trans_brelse(tp, *bpp);
+			return XFS_ERROR(EIO);
+		}
+	}
+
+	return 0;
+}
 
 /*
  * Maps a dquot to the buffer containing its on-disk version.
@@ -379,7 +476,6 @@ xfs_qm_dqtobp(
 	xfs_buf_t	*bp;
 	xfs_inode_t	*quotip = XFS_DQ_TO_QIP(dqp);
 	xfs_mount_t	*mp = dqp->q_mount;
-	xfs_disk_dquot_t *ddq;
 	xfs_dqid_t	id = be32_to_cpu(dqp->q_core.d_id);
 	xfs_trans_t	*tp = (tpp ? *tpp : NULL);
 
@@ -440,33 +536,24 @@ xfs_qm_dqtobp(
 		error = xfs_trans_read_buf(mp, tp, mp->m_ddev_targp,
 					   dqp->q_blkno,
 					   mp->m_quotainfo->qi_dqchunklen,
-					   0, &bp);
-		if (error || !bp)
+					   0, &bp, &xfs_dquot_buf_ops);
+
+		if (error == EFSCORRUPTED && (flags & XFS_QMOPT_DQREPAIR)) {
+			xfs_dqid_t firstid = (xfs_dqid_t)map.br_startoff *
+						mp->m_quotainfo->qi_dqperchunk;
+			ASSERT(bp == NULL);
+			error = xfs_qm_dqrepair(mp, tp, dqp, firstid, &bp);
+		}
+
+		if (error) {
+			ASSERT(bp == NULL);
 			return XFS_ERROR(error);
-	}
-
-	ASSERT(xfs_buf_islocked(bp));
-
-	/*
-	 * calculate the location of the dquot inside the buffer.
-	 */
-	ddq = bp->b_addr + dqp->q_bufoffset;
-
-	/*
-	 * A simple sanity check in case we got a corrupted dquot...
-	 */
-	error = xfs_qm_dqcheck(mp, ddq, id, dqp->dq_flags & XFS_DQ_ALLTYPES,
-			   flags & (XFS_QMOPT_DQREPAIR|XFS_QMOPT_DOWARN),
-			   "dqtobp");
-	if (error) {
-		if (!(flags & XFS_QMOPT_DQREPAIR)) {
-			xfs_trans_brelse(tp, bp);
-			return XFS_ERROR(EIO);
 		}
 	}
 
+	ASSERT(xfs_buf_islocked(bp));
 	*O_bpp = bp;
-	*O_ddpp = ddq;
+	*O_ddpp = bp->b_addr + dqp->q_bufoffset;
 
 	return (0);
 }
@@ -857,7 +944,7 @@ xfs_qm_dqflush_done(
 		/* xfs_trans_ail_delete() drops the AIL lock. */
 		spin_lock(&ailp->xa_lock);
 		if (lip->li_lsn == qip->qli_flush_lsn)
-			xfs_trans_ail_delete(ailp, lip);
+			xfs_trans_ail_delete(ailp, lip, SHUTDOWN_CORRUPT_INCORE);
 		else
 			spin_unlock(&ailp->xa_lock);
 	}
@@ -878,8 +965,8 @@ xfs_qm_dqflush_done(
  */
 int
 xfs_qm_dqflush(
-	xfs_dquot_t		*dqp,
-	uint			flags)
+	struct xfs_dquot	*dqp,
+	struct xfs_buf		**bpp)
 {
 	struct xfs_mount	*mp = dqp->q_mount;
 	struct xfs_buf		*bp;
@@ -891,37 +978,39 @@ xfs_qm_dqflush(
 
 	trace_xfs_dqflush(dqp);
 
-	/*
-	 * If not dirty, or it's pinned and we are not supposed to block, nada.
-	 */
-	if (!XFS_DQ_IS_DIRTY(dqp) ||
-	    ((flags & SYNC_TRYLOCK) && atomic_read(&dqp->q_pincount) > 0)) {
-		xfs_dqfunlock(dqp);
-		return 0;
-	}
+	*bpp = NULL;
+
 	xfs_qm_dqunpin_wait(dqp);
 
 	/*
 	 * This may have been unpinned because the filesystem is shutting
 	 * down forcibly. If that's the case we must not write this dquot
-	 * to disk, because the log record didn't make it to disk!
+	 * to disk, because the log record didn't make it to disk.
+	 *
+	 * We also have to remove the log item from the AIL in this case,
+	 * as we wait for an emptry AIL as part of the unmount process.
 	 */
 	if (XFS_FORCED_SHUTDOWN(mp)) {
+		struct xfs_log_item	*lip = &dqp->q_logitem.qli_item;
 		dqp->dq_flags &= ~XFS_DQ_DIRTY;
-		xfs_dqfunlock(dqp);
-		return XFS_ERROR(EIO);
+
+		spin_lock(&mp->m_ail->xa_lock);
+		if (lip->li_flags & XFS_LI_IN_AIL)
+			xfs_trans_ail_delete(mp->m_ail, lip,
+					     SHUTDOWN_CORRUPT_INCORE);
+		else
+			spin_unlock(&mp->m_ail->xa_lock);
+		error = XFS_ERROR(EIO);
+		goto out_unlock;
 	}
 
 	/*
 	 * Get the buffer containing the on-disk dquot
 	 */
 	error = xfs_trans_read_buf(mp, NULL, mp->m_ddev_targp, dqp->q_blkno,
-				   mp->m_quotainfo->qi_dqchunklen, 0, &bp);
-	if (error) {
-		ASSERT(error != ENOENT);
-		xfs_dqfunlock(dqp);
-		return error;
-	}
+				   mp->m_quotainfo->qi_dqchunklen, 0, &bp, NULL);
+	if (error)
+		goto out_unlock;
 
 	/*
 	 * Calculate the location of the dquot inside the buffer.
@@ -967,20 +1056,13 @@ xfs_qm_dqflush(
 		xfs_log_force(mp, 0);
 	}
 
-	if (flags & SYNC_WAIT)
-		error = xfs_bwrite(bp);
-	else
-		xfs_buf_delwri_queue(bp);
-
-	xfs_buf_relse(bp);
-
 	trace_xfs_dqflush_done(dqp);
+	*bpp = bp;
+	return 0;
 
-	/*
-	 * dqp is still locked, but caller is free to unlock it now.
-	 */
-	return error;
-
+out_unlock:
+	xfs_dqfunlock(dqp);
+	return XFS_ERROR(EIO);
 }
 
 /*
@@ -1009,39 +1091,6 @@ xfs_dqlock2(
 	} else if (d2) {
 		mutex_lock(&d2->q_qlock);
 	}
-}
-
-/*
- * Give the buffer a little push if it is incore and
- * wait on the flush lock.
- */
-void
-xfs_dqflock_pushbuf_wait(
-	xfs_dquot_t	*dqp)
-{
-	xfs_mount_t	*mp = dqp->q_mount;
-	xfs_buf_t	*bp;
-
-	/*
-	 * Check to see if the dquot has been flushed delayed
-	 * write.  If so, grab its buffer and send it
-	 * out immediately.  We'll be able to acquire
-	 * the flush lock when the I/O completes.
-	 */
-	bp = xfs_incore(mp->m_ddev_targp, dqp->q_blkno,
-			mp->m_quotainfo->qi_dqchunklen, XBF_TRYLOCK);
-	if (!bp)
-		goto out_lock;
-
-	if (XFS_BUF_ISDELAYWRITE(bp)) {
-		if (xfs_buf_ispinned(bp))
-			xfs_log_force(mp, 0);
-		xfs_buf_delwri_promote(bp);
-		wake_up_process(bp->b_target->bt_task);
-	}
-	xfs_buf_relse(bp);
-out_lock:
-	xfs_dqflock(dqp);
 }
 
 int __init

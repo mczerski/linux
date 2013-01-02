@@ -38,11 +38,7 @@ void arch_local_irq_restore(unsigned long flags)
 EXPORT_SYMBOL(arch_local_irq_restore);
 
 
-/*
- * OR1K PIC implementation
- *
- * The OR1K PIC is built into the CPU and has 32 IRQs, numbered 0 to 31.
- */
+/* OR1K PIC implementation */
 
 /* We're a couple of cycles faster than the generic implementations with
  * these 'fast' versions.
@@ -62,7 +58,7 @@ static void or1k_pic_ack(struct irq_data *data)
 {
 	/* EDGE-triggered interrupts need to be ack'ed in order to clear
 	 * the latch.
-	 * LEVER-triggered interrupts do not need to be ack'ed; however,
+	 * LEVEL-triggered interrupts do not need to be ack'ed; however,
 	 * ack'ing the interrupt has no ill-effect and is quicker than
 	 * trying to figure out what type it is...
 	 */
@@ -81,7 +77,7 @@ static void or1k_pic_ack(struct irq_data *data)
 
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->hwirq));
 #else
-	WARN(1, "Interrupt handling possibily broken\n");
+	WARN(1, "Interrupt handling possibly broken\n");
 	mtspr(SPR_PICSR, (1UL << data->hwirq));
 #endif
 }
@@ -91,9 +87,11 @@ static void or1k_pic_mask_ack(struct irq_data *data)
 	/* Comments for pic_ack apply here, too */
 
 #ifdef CONFIG_OR1K_1200
+	mtspr(SPR_PICMR, mfspr(SPR_PICMR) & ~(1UL << data->hwirq));
 	mtspr(SPR_PICSR, mfspr(SPR_PICSR) & ~(1UL << data->hwirq));
 #else
-	WARN(1, "Interrupt handling possibily broken\n");
+	WARN(1, "Interrupt handling possibly broken\n");
+	mtspr(SPR_PICMR, (1UL << data->hwirq));
 	mtspr(SPR_PICSR, (1UL << data->hwirq));
 #endif
 }
@@ -120,58 +118,25 @@ static struct irq_chip or1k_dev = {
 
 static struct irq_domain *root_domain;
 
-/*
- * The OR1K PIC has 32 interrupts, numbered 0 to 31.
- *
- * The irqdomain infrastructure will remap these hardware interrupts
- * to "virtual" Linux interrupt numbers.  The virtual IRQ numbering is
- * what drivers deal with; these are numbered from 1 onwards.
- *
- * There seems to be constant confusion about this, but hardware IRQ 0
- * is valid, while "virtual" IRQ 0 is not a valid interrupt number in
- * Linux.  HW IRQ numbers are only valid in the context of their domain.
- */
-static inline void dispatch_irq_handlers(void)
+static inline int pic_get_irq(int first)
 {
-	unsigned long picsr;
-	irq_hw_number_t hwirq;
-	unsigned int virq;
-	int offset;
+	int hwirq;
 
-	while ((picsr = mfspr(SPR_PICSR))) {
-		hwirq = (irq_hw_number_t)-1;
-		while ((offset = ffs(picsr))) {
-			hwirq += offset;
-			virq = irq_radix_revmap_lookup(root_domain, hwirq);
-			/*
-			 * There's a pending rewrite of irq_find_mapping
-			 * by which it will replace the call to radix_lookup
-			 * above...
-			 */
-//			virq = irq_find_mapping(root_domain, hwirq);
-			generic_handle_irq(virq);
-			picsr >>= offset;
-		}
-	}
+	hwirq = ffs(mfspr(SPR_PICSR) >> first);
+	if (!hwirq)
+		return NO_IRQ;
+	else
+		hwirq = hwirq + first -1;
+
+	return irq_find_mapping(root_domain, hwirq);
 }
 
 
-/**
- * or1k_map:
- * @d: irqdomain context
- * @virq: Linux virtual IRQ number
- * @hw:   HW IRQ number (0-31 for OR1K PIC)
- *
- * Callback that the irqdomain framework invokes when it creates a new
- * mapping of a HW IRQ into the Linux virtual irq number-space.  This
- * function should set up the Linux irq with any properties required to
- * handle the HW IRQ in question.
- */
-static int or1k_map(struct irq_domain *d, unsigned int virq, irq_hw_number_t hw)
+static int or1k_map(struct irq_domain *d, unsigned int irq, irq_hw_number_t hw)
 {
-	irq_set_chip_and_handler_name(virq, &or1k_dev,
+	irq_set_chip_and_handler_name(irq, &or1k_dev,
 				      handle_level_irq, "level");
-	irq_set_status_flags(virq, IRQ_LEVEL | IRQ_NOPROBE);
+	irq_set_status_flags(irq, IRQ_LEVEL | IRQ_NOPROBE);
 
 	return 0;
 }
@@ -180,16 +145,6 @@ static const struct irq_domain_ops or1k_irq_domain_ops = {
 	.xlate = irq_domain_xlate_onecell,
 	.map = or1k_map,
 };
-
-/*
- * This sets up nr_irqs and returns the number of "legacy" (preallocated) IRQS. 
- */
-int __init arch_probe_nr_irqs(void)
-{
-        nr_irqs = 32;
-
-        return 0;
-}
 
 /*
  * This sets up the IRQ domain for the PIC built in to the OpenRISC
@@ -207,30 +162,25 @@ static void __init or1k_irq_init(void)
 	/* Disable all interrupts until explicitly requested */
 	mtspr(SPR_PICMR, (0UL));
 
-	root_domain = irq_domain_add_tree(intc, &or1k_irq_domain_ops, NULL);
+	root_domain = irq_domain_add_linear(intc, 32,
+					    &or1k_irq_domain_ops, NULL);
 }
 
-/*
- * This is the interface from the low-level Linux startup code to the
- * architecture-specific IRQ initialization code.  Every architecture
- * needs to have this.
- */
 void __init init_IRQ(void)
 {
 	or1k_irq_init();
 }
 
-/*
- * This is the entry point in C code for handling interrupts... invoked
- * from the exception handling entry point in entry.S (assembly voodoo).
- */
 void __irq_entry do_IRQ(struct pt_regs *regs)
 {
+	int irq = -1;
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	irq_enter();
-	dispatch_irq_handlers();
-	irq_exit();
 
+	while ((irq = pic_get_irq(irq + 1)) != NO_IRQ)
+		generic_handle_irq(irq);
+
+	irq_exit();
 	set_irq_regs(old_regs);
 }

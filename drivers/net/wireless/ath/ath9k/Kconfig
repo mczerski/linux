@@ -17,6 +17,7 @@ config ATH9K_BTCOEX_SUPPORT
 config ATH9K
 	tristate "Atheros 802.11n wireless cards support"
 	depends on MAC80211
+	select ATH_COMMON
 	select ATH9K_HW
 	select MAC80211_LEDS
 	select LEDS_CLASS
@@ -64,7 +65,7 @@ config ATH9K_DEBUGFS
 
 config ATH9K_DFS_CERTIFIED
 	bool "Atheros DFS support for certified platforms"
-	depends on ATH9K && EXPERT
+	depends on ATH9K && CFG80211_CERTIFICATION_ONUS
 	default n
 	---help---
 	  This option enables DFS support for initiating radiation on

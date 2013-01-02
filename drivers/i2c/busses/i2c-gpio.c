@@ -184,18 +184,17 @@ static int __devinit i2c_gpio_probe(struct platform_device *pdev)
 	bit_data->data = pdata;
 
 	adap->owner = THIS_MODULE;
-	snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
+	if (pdev->dev.of_node)
+		strlcpy(adap->name, dev_name(&pdev->dev), sizeof(adap->name));
+	else
+		snprintf(adap->name, sizeof(adap->name), "i2c-gpio%d", pdev->id);
+
 	adap->algo_data = bit_data;
 	adap->class = I2C_CLASS_HWMON | I2C_CLASS_SPD;
 	adap->dev.parent = &pdev->dev;
 	adap->dev.of_node = pdev->dev.of_node;
 
-	/*
-	 * If "dev->id" is negative we consider it as zero.
-	 * The reason to do so is to avoid sysfs names that only make
-	 * sense when there are multiple adapters.
-	 */
-	adap->nr = (pdev->id != -1) ? pdev->id : 0;
+	adap->nr = pdev->id;
 	ret = i2c_bit_add_numbered_bus(adap);
 	if (ret)
 		goto err_add_bus;

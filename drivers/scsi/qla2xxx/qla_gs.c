@@ -1,10 +1,11 @@
 /*
  * QLogic Fibre Channel HBA Driver
- * Copyright (c)  2003-2011 QLogic Corporation
+ * Copyright (c)  2003-2012 QLogic Corporation
  *
  * See LICENSE.qla2xxx for copyright and licensing details.
  */
 #include "qla_def.h"
+#include "qla_target.h"
 
 static int qla2x00_sns_ga_nxt(scsi_qla_host_t *, fc_port_t *);
 static int qla2x00_sns_gid_pt(scsi_qla_host_t *, sw_info_t *);
@@ -216,6 +217,9 @@ qla2x00_ga_nxt(scsi_qla_host_t *vha, fc_port_t *fcport)
 		    WWN_SIZE);
 		memcpy(fcport->port_name, ct_rsp->rsp.ga_nxt.port_name,
 		    WWN_SIZE);
+
+		fcport->fc4_type = (ct_rsp->rsp.ga_nxt.fc4_types[2] & BIT_0) ?
+		    FC4_TYPE_FCP_SCSI : FC4_TYPE_OTHER;
 
 		if (ct_rsp->rsp.ga_nxt.port_type != NS_N_PORT_TYPE &&
 		    ct_rsp->rsp.ga_nxt.port_type != NS_NL_PORT_TYPE)
@@ -556,7 +560,8 @@ qla2x00_rff_id(scsi_qla_host_t *vha)
 	ct_req->req.rff_id.port_id[1] = vha->d_id.b.area;
 	ct_req->req.rff_id.port_id[2] = vha->d_id.b.al_pa;
 
-	ct_req->req.rff_id.fc4_feature = BIT_1;
+	qlt_rff_id(vha, ct_req);
+
 	ct_req->req.rff_id.fc4_type = 0x08;		/* SCSI - FCP */
 
 	/* Execute MS IOCB */
@@ -1129,7 +1134,7 @@ qla2x00_mgmt_svr_login(scsi_qla_host_t *vha)
 		return ret;
 
 	rval = ha->isp_ops->fabric_login(vha, vha->mgmt_svr_loop_id, 0xff, 0xff,
-	    0xfa, mb, BIT_1|BIT_0);
+	    0xfa, mb, BIT_1);
 	if (rval != QLA_SUCCESS || mb[0] != MBS_COMMAND_COMPLETE) {
 		if (rval == QLA_MEMORY_ALLOC_FAILED)
 			ql_dbg(ql_dbg_disc, vha, 0x2085,
@@ -1927,6 +1932,9 @@ qla2x00_gpsc(scsi_qla_host_t *vha, sw_info_t *list)
 				break;
 			case BIT_11:
 				list[i].fp_speed = PORT_SPEED_8GB;
+				break;
+			case BIT_10:
+				list[i].fp_speed = PORT_SPEED_16GB;
 				break;
 			}
 

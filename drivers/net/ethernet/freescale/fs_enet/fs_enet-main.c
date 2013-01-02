@@ -963,6 +963,7 @@ static const struct ethtool_ops fs_ethtool_ops = {
 	.get_msglevel = fs_get_msglevel,
 	.set_msglevel = fs_set_msglevel,
 	.get_regs = fs_get_regs,
+	.get_ts_info = ethtool_op_get_ts_info,
 };
 
 static int fs_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
@@ -1003,7 +1004,7 @@ static const struct net_device_ops fs_enet_netdev_ops = {
 };
 
 static struct of_device_id fs_enet_match[];
-static int __devinit fs_enet_probe(struct platform_device *ofdev)
+static int fs_enet_probe(struct platform_device *ofdev)
 {
 	const struct of_device_id *match;
 	struct net_device *ndev;

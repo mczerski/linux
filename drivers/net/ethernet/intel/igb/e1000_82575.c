@@ -36,6 +36,7 @@
 
 #include "e1000_mac.h"
 #include "e1000_82575.h"
+#include "e1000_i210.h"
 
 static s32  igb_get_invariants_82575(struct e1000_hw *);
 static s32  igb_acquire_phy_82575(struct e1000_hw *);
@@ -52,6 +53,8 @@ static s32  igb_write_phy_reg_82580(struct e1000_hw *, u32, u16);
 static s32  igb_reset_hw_82575(struct e1000_hw *);
 static s32  igb_reset_hw_82580(struct e1000_hw *);
 static s32  igb_set_d0_lplu_state_82575(struct e1000_hw *, bool);
+static s32  igb_set_d0_lplu_state_82580(struct e1000_hw *, bool);
+static s32  igb_set_d3_lplu_state_82580(struct e1000_hw *, bool);
 static s32  igb_setup_copper_link_82575(struct e1000_hw *);
 static s32  igb_setup_serdes_link_82575(struct e1000_hw *);
 static s32  igb_write_phy_reg_sgmii_82575(struct e1000_hw *, u32, u16);
@@ -96,6 +99,8 @@ static bool igb_sgmii_uses_mdio_82575(struct e1000_hw *hw)
 		break;
 	case e1000_82580:
 	case e1000_i350:
+	case e1000_i210:
+	case e1000_i211:
 		reg = rd32(E1000_MDICNFG);
 		ext_mdio = !!(reg & E1000_MDICNFG_EXT_MDIO);
 		break;
@@ -150,6 +155,17 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 	case E1000_DEV_ID_I350_SGMII:
 		mac->type = e1000_i350;
 		break;
+	case E1000_DEV_ID_I210_COPPER:
+	case E1000_DEV_ID_I210_COPPER_OEM1:
+	case E1000_DEV_ID_I210_COPPER_IT:
+	case E1000_DEV_ID_I210_FIBER:
+	case E1000_DEV_ID_I210_SERDES:
+	case E1000_DEV_ID_I210_SGMII:
+		mac->type = e1000_i210;
+		break;
+	case E1000_DEV_ID_I211_COPPER:
+		mac->type = e1000_i211;
+		break;
 	default:
 		return -E1000_ERR_MAC_INIT;
 		break;
@@ -182,26 +198,42 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 	/* Set mta register count */
 	mac->mta_reg_count = 128;
 	/* Set rar entry count */
-	mac->rar_entry_count = E1000_RAR_ENTRIES_82575;
-	if (mac->type == e1000_82576)
+	switch (mac->type) {
+	case e1000_82576:
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82576;
-	if (mac->type == e1000_82580)
+		break;
+	case e1000_82580:
 		mac->rar_entry_count = E1000_RAR_ENTRIES_82580;
-	if (mac->type == e1000_i350)
+		break;
+	case e1000_i350:
 		mac->rar_entry_count = E1000_RAR_ENTRIES_I350;
+		break;
+	default:
+		mac->rar_entry_count = E1000_RAR_ENTRIES_82575;
+		break;
+	}
 	/* reset */
 	if (mac->type >= e1000_82580)
 		mac->ops.reset_hw = igb_reset_hw_82580;
 	else
 		mac->ops.reset_hw = igb_reset_hw_82575;
+
+	if (mac->type >= e1000_i210) {
+		mac->ops.acquire_swfw_sync = igb_acquire_swfw_sync_i210;
+		mac->ops.release_swfw_sync = igb_release_swfw_sync_i210;
+	} else {
+		mac->ops.acquire_swfw_sync = igb_acquire_swfw_sync_82575;
+		mac->ops.release_swfw_sync = igb_release_swfw_sync_82575;
+	}
+
 	/* Set if part includes ASF firmware */
 	mac->asf_firmware_present = true;
 	/* Set if manageability features are enabled. */
 	mac->arc_subsystem_valid =
 		(rd32(E1000_FWSM) & E1000_FWSM_MODE_MASK)
 			? true : false;
-	/* enable EEE on i350 parts */
-	if (mac->type == e1000_i350)
+	/* enable EEE on i350 parts and later parts */
+	if (mac->type >= e1000_i350)
 		dev_spec->eee_disable = false;
 	else
 		dev_spec->eee_disable = true;
@@ -213,26 +245,6 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 
 	/* NVM initialization */
 	eecd = rd32(E1000_EECD);
-
-	nvm->opcode_bits        = 8;
-	nvm->delay_usec         = 1;
-	switch (nvm->override) {
-	case e1000_nvm_override_spi_large:
-		nvm->page_size    = 32;
-		nvm->address_bits = 16;
-		break;
-	case e1000_nvm_override_spi_small:
-		nvm->page_size    = 8;
-		nvm->address_bits = 8;
-		break;
-	default:
-		nvm->page_size    = eecd & E1000_EECD_ADDR_BITS ? 32 : 8;
-		nvm->address_bits = eecd & E1000_EECD_ADDR_BITS ? 16 : 8;
-		break;
-	}
-
-	nvm->type = e1000_nvm_eeprom_spi;
-
 	size = (u16)((eecd & E1000_EECD_SIZE_EX_MASK) >>
 		     E1000_EECD_SIZE_EX_SHIFT);
 
@@ -249,32 +261,88 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 		pr_notice("The NVM size is not valid, defaulting to 32K\n");
 		size = 15;
 	}
+
 	nvm->word_size = 1 << size;
-	if (nvm->word_size == (1 << 15))
-		nvm->page_size = 128;
+	if (hw->mac.type < e1000_i210) {
+		nvm->opcode_bits        = 8;
+		nvm->delay_usec         = 1;
+		switch (nvm->override) {
+		case e1000_nvm_override_spi_large:
+			nvm->page_size    = 32;
+			nvm->address_bits = 16;
+			break;
+		case e1000_nvm_override_spi_small:
+			nvm->page_size    = 8;
+			nvm->address_bits = 8;
+			break;
+		default:
+			nvm->page_size    = eecd
+				& E1000_EECD_ADDR_BITS ? 32 : 8;
+			nvm->address_bits = eecd
+				& E1000_EECD_ADDR_BITS ? 16 : 8;
+			break;
+		}
+		if (nvm->word_size == (1 << 15))
+			nvm->page_size = 128;
+
+		nvm->type = e1000_nvm_eeprom_spi;
+	} else
+		nvm->type = e1000_nvm_flash_hw;
 
 	/* NVM Function Pointers */
-	nvm->ops.acquire = igb_acquire_nvm_82575;
-	if (nvm->word_size < (1 << 15))
-		nvm->ops.read = igb_read_nvm_eerd;
-	else
-		nvm->ops.read = igb_read_nvm_spi;
-
-	nvm->ops.release = igb_release_nvm_82575;
 	switch (hw->mac.type) {
 	case e1000_82580:
 		nvm->ops.validate = igb_validate_nvm_checksum_82580;
 		nvm->ops.update = igb_update_nvm_checksum_82580;
+		nvm->ops.acquire = igb_acquire_nvm_82575;
+		nvm->ops.release = igb_release_nvm_82575;
+		if (nvm->word_size < (1 << 15))
+			nvm->ops.read = igb_read_nvm_eerd;
+		else
+			nvm->ops.read = igb_read_nvm_spi;
+		nvm->ops.write = igb_write_nvm_spi;
 		break;
 	case e1000_i350:
 		nvm->ops.validate = igb_validate_nvm_checksum_i350;
 		nvm->ops.update = igb_update_nvm_checksum_i350;
+		nvm->ops.acquire = igb_acquire_nvm_82575;
+		nvm->ops.release = igb_release_nvm_82575;
+		if (nvm->word_size < (1 << 15))
+			nvm->ops.read = igb_read_nvm_eerd;
+		else
+			nvm->ops.read = igb_read_nvm_spi;
+		nvm->ops.write = igb_write_nvm_spi;
+		break;
+	case e1000_i210:
+		nvm->ops.validate = igb_validate_nvm_checksum_i210;
+		nvm->ops.update   = igb_update_nvm_checksum_i210;
+		nvm->ops.acquire = igb_acquire_nvm_i210;
+		nvm->ops.release = igb_release_nvm_i210;
+		nvm->ops.read    = igb_read_nvm_srrd_i210;
+		nvm->ops.write   = igb_write_nvm_srwr_i210;
+		nvm->ops.valid_led_default = igb_valid_led_default_i210;
+		break;
+	case e1000_i211:
+		nvm->ops.acquire  = igb_acquire_nvm_i210;
+		nvm->ops.release  = igb_release_nvm_i210;
+		nvm->ops.read     = igb_read_nvm_i211;
+		nvm->ops.valid_led_default = igb_valid_led_default_i210;
+		nvm->ops.validate = NULL;
+		nvm->ops.update   = NULL;
+		nvm->ops.write    = NULL;
 		break;
 	default:
 		nvm->ops.validate = igb_validate_nvm_checksum;
 		nvm->ops.update = igb_update_nvm_checksum;
+		nvm->ops.acquire = igb_acquire_nvm_82575;
+		nvm->ops.release = igb_release_nvm_82575;
+		if (nvm->word_size < (1 << 15))
+			nvm->ops.read = igb_read_nvm_eerd;
+		else
+			nvm->ops.read = igb_read_nvm_spi;
+		nvm->ops.write = igb_write_nvm_spi;
+		break;
 	}
-	nvm->ops.write = igb_write_nvm_spi;
 
 	/* if part supports SR-IOV then initialize mailbox parameters */
 	switch (mac->type) {
@@ -312,9 +380,13 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 	if (igb_sgmii_active_82575(hw) && !igb_sgmii_uses_mdio_82575(hw)) {
 		phy->ops.read_reg   = igb_read_phy_reg_sgmii_82575;
 		phy->ops.write_reg  = igb_write_phy_reg_sgmii_82575;
-	} else if (hw->mac.type >= e1000_82580) {
+	} else if ((hw->mac.type == e1000_82580)
+		|| (hw->mac.type == e1000_i350)) {
 		phy->ops.read_reg   = igb_read_phy_reg_82580;
 		phy->ops.write_reg  = igb_write_phy_reg_82580;
+	} else if (hw->phy.type >= e1000_phy_i210) {
+		phy->ops.read_reg   = igb_read_phy_reg_gs40g;
+		phy->ops.write_reg  = igb_write_phy_reg_gs40g;
 	} else {
 		phy->ops.read_reg   = igb_read_phy_reg_igp;
 		phy->ops.write_reg  = igb_write_phy_reg_igp;
@@ -343,6 +415,14 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 		else
 			phy->ops.get_cable_length = igb_get_cable_length_m88;
 
+		if (phy->id == I210_I_PHY_ID) {
+			phy->ops.get_cable_length =
+					 igb_get_cable_length_m88_gen2;
+			phy->ops.set_d0_lplu_state =
+					igb_set_d0_lplu_state_82580;
+			phy->ops.set_d3_lplu_state =
+					igb_set_d3_lplu_state_82580;
+		}
 		phy->ops.force_speed_duplex = igb_phy_force_speed_duplex_m88;
 		break;
 	case IGP03E1000_E_PHY_ID:
@@ -359,6 +439,17 @@ static s32 igb_get_invariants_82575(struct e1000_hw *hw)
 		phy->ops.force_speed_duplex = igb_phy_force_speed_duplex_82580;
 		phy->ops.get_cable_length   = igb_get_cable_length_82580;
 		phy->ops.get_phy_info       = igb_get_phy_info_82580;
+		phy->ops.set_d0_lplu_state  = igb_set_d0_lplu_state_82580;
+		phy->ops.set_d3_lplu_state  = igb_set_d3_lplu_state_82580;
+		break;
+	case I210_I_PHY_ID:
+		phy->type                   = e1000_phy_i210;
+		phy->ops.get_phy_info       = igb_get_phy_info_m88;
+		phy->ops.check_polarity     = igb_check_polarity_m88;
+		phy->ops.get_cable_length   = igb_get_cable_length_m88_gen2;
+		phy->ops.set_d0_lplu_state  = igb_set_d0_lplu_state_82580;
+		phy->ops.set_d3_lplu_state  = igb_set_d3_lplu_state_82580;
+		phy->ops.force_speed_duplex = igb_phy_force_speed_duplex_m88;
 		break;
 	default:
 		return -E1000_ERR_PHY;
@@ -385,7 +476,7 @@ static s32 igb_acquire_phy_82575(struct e1000_hw *hw)
 	else if (hw->bus.func == E1000_FUNC_3)
 		mask = E1000_SWFW_PHY3_SM;
 
-	return igb_acquire_swfw_sync_82575(hw, mask);
+	return hw->mac.ops.acquire_swfw_sync(hw, mask);
 }
 
 /**
@@ -406,7 +497,7 @@ static void igb_release_phy_82575(struct e1000_hw *hw)
 	else if (hw->bus.func == E1000_FUNC_3)
 		mask = E1000_SWFW_PHY3_SM;
 
-	igb_release_swfw_sync_82575(hw, mask);
+	hw->mac.ops.release_swfw_sync(hw, mask);
 }
 
 /**
@@ -510,6 +601,8 @@ static s32 igb_get_phy_id_82575(struct e1000_hw *hw)
 			break;
 		case e1000_82580:
 		case e1000_i350:
+		case e1000_i210:
+		case e1000_i211:
 			mdic = rd32(E1000_MDICNFG);
 			mdic &= E1000_MDICNFG_PHY_MASK;
 			phy->addr = mdic >> E1000_MDICNFG_PHY_SHIFT;
@@ -674,6 +767,96 @@ out:
 }
 
 /**
+ *  igb_set_d0_lplu_state_82580 - Set Low Power Linkup D0 state
+ *  @hw: pointer to the HW structure
+ *  @active: true to enable LPLU, false to disable
+ *
+ *  Sets the LPLU D0 state according to the active flag.  When
+ *  activating LPLU this function also disables smart speed
+ *  and vice versa.  LPLU will not be activated unless the
+ *  device autonegotiation advertisement meets standards of
+ *  either 10 or 10/100 or 10/100/1000 at all duplexes.
+ *  This is a function pointer entry point only called by
+ *  PHY setup routines.
+ **/
+static s32 igb_set_d0_lplu_state_82580(struct e1000_hw *hw, bool active)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val = 0;
+	u16 data;
+
+	data = rd32(E1000_82580_PHY_POWER_MGMT);
+
+	if (active) {
+		data |= E1000_82580_PM_D0_LPLU;
+
+		/* When LPLU is enabled, we should disable SmartSpeed */
+		data &= ~E1000_82580_PM_SPD;
+	} else {
+		data &= ~E1000_82580_PM_D0_LPLU;
+
+		/*
+		 * LPLU and SmartSpeed are mutually exclusive.  LPLU is used
+		 * during Dx states where the power conservation is most
+		 * important.  During driver activity we should enable
+		 * SmartSpeed, so performance is maintained.
+		 */
+		if (phy->smart_speed == e1000_smart_speed_on)
+			data |= E1000_82580_PM_SPD;
+		else if (phy->smart_speed == e1000_smart_speed_off)
+			data &= ~E1000_82580_PM_SPD; }
+
+	wr32(E1000_82580_PHY_POWER_MGMT, data);
+	return ret_val;
+}
+
+/**
+ *  igb_set_d3_lplu_state_82580 - Sets low power link up state for D3
+ *  @hw: pointer to the HW structure
+ *  @active: boolean used to enable/disable lplu
+ *
+ *  Success returns 0, Failure returns 1
+ *
+ *  The low power link up (lplu) state is set to the power management level D3
+ *  and SmartSpeed is disabled when active is true, else clear lplu for D3
+ *  and enable Smartspeed.  LPLU and Smartspeed are mutually exclusive.  LPLU
+ *  is used during Dx states where the power conservation is most important.
+ *  During driver activity, SmartSpeed should be enabled so performance is
+ *  maintained.
+ **/
+s32 igb_set_d3_lplu_state_82580(struct e1000_hw *hw, bool active)
+{
+	struct e1000_phy_info *phy = &hw->phy;
+	s32 ret_val = 0;
+	u16 data;
+
+	data = rd32(E1000_82580_PHY_POWER_MGMT);
+
+	if (!active) {
+		data &= ~E1000_82580_PM_D3_LPLU;
+		/*
+		 * LPLU and SmartSpeed are mutually exclusive.  LPLU is used
+		 * during Dx states where the power conservation is most
+		 * important.  During driver activity we should enable
+		 * SmartSpeed, so performance is maintained.
+		 */
+		if (phy->smart_speed == e1000_smart_speed_on)
+			data |= E1000_82580_PM_SPD;
+		else if (phy->smart_speed == e1000_smart_speed_off)
+			data &= ~E1000_82580_PM_SPD;
+	} else if ((phy->autoneg_advertised == E1000_ALL_SPEED_DUPLEX) ||
+		   (phy->autoneg_advertised == E1000_ALL_NOT_GIG) ||
+		   (phy->autoneg_advertised == E1000_ALL_10_SPEED)) {
+		data |= E1000_82580_PM_D3_LPLU;
+		/* When LPLU is enabled, we should disable SmartSpeed */
+		data &= ~E1000_82580_PM_SPD;
+	}
+
+	wr32(E1000_82580_PHY_POWER_MGMT, data);
+	return ret_val;
+}
+
+/**
  *  igb_acquire_nvm_82575 - Request for access to EEPROM
  *  @hw: pointer to the HW structure
  *
@@ -686,14 +869,14 @@ static s32 igb_acquire_nvm_82575(struct e1000_hw *hw)
 {
 	s32 ret_val;
 
-	ret_val = igb_acquire_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
+	ret_val = hw->mac.ops.acquire_swfw_sync(hw, E1000_SWFW_EEP_SM);
 	if (ret_val)
 		goto out;
 
 	ret_val = igb_acquire_nvm(hw);
 
 	if (ret_val)
-		igb_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
+		hw->mac.ops.release_swfw_sync(hw, E1000_SWFW_EEP_SM);
 
 out:
 	return ret_val;
@@ -709,7 +892,7 @@ out:
 static void igb_release_nvm_82575(struct e1000_hw *hw)
 {
 	igb_release_nvm(hw);
-	igb_release_swfw_sync_82575(hw, E1000_SWFW_EEP_SM);
+	hw->mac.ops.release_swfw_sync(hw, E1000_SWFW_EEP_SM);
 }
 
 /**
@@ -845,6 +1028,15 @@ static s32 igb_check_for_link_82575(struct e1000_hw *hw)
 		 * continue to check for link.
 		 */
 		hw->mac.get_link_status = !hw->mac.serdes_has_link;
+
+		/* Configure Flow Control now that Auto-Neg has completed.
+		 * First, we need to restore the desired flow control
+		 * settings because we may have had to re-autoneg with a
+		 * different link partner.
+		 */
+		ret_val = igb_config_fc_after_link_up(hw);
+		if (ret_val)
+			hw_dbg("Error configuring flow control\n");
 	} else {
 		ret_val = igb_check_for_copper_link(hw);
 	}
@@ -1080,7 +1272,6 @@ static s32 igb_init_hw_82575(struct e1000_hw *hw)
 	 * is no link.
 	 */
 	igb_clear_hw_cntrs_82575(hw);
-
 	return ret_val;
 }
 
@@ -1096,11 +1287,19 @@ static s32 igb_setup_copper_link_82575(struct e1000_hw *hw)
 {
 	u32 ctrl;
 	s32  ret_val;
+	u32 phpm_reg;
 
 	ctrl = rd32(E1000_CTRL);
 	ctrl |= E1000_CTRL_SLU;
 	ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
 	wr32(E1000_CTRL, ctrl);
+
+	/* Clear Go Link Disconnect bit */
+	if (hw->mac.type >= e1000_82580) {
+		phpm_reg = rd32(E1000_82580_PHY_POWER_MGMT);
+		phpm_reg &= ~E1000_82580_PM_GO_LINKD;
+		wr32(E1000_82580_PHY_POWER_MGMT, phpm_reg);
+	}
 
 	ret_val = igb_setup_serdes_link_82575(hw);
 	if (ret_val)
@@ -1117,6 +1316,7 @@ static s32 igb_setup_copper_link_82575(struct e1000_hw *hw)
 		}
 	}
 	switch (hw->phy.type) {
+	case e1000_phy_i210:
 	case e1000_phy_m88:
 		if (hw->phy.id == I347AT4_E_PHY_ID ||
 		    hw->phy.id == M88E1112_E_PHY_ID)
@@ -1154,7 +1354,7 @@ out:
  **/
 static s32 igb_setup_serdes_link_82575(struct e1000_hw *hw)
 {
-	u32 ctrl_ext, ctrl_reg, reg;
+	u32 ctrl_ext, ctrl_reg, reg, anadv_reg;
 	bool pcs_autoneg;
 	s32 ret_val = E1000_SUCCESS;
 	u16 data;
@@ -1242,27 +1442,45 @@ static s32 igb_setup_serdes_link_82575(struct e1000_hw *hw)
 	reg &= ~(E1000_PCS_LCTL_AN_ENABLE | E1000_PCS_LCTL_FLV_LINK_UP |
 		E1000_PCS_LCTL_FSD | E1000_PCS_LCTL_FORCE_LINK);
 
-	/*
-	 * We force flow control to prevent the CTRL register values from being
-	 * overwritten by the autonegotiated flow control values
-	 */
-	reg |= E1000_PCS_LCTL_FORCE_FCTRL;
-
 	if (pcs_autoneg) {
 		/* Set PCS register for autoneg */
 		reg |= E1000_PCS_LCTL_AN_ENABLE | /* Enable Autoneg */
 		       E1000_PCS_LCTL_AN_RESTART; /* Restart autoneg */
+
+		/* Disable force flow control for autoneg */
+		reg &= ~E1000_PCS_LCTL_FORCE_FCTRL;
+
+		/* Configure flow control advertisement for autoneg */
+		anadv_reg = rd32(E1000_PCS_ANADV);
+		anadv_reg &= ~(E1000_TXCW_ASM_DIR | E1000_TXCW_PAUSE);
+		switch (hw->fc.requested_mode) {
+		case e1000_fc_full:
+		case e1000_fc_rx_pause:
+			anadv_reg |= E1000_TXCW_ASM_DIR;
+			anadv_reg |= E1000_TXCW_PAUSE;
+			break;
+		case e1000_fc_tx_pause:
+			anadv_reg |= E1000_TXCW_ASM_DIR;
+			break;
+		default:
+			break;
+		}
+		wr32(E1000_PCS_ANADV, anadv_reg);
+
 		hw_dbg("Configuring Autoneg:PCS_LCTL=0x%08X\n", reg);
 	} else {
 		/* Set PCS register for forced link */
 		reg |= E1000_PCS_LCTL_FSD;        /* Force Speed */
+
+		/* Force flow control for forced link */
+		reg |= E1000_PCS_LCTL_FORCE_FCTRL;
 
 		hw_dbg("Configuring Forced Link:PCS_LCTL=0x%08X\n", reg);
 	}
 
 	wr32(E1000_PCS_LCTL, reg);
 
-	if (!igb_sgmii_active_82575(hw))
+	if (!pcs_autoneg && !igb_sgmii_active_82575(hw))
 		igb_force_mac_fc(hw);
 
 	return ret_val;
@@ -1736,6 +1954,12 @@ static s32 igb_reset_hw_82580(struct e1000_hw *hw)
 
 	hw->dev_spec._82575.global_device_reset = false;
 
+	/* due to hw errata, global device reset doesn't always
+	 * work on 82580
+	 */
+	if (hw->mac.type == e1000_82580)
+		global_device_reset = false;
+
 	/* Get current control state. */
 	ctrl = rd32(E1000_CTRL);
 
@@ -1757,7 +1981,7 @@ static s32 igb_reset_hw_82580(struct e1000_hw *hw)
 
 	/* Determine whether or not a global dev reset is requested */
 	if (global_device_reset &&
-		igb_acquire_swfw_sync_82575(hw, swmbsw_mask))
+		hw->mac.ops.acquire_swfw_sync(hw, swmbsw_mask))
 			global_device_reset = false;
 
 	if (global_device_reset &&
@@ -1803,7 +2027,7 @@ static s32 igb_reset_hw_82580(struct e1000_hw *hw)
 
 	/* Release semaphore */
 	if (global_device_reset)
-		igb_release_swfw_sync_82575(hw, swmbsw_mask);
+		hw->mac.ops.release_swfw_sync(hw, swmbsw_mask);
 
 	return ret_val;
 }
@@ -2041,22 +2265,26 @@ out:
 s32 igb_set_eee_i350(struct e1000_hw *hw)
 {
 	s32 ret_val = 0;
-	u32 ipcnfg, eeer, ctrl_ext;
+	u32 ipcnfg, eeer;
 
-	ctrl_ext = rd32(E1000_CTRL_EXT);
-	if ((hw->mac.type != e1000_i350) ||
-	    (ctrl_ext & E1000_CTRL_EXT_LINK_MODE_MASK))
+	if ((hw->mac.type < e1000_i350) ||
+	    (hw->phy.media_type != e1000_media_type_copper))
 		goto out;
 	ipcnfg = rd32(E1000_IPCNFG);
 	eeer = rd32(E1000_EEER);
 
 	/* enable or disable per user setting */
 	if (!(hw->dev_spec._82575.eee_disable)) {
-		ipcnfg |= (E1000_IPCNFG_EEE_1G_AN |
-			E1000_IPCNFG_EEE_100M_AN);
-		eeer |= (E1000_EEER_TX_LPI_EN |
-			E1000_EEER_RX_LPI_EN |
+		u32 eee_su = rd32(E1000_EEE_SU);
+
+		ipcnfg |= (E1000_IPCNFG_EEE_1G_AN | E1000_IPCNFG_EEE_100M_AN);
+		eeer |= (E1000_EEER_TX_LPI_EN | E1000_EEER_RX_LPI_EN |
 			E1000_EEER_LPI_FC);
+
+		/* This bit should not be set in normal operation. */
+		if (eee_su & E1000_EEE_SU_LPI_CLK_STP)
+			hw_dbg("LPI Clock Stop Bit should not be set!\n");
+
 
 	} else {
 		ipcnfg &= ~(E1000_IPCNFG_EEE_1G_AN |
@@ -2067,6 +2295,8 @@ s32 igb_set_eee_i350(struct e1000_hw *hw)
 	}
 	wr32(E1000_IPCNFG, ipcnfg);
 	wr32(E1000_EEER, eeer);
+	rd32(E1000_IPCNFG);
+	rd32(E1000_EEER);
 out:
 
 	return ret_val;

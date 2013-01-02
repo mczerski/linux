@@ -69,14 +69,8 @@
 #include <sys/poll.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <pwd.h>
 #include <inttypes.h>
-#include "../../../include/linux/magic.h"
+#include <linux/magic.h>
 #include "types.h"
 #include <sys/ttydefaults.h>
 
@@ -204,6 +198,10 @@ static inline int has_extension(const char *filename, const char *ext)
 #undef tolower
 #undef toupper
 
+#ifndef NSEC_PER_MSEC
+#define NSEC_PER_MSEC	1000000L
+#endif
+
 extern unsigned char sane_ctype[256];
 #define GIT_SPACE		0x01
 #define GIT_DIGIT		0x02
@@ -242,14 +240,13 @@ void argv_free(char **argv);
 bool strglobmatch(const char *str, const char *pat);
 bool strlazymatch(const char *str, const char *pat);
 int strtailcmp(const char *s1, const char *s2);
+char *strxfrchar(char *s, char from, char to);
 unsigned long convert_unit(unsigned long value, char *unit);
 int readn(int fd, void *buf, size_t size);
 
 struct perf_event_attr;
 
 void event_attr_init(struct perf_event_attr *attr);
-
-uid_t parse_target_uid(const char *str, const char *tid, const char *pid);
 
 #define _STR(x) #x
 #define STR(x) _STR(x)
@@ -264,5 +261,14 @@ bool is_power_of_2(unsigned long n)
 {
 	return (n != 0 && ((n & (n - 1)) == 0));
 }
+
+size_t hex_width(u64 v);
+int hex2u64(const char *ptr, u64 *val);
+
+char *rtrim(char *s);
+
+void dump_stack(void);
+
+extern unsigned int page_size;
 
 #endif

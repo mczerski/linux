@@ -185,7 +185,7 @@ static struct gpio_chip sch_gpio_resume = {
 	.set			= sch_gpio_resume_set,
 };
 
-static int __devinit sch_gpio_probe(struct platform_device *pdev)
+static int sch_gpio_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	int err, id;
@@ -232,8 +232,17 @@ static int __devinit sch_gpio_probe(struct platform_device *pdev)
 			sch_gpio_resume.ngpio = 9;
 			break;
 
+		case PCI_DEVICE_ID_INTEL_CENTERTON_ILB:
+			sch_gpio_core.base = 0;
+			sch_gpio_core.ngpio = 21;
+
+			sch_gpio_resume.base = 21;
+			sch_gpio_resume.ngpio = 9;
+			break;
+
 		default:
-			return -ENODEV;
+			err = -ENODEV;
+			goto err_sch_gpio_core;
 	}
 
 	sch_gpio_core.dev = &pdev->dev;
@@ -262,7 +271,7 @@ err_sch_gpio_core:
 	return err;
 }
 
-static int __devexit sch_gpio_remove(struct platform_device *pdev)
+static int sch_gpio_remove(struct platform_device *pdev)
 {
 	struct resource *res;
 	if (gpio_ba) {
@@ -294,7 +303,7 @@ static struct platform_driver sch_gpio_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe		= sch_gpio_probe,
-	.remove		= __devexit_p(sch_gpio_remove),
+	.remove		= sch_gpio_remove,
 };
 
 module_platform_driver(sch_gpio_driver);

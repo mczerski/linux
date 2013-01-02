@@ -55,10 +55,11 @@ extern void igb_rx_fifo_flush_82575(struct e1000_hw *hw);
 #define E1000_SRRCTL_DROP_EN                            0x80000000
 #define E1000_SRRCTL_TIMESTAMP                          0x40000000
 
+
 #define E1000_MRQC_ENABLE_RSS_4Q            0x00000002
 #define E1000_MRQC_ENABLE_VMDQ              0x00000003
-#define E1000_MRQC_ENABLE_VMDQ_RSS_2Q       0x00000005
 #define E1000_MRQC_RSS_FIELD_IPV4_UDP       0x00400000
+#define E1000_MRQC_ENABLE_VMDQ_RSS_2Q       0x00000005
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP       0x00800000
 #define E1000_MRQC_RSS_FIELD_IPV6_UDP_EX    0x01000000
 
@@ -171,10 +172,13 @@ struct e1000_adv_tx_context_desc {
 #define E1000_DCA_RXCTRL_DESC_DCA_EN (1 << 5) /* DCA Rx Desc enable */
 #define E1000_DCA_RXCTRL_HEAD_DCA_EN (1 << 6) /* DCA Rx Desc header enable */
 #define E1000_DCA_RXCTRL_DATA_DCA_EN (1 << 7) /* DCA Rx Desc payload enable */
+#define E1000_DCA_RXCTRL_DESC_RRO_EN (1 << 9) /* DCA Rx rd Desc Relax Order */
 
 #define E1000_DCA_TXCTRL_CPUID_MASK 0x0000001F /* Tx CPUID Mask */
 #define E1000_DCA_TXCTRL_DESC_DCA_EN (1 << 5) /* DCA Tx Desc enable */
+#define E1000_DCA_TXCTRL_DESC_RRO_EN (1 << 9) /* Tx rd Desc Relax Order */
 #define E1000_DCA_TXCTRL_TX_WB_RO_EN (1 << 11) /* Tx Desc writeback RO bit */
+#define E1000_DCA_TXCTRL_DATA_RRO_EN (1 << 13) /* Tx rd data Relax Order */
 
 /* Additional DCA related definitions, note change in position of CPUID */
 #define E1000_DCA_TXCTRL_CPUID_MASK_82576 0xFF000000 /* Tx CPUID Mask */

@@ -15,6 +15,7 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
 #include <asm/mach/pci.h>
+#include <asm/system_info.h>
 
 #define SLOT_ETHA		0x0B	/* IDSEL = AD21 */
 #define SLOT_ETHB		0x0C	/* IDSEL = AD20 */
@@ -329,7 +330,7 @@ static struct platform_device device_hss_tab[] = {
 };
 
 
-static struct platform_device *device_tab[6] __initdata = {
+static struct platform_device *device_tab[7] __initdata = {
 	&device_flash,		/* index 0 */
 };
 
@@ -473,11 +474,10 @@ static int __init gmlr_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 
 static struct hw_pci gmlr_hw_pci __initdata = {
 	.nr_controllers = 1,
+	.ops		= &ixp4xx_ops,
 	.preinit	= gmlr_pci_preinit,
 	.postinit	= gmlr_pci_postinit,
-	.swizzle	= pci_std_swizzle,
 	.setup		= ixp4xx_setup,
-	.scan		= ixp4xx_scan_bus,
 	.map_irq	= gmlr_map_irq,
 };
 

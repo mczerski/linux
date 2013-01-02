@@ -74,8 +74,6 @@ static int __init pcibios_init(void)
 
 subsys_initcall(pcibios_init);
 
-#ifdef CONFIG_HOTPLUG
-
 int pcibios_unmap_io_space(struct pci_bus *bus)
 {
 	struct pci_controller *hose;
@@ -123,8 +121,6 @@ int pcibios_unmap_io_space(struct pci_bus *bus)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(pcibios_unmap_io_space);
-
-#endif /* CONFIG_HOTPLUG */
 
 static int __devinit pcibios_map_phb_io_space(struct pci_controller *hose)
 {
@@ -236,7 +232,7 @@ long sys_pciconfig_iobase(long which, unsigned long in_bus,
 
 	for (ln = pci_root_buses.next; ln != &pci_root_buses; ln = ln->next) {
 		bus = pci_bus_b(ln);
-		if (in_bus >= bus->number && in_bus <= bus->subordinate)
+		if (in_bus >= bus->number && in_bus <= bus->busn_res.end)
 			break;
 		bus = NULL;
 	}

@@ -19,7 +19,7 @@
 #include <linux/of_gpio.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/spi_bitbang.h>
-#include <linux/pinctrl/pinmux.h>
+#include <linux/pinctrl/consumer.h>
 
 #define DRIVER_NAME "sirfsoc_spi"
 
@@ -127,7 +127,7 @@ struct sirfsoc_spi {
 	void __iomem *base;
 	u32 ctrl_freq;  /* SPI controller clock speed */
 	struct clk *clk;
-	struct pinmux *pmx;
+	struct pinctrl *p;
 
 	/* rx & tx bufs from the spi_transfer */
 	const void *tx;
@@ -479,7 +479,7 @@ static int spi_sirfsoc_setup(struct spi_device *spi)
 	return spi_sirfsoc_setup_transfer(spi, NULL);
 }
 
-static int __devinit spi_sirfsoc_probe(struct platform_device *pdev)
+static int spi_sirfsoc_probe(struct platform_device *pdev)
 {
 	struct sirfsoc_spi *sspi;
 	struct spi_master *master;
@@ -560,17 +560,15 @@ static int __devinit spi_sirfsoc_probe(struct platform_device *pdev)
 	master->bus_num = pdev->id;
 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
 
-	sspi->pmx = pinmux_get(&pdev->dev, NULL);
-	ret = IS_ERR(sspi->pmx);
+	sspi->p = pinctrl_get_select_default(&pdev->dev);
+	ret = IS_ERR(sspi->p);
 	if (ret)
 		goto free_master;
-
-	pinmux_enable(sspi->pmx);
 
 	sspi->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(sspi->clk)) {
 		ret = -EINVAL;
-		goto free_pmx;
+		goto free_pin;
 	}
 	clk_enable(sspi->clk);
 	sspi->ctrl_freq = clk_get_rate(sspi->clk);
@@ -598,16 +596,15 @@ static int __devinit spi_sirfsoc_probe(struct platform_device *pdev)
 free_clk:
 	clk_disable(sspi->clk);
 	clk_put(sspi->clk);
-free_pmx:
-	pinmux_disable(sspi->pmx);
-	pinmux_put(sspi->pmx);
+free_pin:
+	pinctrl_put(sspi->p);
 free_master:
 	spi_master_put(master);
 err_cs:
 	return ret;
 }
 
-static int  __devexit spi_sirfsoc_remove(struct platform_device *pdev)
+static int  spi_sirfsoc_remove(struct platform_device *pdev)
 {
 	struct spi_master *master;
 	struct sirfsoc_spi *sspi;
@@ -623,8 +620,7 @@ static int  __devexit spi_sirfsoc_remove(struct platform_device *pdev)
 	}
 	clk_disable(sspi->clk);
 	clk_put(sspi->clk);
-	pinmux_disable(sspi->pmx);
-	pinmux_put(sspi->pmx);
+	pinctrl_put(sspi->p);
 	spi_master_put(master);
 	return 0;
 }
@@ -677,7 +673,7 @@ static struct platform_driver spi_sirfsoc_driver = {
 		.of_match_table = spi_sirfsoc_of_match,
 	},
 	.probe = spi_sirfsoc_probe,
-	.remove = __devexit_p(spi_sirfsoc_remove),
+	.remove = spi_sirfsoc_remove,
 };
 module_platform_driver(spi_sirfsoc_driver);
 

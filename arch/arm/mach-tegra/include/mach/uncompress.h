@@ -28,8 +28,7 @@
 #include <linux/types.h>
 #include <linux/serial_reg.h>
 
-#include <mach/iomap.h>
-#include <mach/irammap.h>
+#include "../../iomap.h"
 
 #define BIT(x) (1 << (x))
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
@@ -52,16 +51,81 @@ static inline void flush(void)
 {
 }
 
-static inline void save_uart_address(void)
-{
-	u32 *buf = (u32 *)(TEGRA_IRAM_BASE + TEGRA_IRAM_DEBUG_UART_OFFSET);
+static const struct {
+	u32 base;
+	u32 reset_reg;
+	u32 clock_reg;
+	u32 bit;
+} uarts[] = {
+	{
+		TEGRA_UARTA_BASE,
+		TEGRA_CLK_RESET_BASE + 0x04,
+		TEGRA_CLK_RESET_BASE + 0x10,
+		6,
+	},
+	{
+		TEGRA_UARTB_BASE,
+		TEGRA_CLK_RESET_BASE + 0x04,
+		TEGRA_CLK_RESET_BASE + 0x10,
+		7,
+	},
+	{
+		TEGRA_UARTC_BASE,
+		TEGRA_CLK_RESET_BASE + 0x08,
+		TEGRA_CLK_RESET_BASE + 0x14,
+		23,
+	},
+	{
+		TEGRA_UARTD_BASE,
+		TEGRA_CLK_RESET_BASE + 0x0c,
+		TEGRA_CLK_RESET_BASE + 0x18,
+		1,
+	},
+	{
+		TEGRA_UARTE_BASE,
+		TEGRA_CLK_RESET_BASE + 0x0c,
+		TEGRA_CLK_RESET_BASE + 0x18,
+		2,
+	},
+};
 
-	if (uart) {
-		buf[0] = TEGRA_IRAM_DEBUG_UART_COOKIE;
-		buf[1] = (u32)uart;
-	} else
-		buf[0] = 0;
+static inline bool uart_clocked(int i)
+{
+	if (*(u8 *)uarts[i].reset_reg & BIT(uarts[i].bit))
+		return false;
+
+	if (!(*(u8 *)uarts[i].clock_reg & BIT(uarts[i].bit)))
+		return false;
+
+	return true;
 }
+
+#ifdef CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA
+int auto_odmdata(void)
+{
+	volatile u32 *pmc = (volatile u32 *)TEGRA_PMC_BASE;
+	u32 odmdata = pmc[0xa0 / 4];
+
+	/*
+	 * Bits 19:18 are the console type: 0=default, 1=none, 2==DCC, 3==UART
+	 * Some boards apparently swap the last two values, but we don't have
+	 * any way of catering for that here, so we just accept either. If this
+	 * doesn't make sense for your board, just don't enable this feature.
+	 *
+	 * Bits 17:15 indicate the UART to use, 0/1/2/3/4 are UART A/B/C/D/E.
+	 */
+
+	switch  ((odmdata >> 18) & 3) {
+	case 2:
+	case 3:
+		break;
+	default:
+		return -1;
+	}
+
+	return (odmdata >> 15) & 7;
+}
+#endif
 
 /*
  * Setup before decompression.  This is where we do UART selection for
@@ -69,77 +133,30 @@ static inline void save_uart_address(void)
  */
 static inline void arch_decomp_setup(void)
 {
-	static const struct {
-		u32 base;
-		u32 reset_reg;
-		u32 clock_reg;
-		u32 bit;
-	} uarts[] = {
-		{
-			TEGRA_UARTA_BASE,
-			TEGRA_CLK_RESET_BASE + 0x04,
-			TEGRA_CLK_RESET_BASE + 0x10,
-			6,
-		},
-		{
-			TEGRA_UARTB_BASE,
-			TEGRA_CLK_RESET_BASE + 0x04,
-			TEGRA_CLK_RESET_BASE + 0x10,
-			7,
-		},
-		{
-			TEGRA_UARTC_BASE,
-			TEGRA_CLK_RESET_BASE + 0x08,
-			TEGRA_CLK_RESET_BASE + 0x14,
-			23,
-		},
-		{
-			TEGRA_UARTD_BASE,
-			TEGRA_CLK_RESET_BASE + 0x0c,
-			TEGRA_CLK_RESET_BASE + 0x18,
-			1,
-		},
-		{
-			TEGRA_UARTE_BASE,
-			TEGRA_CLK_RESET_BASE + 0x0c,
-			TEGRA_CLK_RESET_BASE + 0x18,
-			2,
-		},
-	};
-	int i;
+	int uart_id;
 	volatile u32 *apb_misc = (volatile u32 *)TEGRA_APB_MISC_BASE;
 	u32 chip, div;
 
-	/*
-	 * Look for the first UART that:
-	 * a) Is not in reset.
-	 * b) Is clocked.
-	 * c) Has a 'D' in the scratchpad register.
-	 *
-	 * Note that on Tegra30, the first two conditions are required, since
-	 * if not true, accesses to the UART scratch register will hang.
-	 * Tegra20 doesn't have this issue.
-	 *
-	 * The intent is that the bootloader will tell the kernel which UART
-	 * to use by setting up those conditions. If nothing found, we'll fall
-	 * back to what's specified in TEGRA_DEBUG_UART_BASE.
-	 */
-	for (i = 0; i < ARRAY_SIZE(uarts); i++) {
-		if (*(u8 *)uarts[i].reset_reg & BIT(uarts[i].bit))
-			continue;
+#if defined(CONFIG_TEGRA_DEBUG_UART_AUTO_ODMDATA)
+	uart_id = auto_odmdata();
+#elif defined(CONFIG_TEGRA_DEBUG_UARTA)
+	uart_id = 0;
+#elif defined(CONFIG_TEGRA_DEBUG_UARTB)
+	uart_id = 1;
+#elif defined(CONFIG_TEGRA_DEBUG_UARTC)
+	uart_id = 2;
+#elif defined(CONFIG_TEGRA_DEBUG_UARTD)
+	uart_id = 3;
+#elif defined(CONFIG_TEGRA_DEBUG_UARTE)
+	uart_id = 4;
+#endif
 
-		if (!(*(u8 *)uarts[i].clock_reg & BIT(uarts[i].bit)))
-			continue;
+	if (uart_id < 0 || uart_id >= ARRAY_SIZE(uarts) ||
+	    !uart_clocked(uart_id))
+		uart = NULL;
+	else
+		uart = (volatile u8 *)uarts[uart_id].base;
 
-		uart = (volatile u8 *)uarts[i].base;
-		if (uart[UART_SCR << DEBUG_UART_SHIFT] != 'D')
-			continue;
-
-		break;
-	}
-	if (i == ARRAY_SIZE(uarts))
-		uart = (volatile u8 *)TEGRA_DEBUG_UART_BASE;
-	save_uart_address();
 	if (uart == NULL)
 		return;
 

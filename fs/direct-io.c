@@ -145,50 +145,6 @@ struct dio {
 
 static struct kmem_cache *dio_cache __read_mostly;
 
-static void __inode_dio_wait(struct inode *inode)
-{
-	wait_queue_head_t *wq = bit_waitqueue(&inode->i_state, __I_DIO_WAKEUP);
-	DEFINE_WAIT_BIT(q, &inode->i_state, __I_DIO_WAKEUP);
-
-	do {
-		prepare_to_wait(wq, &q.wait, TASK_UNINTERRUPTIBLE);
-		if (atomic_read(&inode->i_dio_count))
-			schedule();
-	} while (atomic_read(&inode->i_dio_count));
-	finish_wait(wq, &q.wait);
-}
-
-/**
- * inode_dio_wait - wait for outstanding DIO requests to finish
- * @inode: inode to wait for
- *
- * Waits for all pending direct I/O requests to finish so that we can
- * proceed with a truncate or equivalent operation.
- *
- * Must be called under a lock that serializes taking new references
- * to i_dio_count, usually by inode->i_mutex.
- */
-void inode_dio_wait(struct inode *inode)
-{
-	if (atomic_read(&inode->i_dio_count))
-		__inode_dio_wait(inode);
-}
-EXPORT_SYMBOL(inode_dio_wait);
-
-/*
- * inode_dio_done - signal finish of a direct I/O requests
- * @inode: inode the direct I/O happens on
- *
- * This is called once we've finished processing a direct I/O request,
- * and is used to wake up callers waiting for direct I/O to be quiesced.
- */
-void inode_dio_done(struct inode *inode)
-{
-	if (atomic_dec_and_test(&inode->i_dio_count))
-		wake_up_bit(&inode->i_state, __I_DIO_WAKEUP);
-}
-EXPORT_SYMBOL(inode_dio_done);
-
 /*
  * How many pages are in the queue?
  */
@@ -584,6 +540,7 @@ static int get_more_blocks(struct dio *dio, struct dio_submit *sdio,
 	sector_t fs_endblk;	/* Into file, in filesystem-sized blocks */
 	unsigned long fs_count;	/* Number of filesystem-sized blocks */
 	int create;
+	unsigned int i_blkbits = sdio->blkbits + sdio->blkfactor;
 
 	/*
 	 * If there was a memory error and we've overwritten all the
@@ -598,7 +555,7 @@ static int get_more_blocks(struct dio *dio, struct dio_submit *sdio,
 		fs_count = fs_endblk - fs_startblk + 1;
 
 		map_bh->b_state = 0;
-		map_bh->b_size = fs_count << dio->inode->i_blkbits;
+		map_bh->b_size = fs_count << i_blkbits;
 
 		/*
 		 * For writes inside i_size on a DIO_SKIP_HOLES filesystem we
@@ -1097,7 +1054,8 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	int seg;
 	size_t size;
 	unsigned long addr;
-	unsigned blkbits = inode->i_blkbits;
+	unsigned i_blkbits = ACCESS_ONCE(inode->i_blkbits);
+	unsigned blkbits = i_blkbits;
 	unsigned blocksize_mask = (1 << blkbits) - 1;
 	ssize_t retval = -EINVAL;
 	loff_t end = offset;
@@ -1106,6 +1064,7 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	unsigned long user_addr;
 	size_t bytes;
 	struct buffer_head map_bh = { 0, };
+	struct blk_plug plug;
 
 	if (rw & WRITE)
 		rw = WRITE_ODIRECT;
@@ -1192,7 +1151,7 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	dio->inode = inode;
 	dio->rw = rw;
 	sdio.blkbits = blkbits;
-	sdio.blkfactor = inode->i_blkbits - blkbits;
+	sdio.blkfactor = i_blkbits - blkbits;
 	sdio.block_in_file = offset >> blkbits;
 
 	sdio.get_block = get_block;
@@ -1220,6 +1179,8 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 			((user_addr + iov[seg].iov_len + PAGE_SIZE-1) /
 				PAGE_SIZE - user_addr / PAGE_SIZE);
 	}
+
+	blk_start_plug(&plug);
 
 	for (seg = 0; seg < nr_segs; seg++) {
 		user_addr = (unsigned long)iov[seg].iov_base;
@@ -1279,6 +1240,8 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	if (sdio.bio)
 		dio_bio_submit(dio, &sdio);
 
+	blk_finish_plug(&plug);
+
 	/*
 	 * It is possible that, we return short IO due to end of file.
 	 * In that case, we need to release all the pages we got hold on.
@@ -1302,7 +1265,7 @@ do_blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 	 */
 	BUG_ON(retval == -EIOCBQUEUED);
 	if (dio->is_async && retval == 0 && dio->result &&
-	    ((rw & READ) || (dio->result == sdio.size)))
+	    ((rw == READ) || (dio->result == sdio.size)))
 		retval = -EIOCBQUEUED;
 
 	if (retval != -EIOCBQUEUED)

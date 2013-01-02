@@ -15,8 +15,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <mach/hardware.h>
 #include <linux/io.h>
+
+#include "hardware.h"
 
 static int mx5_cpu_rev = -1;
 
@@ -62,11 +63,8 @@ EXPORT_SYMBOL(mx51_revision);
  * Dependent on link order - so the assumption is that vfp_init is called
  * before us.
  */
-static int __init mx51_neon_fixup(void)
+int __init mx51_neon_fixup(void)
 {
-	if (!cpu_is_mx51())
-		return 0;
-
 	if (mx51_revision() < IMX_CHIP_REVISION_3_0 &&
 			(elf_hwcap & HWCAP_NEON)) {
 		elf_hwcap &= ~HWCAP_NEON;
@@ -75,7 +73,6 @@ static int __init mx51_neon_fixup(void)
 	return 0;
 }
 
-late_initcall(mx51_neon_fixup);
 #endif
 
 static int get_mx53_srev(void)

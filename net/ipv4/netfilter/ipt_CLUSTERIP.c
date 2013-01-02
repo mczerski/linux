@@ -246,8 +246,7 @@ clusterip_hashfn(const struct sk_buff *skb,
 			dport = ports[1];
 		}
 	} else {
-		if (net_ratelimit())
-			pr_info("unknown protocol %u\n", iph->protocol);
+		net_info_ratelimited("unknown protocol %u\n", iph->protocol);
 	}
 
 	switch (config->hash_mode) {
@@ -662,6 +661,7 @@ static ssize_t clusterip_proc_write(struct file *file, const char __user *input,
 #define PROC_WRITELEN	10
 	char buffer[PROC_WRITELEN+1];
 	unsigned long nodenum;
+	int rc;
 
 	if (size > PROC_WRITELEN)
 		return -EIO;
@@ -670,11 +670,15 @@ static ssize_t clusterip_proc_write(struct file *file, const char __user *input,
 	buffer[size] = 0;
 
 	if (*buffer == '+') {
-		nodenum = simple_strtoul(buffer+1, NULL, 10);
+		rc = kstrtoul(buffer+1, 10, &nodenum);
+		if (rc)
+			return rc;
 		if (clusterip_add_node(c, nodenum))
 			return -ENOMEM;
 	} else if (*buffer == '-') {
-		nodenum = simple_strtoul(buffer+1, NULL,10);
+		rc = kstrtoul(buffer+1, 10, &nodenum);
+		if (rc)
+			return rc;
 		if (clusterip_del_node(c, nodenum))
 			return -ENOENT;
 	} else

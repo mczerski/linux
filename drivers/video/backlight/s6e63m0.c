@@ -733,7 +733,7 @@ static ssize_t s6e63m0_sysfs_show_gamma_table(struct device *dev,
 static DEVICE_ATTR(gamma_table, 0444,
 		s6e63m0_sysfs_show_gamma_table, NULL);
 
-static int __devinit s6e63m0_probe(struct spi_device *spi)
+static int s6e63m0_probe(struct spi_device *spi)
 {
 	int ret = 0;
 	struct s6e63m0 *lcd = NULL;
@@ -741,7 +741,7 @@ static int __devinit s6e63m0_probe(struct spi_device *spi)
 	struct backlight_device *bd = NULL;
 	struct backlight_properties props;
 
-	lcd = kzalloc(sizeof(struct s6e63m0), GFP_KERNEL);
+	lcd = devm_kzalloc(&spi->dev, sizeof(struct s6e63m0), GFP_KERNEL);
 	if (!lcd)
 		return -ENOMEM;
 
@@ -751,23 +751,21 @@ static int __devinit s6e63m0_probe(struct spi_device *spi)
 	ret = spi_setup(spi);
 	if (ret < 0) {
 		dev_err(&spi->dev, "spi setup failed.\n");
-		goto out_free_lcd;
+		return ret;
 	}
 
 	lcd->spi = spi;
 	lcd->dev = &spi->dev;
 
-	lcd->lcd_pd = (struct lcd_platform_data *)spi->dev.platform_data;
+	lcd->lcd_pd = spi->dev.platform_data;
 	if (!lcd->lcd_pd) {
 		dev_err(&spi->dev, "platform data is NULL.\n");
-		goto out_free_lcd;
+		return -EFAULT;
 	}
 
 	ld = lcd_device_register("s6e63m0", &spi->dev, lcd, &s6e63m0_lcd_ops);
-	if (IS_ERR(ld)) {
-		ret = PTR_ERR(ld);
-		goto out_free_lcd;
-	}
+	if (IS_ERR(ld))
+		return PTR_ERR(ld);
 
 	lcd->ld = ld;
 
@@ -824,12 +822,10 @@ static int __devinit s6e63m0_probe(struct spi_device *spi)
 
 out_lcd_unregister:
 	lcd_device_unregister(ld);
-out_free_lcd:
-	kfree(lcd);
 	return ret;
 }
 
-static int __devexit s6e63m0_remove(struct spi_device *spi)
+static int s6e63m0_remove(struct spi_device *spi)
 {
 	struct s6e63m0 *lcd = dev_get_drvdata(&spi->dev);
 
@@ -838,7 +834,6 @@ static int __devexit s6e63m0_remove(struct spi_device *spi)
 	device_remove_file(&spi->dev, &dev_attr_gamma_mode);
 	backlight_device_unregister(lcd->bd);
 	lcd_device_unregister(lcd->ld);
-	kfree(lcd);
 
 	return 0;
 }
@@ -899,11 +894,10 @@ static void s6e63m0_shutdown(struct spi_device *spi)
 static struct spi_driver s6e63m0_driver = {
 	.driver = {
 		.name	= "s6e63m0",
-		.bus	= &spi_bus_type,
 		.owner	= THIS_MODULE,
 	},
 	.probe		= s6e63m0_probe,
-	.remove		= __devexit_p(s6e63m0_remove),
+	.remove		= s6e63m0_remove,
 	.shutdown	= s6e63m0_shutdown,
 	.suspend	= s6e63m0_suspend,
 	.resume		= s6e63m0_resume,

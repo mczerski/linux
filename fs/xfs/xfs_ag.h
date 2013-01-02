@@ -108,6 +108,8 @@ typedef struct xfs_agf {
 extern int xfs_read_agf(struct xfs_mount *mp, struct xfs_trans *tp,
 			xfs_agnumber_t agno, int flags, struct xfs_buf **bpp);
 
+extern const struct xfs_buf_ops xfs_agf_buf_ops;
+
 /*
  * Size of the unlinked inode hash table in the agi.
  */
@@ -161,6 +163,8 @@ typedef struct xfs_agi {
 extern int xfs_read_agi(struct xfs_mount *mp, struct xfs_trans *tp,
 				xfs_agnumber_t agno, struct xfs_buf **bpp);
 
+extern const struct xfs_buf_ops xfs_agi_buf_ops;
+
 /*
  * The third a.g. block contains the a.g. freelist, an array
  * of block pointers to blocks owned by the allocation btree code.
@@ -173,24 +177,6 @@ extern int xfs_read_agi(struct xfs_mount *mp, struct xfs_trans *tp,
 typedef struct xfs_agfl {
 	__be32		agfl_bno[1];	/* actually XFS_AGFL_SIZE(mp) */
 } xfs_agfl_t;
-
-/*
- * Busy block/extent entry.  Indexed by a rbtree in perag to mark blocks that
- * have been freed but whose transactions aren't committed to disk yet.
- *
- * Note that we use the transaction ID to record the transaction, not the
- * transaction structure itself. See xfs_alloc_busy_insert() for details.
- */
-struct xfs_busy_extent {
-	struct rb_node	rb_node;	/* ag by-bno indexed search tree */
-	struct list_head list;		/* transaction busy extent list */
-	xfs_agnumber_t	agno;
-	xfs_agblock_t	bno;
-	xfs_extlen_t	length;
-	unsigned int	flags;
-#define XFS_ALLOC_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
-#define XFS_ALLOC_BUSY_SKIP_DISCARD	0x02	/* do not discard */
-};
 
 /*
  * Per-ag incore structure, copies of information in agf and agi,
@@ -251,6 +237,7 @@ typedef struct xfs_perag {
 #define XFS_ICI_NO_TAG		(-1)	/* special flag for an untagged lookup
 					   in xfs_inode_ag_iterator */
 #define XFS_ICI_RECLAIM_TAG	0	/* inode is to be reclaimed */
+#define XFS_ICI_EOFBLOCKS_TAG	1	/* inode has blocks beyond EOF */
 
 #define	XFS_AG_MAXLEVELS(mp)		((mp)->m_ag_maxlevels)
 #define	XFS_MIN_FREELIST_RAW(bl,cl,mp)	\

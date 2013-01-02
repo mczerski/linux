@@ -64,7 +64,7 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, const struct in6_addr *addr)
 	int	ishost = !net->ipv6.devconf_all->forwarding;
 	int	err = 0;
 
-	if (!capable(CAP_NET_ADMIN))
+	if (!ns_capable(net->user_ns, CAP_NET_ADMIN))
 		return -EPERM;
 	if (ipv6_addr_is_multicast(addr))
 		return -EINVAL;
@@ -84,7 +84,7 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, const struct in6_addr *addr)
 		rt = rt6_lookup(net, addr, NULL, 0, 0);
 		if (rt) {
 			dev = rt->dst.dev;
-			dst_release(&rt->dst);
+			ip6_rt_put(rt);
 		} else if (ishost) {
 			err = -EADDRNOTAVAIL;
 			goto error;
@@ -188,6 +188,9 @@ void ipv6_sock_ac_close(struct sock *sk)
 	struct ipv6_ac_socklist *pac;
 	struct net *net = sock_net(sk);
 	int	prev_index;
+
+	if (!np->ipv6_ac_list)
+		return;
 
 	write_lock_bh(&ipv6_sk_ac_lock);
 	pac = np->ipv6_ac_list;
@@ -342,7 +345,7 @@ static int ipv6_dev_ac_dec(struct net_device *dev, const struct in6_addr *addr)
  *	check if the interface has this anycast address
  *	called with rcu_read_lock()
  */
-static int ipv6_chk_acast_dev(struct net_device *dev, const struct in6_addr *addr)
+static bool ipv6_chk_acast_dev(struct net_device *dev, const struct in6_addr *addr)
 {
 	struct inet6_dev *idev;
 	struct ifacaddr6 *aca;
@@ -356,16 +359,16 @@ static int ipv6_chk_acast_dev(struct net_device *dev, const struct in6_addr *add
 		read_unlock_bh(&idev->lock);
 		return aca != NULL;
 	}
-	return 0;
+	return false;
 }
 
 /*
  *	check if given interface (or any, if dev==0) has this anycast address
  */
-int ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
-			const struct in6_addr *addr)
+bool ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
+			 const struct in6_addr *addr)
 {
-	int found = 0;
+	bool found = false;
 
 	rcu_read_lock();
 	if (dev)
@@ -373,7 +376,7 @@ int ipv6_chk_acast_addr(struct net *net, struct net_device *dev,
 	else
 		for_each_netdev_rcu(net, dev)
 			if (ipv6_chk_acast_dev(dev, addr)) {
-				found = 1;
+				found = true;
 				break;
 			}
 	rcu_read_unlock();

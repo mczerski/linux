@@ -36,7 +36,9 @@
 #include <linux/platform_device.h>
 #include <linux/rtc.h>
 #include <linux/sched.h>
+#include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/of.h>
 
 /* DryIce Register Definitions */
 
@@ -392,6 +394,8 @@ static int dryice_rtc_probe(struct platform_device *pdev)
 	if (imxdi->ioaddr == NULL)
 		return -ENOMEM;
 
+	spin_lock_init(&imxdi->irq_lock);
+
 	imxdi->irq = platform_get_irq(pdev, 0);
 	if (imxdi->irq < 0)
 		return imxdi->irq;
@@ -405,7 +409,7 @@ static int dryice_rtc_probe(struct platform_device *pdev)
 	imxdi->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(imxdi->clk))
 		return PTR_ERR(imxdi->clk);
-	clk_enable(imxdi->clk);
+	clk_prepare_enable(imxdi->clk);
 
 	/*
 	 * Initialize dryice hardware
@@ -470,7 +474,7 @@ static int dryice_rtc_probe(struct platform_device *pdev)
 	return 0;
 
 err:
-	clk_disable(imxdi->clk);
+	clk_disable_unprepare(imxdi->clk);
 	clk_put(imxdi->clk);
 
 	return rc;
@@ -487,16 +491,26 @@ static int __devexit dryice_rtc_remove(struct platform_device *pdev)
 
 	rtc_device_unregister(imxdi->rtc);
 
-	clk_disable(imxdi->clk);
+	clk_disable_unprepare(imxdi->clk);
 	clk_put(imxdi->clk);
 
 	return 0;
 }
 
+#ifdef CONFIG_OF
+static const struct of_device_id dryice_dt_ids[] = {
+	{ .compatible = "fsl,imx25-rtc" },
+	{ /* sentinel */ }
+};
+
+MODULE_DEVICE_TABLE(of, dryice_dt_ids);
+#endif
+
 static struct platform_driver dryice_rtc_driver = {
 	.driver = {
 		   .name = "imxdi_rtc",
 		   .owner = THIS_MODULE,
+		   .of_match_table = of_match_ptr(dryice_dt_ids),
 		   },
 	.remove = __devexit_p(dryice_rtc_remove),
 };

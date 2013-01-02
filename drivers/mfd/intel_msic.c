@@ -306,7 +306,7 @@ int intel_msic_irq_read(struct intel_msic *msic, unsigned short reg, u8 *val)
 }
 EXPORT_SYMBOL_GPL(intel_msic_irq_read);
 
-static int __devinit intel_msic_init_devices(struct intel_msic *msic)
+static int intel_msic_init_devices(struct intel_msic *msic)
 {
 	struct platform_device *pdev = msic->pdev;
 	struct intel_msic_platform_data *pdata = pdev->dev.platform_data;
@@ -344,13 +344,13 @@ static int __devinit intel_msic_init_devices(struct intel_msic *msic)
 			continue;
 
 		ret = mfd_add_devices(&pdev->dev, -1, &msic_devs[i], 1, NULL,
-				      pdata->irq[i]);
+				      pdata->irq[i], NULL);
 		if (ret)
 			goto fail;
 	}
 
 	ret = mfd_add_devices(&pdev->dev, 0, msic_other_devs,
-			      ARRAY_SIZE(msic_other_devs), NULL, 0);
+			      ARRAY_SIZE(msic_other_devs), NULL, 0, NULL);
 	if (ret)
 		goto fail;
 
@@ -364,7 +364,7 @@ fail:
 	return ret;
 }
 
-static void __devexit intel_msic_remove_devices(struct intel_msic *msic)
+static void intel_msic_remove_devices(struct intel_msic *msic)
 {
 	struct platform_device *pdev = msic->pdev;
 	struct intel_msic_platform_data *pdata = pdev->dev.platform_data;
@@ -375,7 +375,7 @@ static void __devexit intel_msic_remove_devices(struct intel_msic *msic)
 		gpio_free(pdata->ocd->gpio);
 }
 
-static int __devinit intel_msic_probe(struct platform_device *pdev)
+static int intel_msic_probe(struct platform_device *pdev)
 {
 	struct intel_msic_platform_data *pdata = pdev->dev.platform_data;
 	struct intel_msic *msic;
@@ -406,7 +406,7 @@ static int __devinit intel_msic_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	msic = kzalloc(sizeof(*msic), GFP_KERNEL);
+	msic = devm_kzalloc(&pdev->dev, sizeof(*msic), GFP_KERNEL);
 	if (!msic)
 		return -ENOMEM;
 
@@ -421,21 +421,13 @@ static int __devinit intel_msic_probe(struct platform_device *pdev)
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(&pdev->dev, "failed to get SRAM iomem resource\n");
-		ret = -ENODEV;
-		goto fail_free_msic;
+		return -ENODEV;
 	}
 
-	res = request_mem_region(res->start, resource_size(res), pdev->name);
-	if (!res) {
-		ret = -EBUSY;
-		goto fail_free_msic;
-	}
-
-	msic->irq_base = ioremap_nocache(res->start, resource_size(res));
+	msic->irq_base = devm_request_and_ioremap(&pdev->dev, res);
 	if (!msic->irq_base) {
 		dev_err(&pdev->dev, "failed to map SRAM memory\n");
-		ret = -ENOMEM;
-		goto fail_release_region;
+		return -ENOMEM;
 	}
 
 	platform_set_drvdata(pdev, msic);
@@ -443,7 +435,7 @@ static int __devinit intel_msic_probe(struct platform_device *pdev)
 	ret = intel_msic_init_devices(msic);
 	if (ret) {
 		dev_err(&pdev->dev, "failed to initialize MSIC devices\n");
-		goto fail_unmap_mem;
+		return ret;
 	}
 
 	dev_info(&pdev->dev, "Intel MSIC version %c%d (vendor %#x)\n",
@@ -451,34 +443,21 @@ static int __devinit intel_msic_probe(struct platform_device *pdev)
 		 msic->vendor);
 
 	return 0;
-
-fail_unmap_mem:
-	iounmap(msic->irq_base);
-fail_release_region:
-	release_mem_region(res->start, resource_size(res));
-fail_free_msic:
-	kfree(msic);
-
-	return ret;
 }
 
-static int __devexit intel_msic_remove(struct platform_device *pdev)
+static int intel_msic_remove(struct platform_device *pdev)
 {
 	struct intel_msic *msic = platform_get_drvdata(pdev);
-	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	intel_msic_remove_devices(msic);
 	platform_set_drvdata(pdev, NULL);
-	iounmap(msic->irq_base);
-	release_mem_region(res->start, resource_size(res));
-	kfree(msic);
 
 	return 0;
 }
 
 static struct platform_driver intel_msic_driver = {
 	.probe		= intel_msic_probe,
-	.remove		= __devexit_p(intel_msic_remove),
+	.remove		= intel_msic_remove,
 	.driver		= {
 		.name	= "intel_msic",
 		.owner	= THIS_MODULE,

@@ -68,7 +68,7 @@ struct ip_vs_dh_bucket {
 /*
  *	Returns hash value for IPVS DH entry
  */
-static inline unsigned ip_vs_dh_hashkey(int af, const union nf_inet_addr *addr)
+static inline unsigned int ip_vs_dh_hashkey(int af, const union nf_inet_addr *addr)
 {
 	__be32 addr_fold = addr->ip;
 
@@ -149,7 +149,7 @@ static int ip_vs_dh_init_svc(struct ip_vs_service *svc)
 
 	/* allocate the DH table for this service */
 	tbl = kmalloc(sizeof(struct ip_vs_dh_bucket)*IP_VS_DH_TAB_SIZE,
-		      GFP_ATOMIC);
+		      GFP_KERNEL);
 	if (tbl == NULL)
 		return -ENOMEM;
 
@@ -215,7 +215,7 @@ ip_vs_dh_schedule(struct ip_vs_service *svc, const struct sk_buff *skb)
 	struct ip_vs_dh_bucket *tbl;
 	struct ip_vs_iphdr iph;
 
-	ip_vs_fill_iphdr(svc->af, skb_network_header(skb), &iph);
+	ip_vs_fill_iph_addr_only(svc->af, skb, &iph);
 
 	IP_VS_DBG(6, "%s(): Scheduling...\n", __func__);
 

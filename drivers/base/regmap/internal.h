@@ -15,9 +15,17 @@
 
 #include <linux/regmap.h>
 #include <linux/fs.h>
+#include <linux/list.h>
 
 struct regmap;
 struct regcache_ops;
+
+struct regmap_debugfs_off_cache {
+	struct list_head list;
+	off_t min;
+	off_t max;
+	unsigned int base_reg;
+};
 
 struct regmap_format {
 	size_t buf_size;
@@ -26,21 +34,34 @@ struct regmap_format {
 	size_t val_bytes;
 	void (*format_write)(struct regmap *map,
 			     unsigned int reg, unsigned int val);
-	void (*format_reg)(void *buf, unsigned int reg);
-	void (*format_val)(void *buf, unsigned int val);
+	void (*format_reg)(void *buf, unsigned int reg, unsigned int shift);
+	void (*format_val)(void *buf, unsigned int val, unsigned int shift);
 	unsigned int (*parse_val)(void *buf);
 };
 
 struct regmap {
-	struct mutex lock;
+	struct mutex mutex;
+	spinlock_t spinlock;
+	regmap_lock lock;
+	regmap_unlock unlock;
+	void *lock_arg; /* This is passed to lock/unlock functions */
 
 	struct device *dev; /* Device we do I/O on */
 	void *work_buf;     /* Scratch buffer used to format I/O */
 	struct regmap_format format;  /* Buffer format */
 	const struct regmap_bus *bus;
+	void *bus_context;
+	const char *name;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugfs;
+	const char *debugfs_name;
+
+	unsigned int debugfs_reg_len;
+	unsigned int debugfs_val_len;
+	unsigned int debugfs_tot_len;
+
+	struct list_head debugfs_off_cache;
 #endif
 
 	unsigned int max_register;
@@ -48,9 +69,17 @@ struct regmap {
 	bool (*readable_reg)(struct device *dev, unsigned int reg);
 	bool (*volatile_reg)(struct device *dev, unsigned int reg);
 	bool (*precious_reg)(struct device *dev, unsigned int reg);
+	const struct regmap_access_table *wr_table;
+	const struct regmap_access_table *rd_table;
+	const struct regmap_access_table *volatile_table;
+	const struct regmap_access_table *precious_table;
 
 	u8 read_flag_mask;
 	u8 write_flag_mask;
+
+	/* number of bits to (left) shift the reg value when formatting*/
+	int reg_shift;
+	int reg_stride;
 
 	/* regcache specific members */
 	const struct regcache_ops *cache_ops;
@@ -79,6 +108,12 @@ struct regmap {
 
 	struct reg_default *patch;
 	int patch_regs;
+
+	/* if set, converts bulk rw to single rw */
+	bool use_single_rw;
+
+	struct rb_root range_tree;
+	void *selector_work_buf;	/* Scratch buffer used for selector */
 };
 
 struct regcache_ops {
@@ -99,13 +134,29 @@ bool regmap_precious(struct regmap *map, unsigned int reg);
 int _regmap_write(struct regmap *map, unsigned int reg,
 		  unsigned int val);
 
+struct regmap_range_node {
+	struct rb_node node;
+	const char *name;
+	struct regmap *map;
+
+	unsigned int range_min;
+	unsigned int range_max;
+
+	unsigned int selector_reg;
+	unsigned int selector_mask;
+	int selector_shift;
+
+	unsigned int window_start;
+	unsigned int window_len;
+};
+
 #ifdef CONFIG_DEBUG_FS
 extern void regmap_debugfs_initcall(void);
-extern void regmap_debugfs_init(struct regmap *map);
+extern void regmap_debugfs_init(struct regmap *map, const char *name);
 extern void regmap_debugfs_exit(struct regmap *map);
 #else
 static inline void regmap_debugfs_initcall(void) { }
-static inline void regmap_debugfs_init(struct regmap *map) { }
+static inline void regmap_debugfs_init(struct regmap *map, const char *name) { }
 static inline void regmap_debugfs_exit(struct regmap *map) { }
 #endif
 

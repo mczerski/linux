@@ -88,7 +88,7 @@ struct lib_info {
 static int load_flat_shared_library(int id, struct lib_info *p);
 #endif
 
-static int load_flat_binary(struct linux_binprm *, struct pt_regs * regs);
+static int load_flat_binary(struct linux_binprm *);
 static int flat_core_dump(struct coredump_params *cprm);
 
 static struct linux_binfmt flat_format = {
@@ -107,7 +107,7 @@ static struct linux_binfmt flat_format = {
 static int flat_core_dump(struct coredump_params *cprm)
 {
 	printk("Process %s:%d received signr %d and should have core dumped\n",
-			current->comm, current->pid, (int) cprm->signr);
+			current->comm, current->pid, (int) cprm->siginfo->si_signo);
 	return(1);
 }
 
@@ -562,7 +562,7 @@ static int load_flat_file(struct linux_binprm * bprm,
 				realdatastart = (unsigned long) -ENOMEM;
 			printk("Unable to allocate RAM for process data, errno %d\n",
 					(int)-realdatastart);
-			do_munmap(current->mm, textpos, text_len);
+			vm_munmap(textpos, text_len);
 			ret = realdatastart;
 			goto err;
 		}
@@ -586,8 +586,8 @@ static int load_flat_file(struct linux_binprm * bprm,
 		}
 		if (IS_ERR_VALUE(result)) {
 			printk("Unable to read data+bss, errno %d\n", (int)-result);
-			do_munmap(current->mm, textpos, text_len);
-			do_munmap(current->mm, realdatastart, len);
+			vm_munmap(textpos, text_len);
+			vm_munmap(realdatastart, len);
 			ret = result;
 			goto err;
 		}
@@ -654,7 +654,7 @@ static int load_flat_file(struct linux_binprm * bprm,
 		}
 		if (IS_ERR_VALUE(result)) {
 			printk("Unable to read code+data+bss, errno %d\n",(int)-result);
-			do_munmap(current->mm, textpos, text_len + data_len + extra +
+			vm_munmap(textpos, text_len + data_len + extra +
 				MAX_SHARED_LIBS * sizeof(unsigned long));
 			ret = result;
 			goto err;
@@ -858,9 +858,10 @@ out:
  * libraries.  There is no binary dependent code anywhere else.
  */
 
-static int load_flat_binary(struct linux_binprm * bprm, struct pt_regs * regs)
+static int load_flat_binary(struct linux_binprm * bprm)
 {
 	struct lib_info libinfo;
+	struct pt_regs *regs = current_pt_regs();
 	unsigned long p = bprm->p;
 	unsigned long stack_len;
 	unsigned long start_addr;

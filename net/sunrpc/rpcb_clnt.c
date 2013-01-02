@@ -23,7 +23,6 @@
 #include <linux/errno.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-#include <linux/nsproxy.h>
 #include <net/ipv6.h>
 
 #include <linux/sunrpc/clnt.h>
@@ -180,14 +179,16 @@ void rpcb_put_local(struct net *net)
 	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
 	struct rpc_clnt *clnt = sn->rpcb_local_clnt;
 	struct rpc_clnt *clnt4 = sn->rpcb_local_clnt4;
-	int shutdown;
+	int shutdown = 0;
 
 	spin_lock(&sn->rpcb_clnt_lock);
-	if (--sn->rpcb_users == 0) {
-		sn->rpcb_local_clnt = NULL;
-		sn->rpcb_local_clnt4 = NULL;
+	if (sn->rpcb_users) {
+		if (--sn->rpcb_users == 0) {
+			sn->rpcb_local_clnt = NULL;
+			sn->rpcb_local_clnt4 = NULL;
+		}
+		shutdown = !sn->rpcb_users;
 	}
-	shutdown = !sn->rpcb_users;
 	spin_unlock(&sn->rpcb_clnt_lock);
 
 	if (shutdown) {
@@ -249,7 +250,7 @@ static int rpcb_create_local_unix(struct net *net)
 	if (IS_ERR(clnt)) {
 		dprintk("RPC:       failed to create AF_LOCAL rpcbind "
 				"client (errno %ld).\n", PTR_ERR(clnt));
-		result = -PTR_ERR(clnt);
+		result = PTR_ERR(clnt);
 		goto out;
 	}
 
@@ -296,7 +297,7 @@ static int rpcb_create_local_net(struct net *net)
 	if (IS_ERR(clnt)) {
 		dprintk("RPC:       failed to create local rpcbind "
 				"client (errno %ld).\n", PTR_ERR(clnt));
-		result = -PTR_ERR(clnt);
+		result = PTR_ERR(clnt);
 		goto out;
 	}
 
@@ -394,6 +395,7 @@ static int rpcb_register_call(struct rpc_clnt *clnt, struct rpc_message *msg)
 
 /**
  * rpcb_register - set or unset a port registration with the local rpcbind svc
+ * @net: target network namespace
  * @prog: RPC program number to bind
  * @vers: RPC version number to bind
  * @prot: transport protocol to register
@@ -521,6 +523,7 @@ static int rpcb_unregister_all_protofamilies(struct sunrpc_net *sn,
 
 /**
  * rpcb_v4_register - set or unset a port registration with the local rpcbind
+ * @net: target network namespace
  * @program: RPC program number of service to (un)register
  * @version: RPC version number of service to (un)register
  * @address: address family, IP address, and port to (un)register
@@ -880,7 +883,10 @@ static void encode_rpcb_string(struct xdr_stream *xdr, const char *string,
 	u32 len;
 
 	len = strlen(string);
-	BUG_ON(len > maxstrlen);
+	WARN_ON_ONCE(len > maxstrlen);
+	if (len > maxstrlen)
+		/* truncate and hope for the best */
+		len = maxstrlen;
 	p = xdr_reserve_space(xdr, 4 + len);
 	xdr_encode_opaque(p, string, len);
 }

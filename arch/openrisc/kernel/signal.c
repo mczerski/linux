@@ -34,8 +34,6 @@
 
 #define DEBUG_SIG 0
 
-#define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
 asmlinkage long
 _sys_sigaltstack(const stack_t *uss, stack_t *uoss, struct pt_regs *regs)
 {
@@ -80,7 +78,6 @@ asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe *frame = (struct rt_sigframe __user *)regs->sp;
 	sigset_t set;
-	int ret;
 
 	/*
 	 * Since we stacked the signal on a dword boundary,
@@ -95,7 +92,6 @@ asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 	if (__copy_from_user(&set, &frame->uc.uc_sigmask, sizeof(set)))
 		goto badframe;
 
-	sigdelsetmask(&set, ~_BLOCKABLE);
 	set_current_blocked(&set);
 
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext))
@@ -103,7 +99,8 @@ asmlinkage long _sys_rt_sigreturn(struct pt_regs *regs)
 
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
-	ret = do_sigaltstack(&frame->uc.uc_stack, NULL, regs->sp);
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs->sp) == -EFAULT)
+		goto badframe;
 
 	return regs->gpr[11];
 
@@ -235,10 +232,10 @@ give_sigsegv:
 	return -EFAULT;
 }
 
-static inline int
+static inline void
 handle_signal(unsigned long sig,
 	      siginfo_t *info, struct k_sigaction *ka,
-	      sigset_t *oldset, struct pt_regs *regs)
+	      struct pt_regs *regs)
 {
 	int ret;
 
@@ -261,15 +258,15 @@ handle_signal(unsigned long sig,
 			regs->pc -= 4;
 			break;
 		}
+		regs->orig_gpr11 = -1;
 	}
 
-	ret = setup_rt_frame(sig, ka, info, oldset, regs);
+	ret = setup_rt_frame(sig, ka, info, sigmask_to_save(), regs);
 	if (ret)
-		return ret;
+		return;
 
-	block_sigmask(ka, sig);
-
-	return 0;
+	signal_delivered(sig, info, ka, regs,
+				 test_thread_flag(TIF_SINGLESTEP));
 }
 
 /*
@@ -284,12 +281,11 @@ handle_signal(unsigned long sig,
  * mode below.
  */
 
-static void do_signal(struct pt_regs *regs)
+void do_signal(struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
 	struct k_sigaction ka;
-	sigset_t *oldset;
 
 	/*
 	 * We want the common case to go fast, which
@@ -300,22 +296,9 @@ static void do_signal(struct pt_regs *regs)
 	if (!user_mode(regs))
 		return;
 
-	if (test_thread_flag(TIF_RESTORE_SIGMASK))
-		oldset = &current->saved_sigmask;
-	else
-		oldset = &current->blocked;
-
 	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
-		if (!handle_signal(signr, &info, &ka, oldset, regs)) {
-			/*
-			 * A signal was successfully delivered; the saved
-			 * sigmask will have been stored in the signal frame,
-			 * and will be restored by sigreturn, so we can simply
-			 * clear the TIF_RESTORE_SIGMASK flag.
-			 */
-			clear_thread_flag(TIF_RESTORE_SIGMASK);
-		}
+		handle_signal(signr, &info, &ka, regs);
 		return;
 	}
 
@@ -335,28 +318,23 @@ static void do_signal(struct pt_regs *regs)
 			regs->pc -= 4;
 			break;
 		}
+		regs->orig_gpr11 = -1;
 	}
 
 	/*
 	 * If there's no signal to deliver, we just put the saved sigmask
 	 * back.
 	 */
-	if (test_thread_flag(TIF_RESTORE_SIGMASK)) {
-		clear_thread_flag(TIF_RESTORE_SIGMASK);
-		sigprocmask(SIG_SETMASK, &current->saved_sigmask, NULL);
-	}
+	restore_saved_sigmask();
 }
 
 asmlinkage void do_notify_resume(struct pt_regs *regs)
 {
-	if (current_thread_info()->flags
-				& (_TIF_SIGPENDING | _TIF_RESTORE_SIGMASK))
+	if (current_thread_info()->flags & _TIF_SIGPENDING)
 		do_signal(regs);
 
 	if (current_thread_info()->flags & _TIF_NOTIFY_RESUME) {
 		clear_thread_flag(TIF_NOTIFY_RESUME);
 		tracehook_notify_resume(regs);
-		if (current->replacement_session_keyring)
-			key_replace_session_keyring();
 	}
 }

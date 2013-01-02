@@ -18,8 +18,8 @@
 #include <linux/gpio.h>
 #include <linux/module.h>
 
-#include "../iio.h"
-#include "../sysfs.h"
+#include <linux/iio/iio.h>
+#include <linux/iio/sysfs.h>
 #include "ad2s1210.h"
 
 #define DRV_NAME "ad2s1210"
@@ -200,7 +200,7 @@ static ssize_t ad2s1210_store_softreset(struct device *dev,
 					const char *buf,
 					size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	int ret;
 
 	mutex_lock(&st->lock);
@@ -214,7 +214,7 @@ static ssize_t ad2s1210_show_fclkin(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	return sprintf(buf, "%d\n", st->fclkin);
 }
 
@@ -223,7 +223,7 @@ static ssize_t ad2s1210_store_fclkin(struct device *dev,
 				     const char *buf,
 				     size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	unsigned long fclkin;
 	int ret;
 
@@ -252,7 +252,7 @@ static ssize_t ad2s1210_show_fexcit(struct device *dev,
 				    struct device_attribute *attr,
 				    char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	return sprintf(buf, "%d\n", st->fexcit);
 }
 
@@ -260,7 +260,7 @@ static ssize_t ad2s1210_store_fexcit(struct device *dev,
 				     struct device_attribute *attr,
 				     const char *buf, size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	unsigned long fexcit;
 	int ret;
 
@@ -287,7 +287,7 @@ static ssize_t ad2s1210_show_control(struct device *dev,
 				     struct device_attribute *attr,
 				     char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	int ret;
 	mutex_lock(&st->lock);
 	ret = ad2s1210_config_read(st, AD2S1210_REG_CONTROL);
@@ -299,7 +299,7 @@ static ssize_t ad2s1210_store_control(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	unsigned long udata;
 	unsigned char data;
 	int ret;
@@ -345,7 +345,7 @@ error_ret:
 static ssize_t ad2s1210_show_resolution(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	return sprintf(buf, "%d\n", st->resolution);
 }
 
@@ -353,7 +353,7 @@ static ssize_t ad2s1210_store_resolution(struct device *dev,
 			struct device_attribute *attr,
 			const char *buf, size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	unsigned char data;
 	unsigned long udata;
 	int ret;
@@ -403,7 +403,7 @@ error_ret:
 static ssize_t ad2s1210_show_fault(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	int ret;
 
 	mutex_lock(&st->lock);
@@ -418,7 +418,7 @@ static ssize_t ad2s1210_clear_fault(struct device *dev,
 				    const char *buf,
 				    size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	int ret;
 
 	mutex_lock(&st->lock);
@@ -441,7 +441,7 @@ static ssize_t ad2s1210_show_reg(struct device *dev,
 				 struct device_attribute *attr,
 				 char *buf)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	struct iio_dev_attr *iattr = to_iio_dev_attr(attr);
 	int ret;
 
@@ -455,7 +455,7 @@ static ssize_t ad2s1210_show_reg(struct device *dev,
 static ssize_t ad2s1210_store_reg(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t len)
 {
-	struct ad2s1210_state *st = iio_priv(dev_get_drvdata(dev));
+	struct ad2s1210_state *st = iio_priv(dev_to_iio_dev(dev));
 	unsigned long data;
 	int ret;
 	struct iio_dev_attr *iattr = to_iio_dev_attr(attr);
@@ -575,15 +575,17 @@ static IIO_DEVICE_ATTR(lot_low_thrd, S_IRUGO | S_IWUSR,
 		       AD2S1210_REG_LOT_LOW_THRD);
 
 
-static struct iio_chan_spec ad2s1210_channels[] = {
+static const struct iio_chan_spec ad2s1210_channels[] = {
 	{
 		.type = IIO_ANGL,
 		.indexed = 1,
 		.channel = 0,
+		.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT,
 	}, {
 		.type = IIO_ANGL_VEL,
 		.indexed = 1,
 		.channel = 0,
+		.info_mask = IIO_CHAN_INFO_RAW_SEPARATE_BIT,
 	}
 };
 
@@ -608,7 +610,7 @@ static const struct attribute_group ad2s1210_attribute_group = {
 	.attrs = ad2s1210_attributes,
 };
 
-static int __devinit ad2s1210_initial(struct ad2s1210_state *st)
+static int ad2s1210_initial(struct ad2s1210_state *st)
 {
 	unsigned char data;
 	int ret;
@@ -679,7 +681,7 @@ static void ad2s1210_free_gpios(struct ad2s1210_state *st)
 	gpio_free_array(ad2s1210_gpios, ARRAY_SIZE(ad2s1210_gpios));
 }
 
-static int __devinit ad2s1210_probe(struct spi_device *spi)
+static int ad2s1210_probe(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev;
 	struct ad2s1210_state *st;
@@ -688,7 +690,7 @@ static int __devinit ad2s1210_probe(struct spi_device *spi)
 	if (spi->dev.platform_data == NULL)
 		return -EINVAL;
 
-	indio_dev = iio_allocate_device(sizeof(*st));
+	indio_dev = iio_device_alloc(sizeof(*st));
 	if (indio_dev == NULL) {
 		ret = -ENOMEM;
 		goto error_ret;
@@ -729,18 +731,18 @@ static int __devinit ad2s1210_probe(struct spi_device *spi)
 error_free_gpios:
 	ad2s1210_free_gpios(st);
 error_free_dev:
-	iio_free_device(indio_dev);
+	iio_device_free(indio_dev);
 error_ret:
 	return ret;
 }
 
-static int __devexit ad2s1210_remove(struct spi_device *spi)
+static int ad2s1210_remove(struct spi_device *spi)
 {
 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
 
 	iio_device_unregister(indio_dev);
 	ad2s1210_free_gpios(iio_priv(indio_dev));
-	iio_free_device(indio_dev);
+	iio_device_free(indio_dev);
 
 	return 0;
 }
@@ -757,7 +759,7 @@ static struct spi_driver ad2s1210_driver = {
 		.owner = THIS_MODULE,
 	},
 	.probe = ad2s1210_probe,
-	.remove = __devexit_p(ad2s1210_remove),
+	.remove = ad2s1210_remove,
 	.id_table = ad2s1210_id,
 };
 module_spi_driver(ad2s1210_driver);

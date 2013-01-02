@@ -19,7 +19,9 @@
 #include <linux/platform_device.h>
 #include <linux/delay.h>
 #include <linux/percpu.h>
+#include <linux/of.h>
 
+#include <asm/arch_timer.h>
 #include <asm/hardware/gic.h>
 #include <asm/localtimer.h>
 
@@ -388,6 +390,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
 {
 	struct mct_clock_event_device *mevt;
 	unsigned int cpu = smp_processor_id();
+	int mct_lx_irq;
 
 	mevt = this_cpu_ptr(&percpu_mct_tick);
 	mevt->evt = evt;
@@ -414,14 +417,18 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
 
 	if (mct_int_type == MCT_INT_SPI) {
 		if (cpu == 0) {
+			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L0 :
+						EXYNOS5_IRQ_MCT_L0;
 			mct_tick0_event_irq.dev_id = mevt;
-			evt->irq = EXYNOS4_IRQ_MCT_L0;
-			setup_irq(EXYNOS4_IRQ_MCT_L0, &mct_tick0_event_irq);
+			evt->irq = mct_lx_irq;
+			setup_irq(mct_lx_irq, &mct_tick0_event_irq);
 		} else {
+			mct_lx_irq = soc_is_exynos4210() ? EXYNOS4_IRQ_MCT_L1 :
+						EXYNOS5_IRQ_MCT_L1;
 			mct_tick1_event_irq.dev_id = mevt;
-			evt->irq = EXYNOS4_IRQ_MCT_L1;
-			setup_irq(EXYNOS4_IRQ_MCT_L1, &mct_tick1_event_irq);
-			irq_set_affinity(EXYNOS4_IRQ_MCT_L1, cpumask_of(1));
+			evt->irq = mct_lx_irq;
+			setup_irq(mct_lx_irq, &mct_tick1_event_irq);
+			irq_set_affinity(mct_lx_irq, cpumask_of(1));
 		}
 	} else {
 		enable_percpu_irq(EXYNOS_IRQ_MCT_LOCALTIMER, 0);
@@ -471,9 +478,14 @@ static void __init exynos4_timer_resources(void)
 #endif /* CONFIG_LOCAL_TIMERS */
 }
 
-static void __init exynos4_timer_init(void)
+static void __init exynos_timer_init(void)
 {
-	if (soc_is_exynos4210())
+	if (soc_is_exynos5440()) {
+		arch_timer_of_register();
+		return;
+	}
+
+	if ((soc_is_exynos4210()) || (soc_is_exynos5250()))
 		mct_int_type = MCT_INT_SPI;
 	else
 		mct_int_type = MCT_INT_PPI;
@@ -484,5 +496,5 @@ static void __init exynos4_timer_init(void)
 }
 
 struct sys_timer exynos4_timer = {
-	.init		= exynos4_timer_init,
+	.init		= exynos_timer_init,
 };

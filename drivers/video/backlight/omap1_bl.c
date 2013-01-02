@@ -18,6 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -25,10 +27,10 @@
 #include <linux/fb.h>
 #include <linux/backlight.h>
 #include <linux/slab.h>
+#include <linux/platform_data/omap1_bl.h>
 
 #include <mach/hardware.h>
-#include <plat/board.h>
-#include <plat/mux.h>
+#include <mach/mux.h>
 
 #define OMAPBL_MAX_INTENSITY		0xff
 
@@ -40,12 +42,12 @@ struct omap_backlight {
 	struct omap_backlight_config *pdata;
 };
 
-static void inline omapbl_send_intensity(int intensity)
+static inline void omapbl_send_intensity(int intensity)
 {
 	omap_writeb(intensity, OMAP_PWL_ENABLE);
 }
 
-static void inline omapbl_send_enable(int enable)
+static inline void omapbl_send_enable(int enable)
 {
 	omap_writeb(enable, OMAP_PWL_CLK_ENABLE);
 }
@@ -168,7 +170,7 @@ static int omapbl_probe(struct platform_device *pdev)
 	dev->props.brightness = pdata->default_intensity;
 	omapbl_update_status(dev);
 
-	printk(KERN_INFO "OMAP LCD backlight initialised\n");
+	pr_info("OMAP LCD backlight initialised\n");
 
 	return 0;
 }

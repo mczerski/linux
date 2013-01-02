@@ -7,7 +7,7 @@ config NET_VENDOR_INTEL
 	default y
 	depends on PCI || PCI_MSI || ISA || ISA_DMA_API || ARM || \
 		   ARCH_ACORN || MCA || MCA_LEGACY || SNI_RM || SUN3 || \
-		   GSC || BVME6000 || MVME16x || ARCH_ENP2611 || \
+		   GSC || BVME6000 || MVME16x || \
 		   (ARM && ARCH_IXP4XX && IXP4XX_NPE && IXP4XX_QMGR) || \
 		   EXPERIMENTAL
 	---help---
@@ -93,6 +93,7 @@ config E1000E
 config IGB
 	tristate "Intel(R) 82575/82576 PCI-Express Gigabit Ethernet support"
 	depends on PCI
+	select PTP_1588_CLOCK
 	---help---
 	  This driver supports Intel(R) 82575/82576 gigabit ethernet family of
 	  adapters.  For more information on how to identify your adapter, go
@@ -165,8 +166,9 @@ config IXGB
 
 config IXGBE
 	tristate "Intel(R) 10GbE PCI Express adapters support"
-	depends on PCI && INET
+	depends on PCI
 	select MDIO
+	select PTP_1588_CLOCK
 	---help---
 	  This driver supports Intel(R) 10GbE PCI Express family of
 	  adapters.  For more information on how to identify your adapter, go
@@ -181,6 +183,14 @@ config IXGBE
 
 	  To compile this driver as a module, choose M here. The module
 	  will be called ixgbe.
+
+config IXGBE_HWMON
+	bool "Intel(R) 10GbE PCI Express adapters HWMON support"
+	default y
+	depends on IXGBE && HWMON && !(IXGBE=y && HWMON=m)
+	---help---
+	  Say Y if you want to expose the thermal sensor data on some of
+	  our cards, via a hwmon sysfs interface.
 
 config IXGBE_DCA
 	bool "Direct Cache Access (DCA) Support"
