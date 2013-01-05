@@ -3,7 +3,6 @@
 #include <linux/ioport.h>
 #include <linux/errno.h>
 #include <linux/of.h>
-#include <linux/errno.h>
 
 #ifdef CONFIG_OF_ADDRESS
 extern u64 of_translate_address(struct device_node *np, const __be32 *addr);

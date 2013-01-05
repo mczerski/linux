@@ -2,8 +2,4 @@ LOAD_CURRENT_THREAD_INFO is not used anywhere
 
 Implement memcpy and memset (string.h)
 
-DMA implementation
-
-Should interrupt handlers run with interrupts enabled??? Who enables the interrupts?
-
 switch bootmem allocation over to memblock
