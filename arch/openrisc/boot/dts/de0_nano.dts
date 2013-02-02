@@ -74,15 +74,27 @@
 			reg = <0x1D>;
 			interrupts = <26>;
 		}; 
-	}; 
+	};
 	
-//	ohs900: ocores@9c000000 {
-//		compatible = "opencores,ohs900-ocores";
-//		reg = <0x9c000000 0x100>;
-//		interrupts = <20 21>;
-//		can_wakeup = <1>;
-//		potpg = <10>;
-//		power = <250>;
-//	};
+	ps2_0: ocps2@94000000 {
+		compatible = "opencores,ocps2", "ocps2";
+		reg = <0x94000000 0x2>;
+		interrupts = <27>;
+	};
+
+	ps2_1: ocps2@95000000 {
+		compatible = "opencores,ocps2", "ocps2";
+		reg = <0x95000000 0x2>;
+		interrupts = <28>;
+	};
+	
+	ohs900: ocores@9c000000 {
+		compatible = "opencores,ohs900-ocores";
+		reg = <0x9c000000 0x100>;
+		interrupts = <20 21>;
+		can_wakeup = <1>;
+		potpg = <10>;
+		power = <250>;
+	};
 	
 };
