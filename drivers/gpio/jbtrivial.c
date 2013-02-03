@@ -23,6 +23,7 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 
 struct jbgpio_instance {
 	struct of_mm_gpio_chip mmchip;

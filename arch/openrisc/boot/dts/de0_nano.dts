@@ -73,7 +73,11 @@
 			compatible = "adxl34x";
 			reg = <0x1D>;
 			interrupts = <26>;
-		}; 
+		};
+		eeprom@50 {
+			compatible = "at24,24c02"; 
+			reg = <0x50>;
+		};
 	};
 	
 	ps2_0: ocps2@94000000 {
@@ -97,4 +101,113 @@
 		power = <250>;
 	};
 	
+	spi0: spi0@b0000000 {
+		compatible = "opencores,spi-simple";
+		reg = <0xb0000000 0x5>;
+
+		/* Devices connected on this SPI bus get
+		 * defined here; address- and size-cells
+		 * apply to these child devices.
+		 */
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		flash0: mtd@0 {
+			compatible = "st,m25p10";
+			reg = <0>;
+			spi-max-frequency = <25000000>;
+
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			partition@0 {
+				label = "FPGA image";
+				reg = <0x00000000 0x000b0000>;
+				read-only;
+			};
+			partition@b0000 {
+				label = "bootloader";
+				reg = <0x000b0000 0x00050000>;
+				read-only;
+			};
+			partition@100000 {
+				label = "free space";
+				reg = <0x00100000 0x00700000>;
+			};
+		};
+	};
+
+	spi1: spi1@b1000000 {
+		compatible = "opencores,spi-simple";
+		reg = <0xb1000000 0x5>;
+
+		/* Devices connected on this SPI bus get
+		 * defined here; address- and size-cells
+		 * apply to these child devices.
+		 */
+
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		adc@0 {
+			compatible = "adcxx,adcxx8s";
+			reg = <0>;
+			spi-max-frequency = <1000000>;
+		};
+		/* Example SD card slot at chipselect 0 */
+		/* mmc-spi-slot@0 {
+			compatible = "mmc-spi-slot";
+			reg = <0>;
+			spi-max-frequency = <10000000>;
+		}; */
+	};
+	
+	gpio0: gpio@91000000 {
+		compatible = "opencores,jbtrivial";
+		reg = <0x91000000 0x2>;
+		#gpio-cells = <2>;
+		gpio-controller;
+		xlnx,data-offset = <0>;
+		xlnx,tri-offset = <1>;
+		xlnx,gpio-width = <8>;
+	};
+	
+	gpio-leds {
+		compatible = "gpio-leds";
+		heartbeat {
+			label = "Heartbeat";
+			gpios = <&gpio0 0 0x0>;
+			linux,default-trigger = "heartbeat";
+		};
+		led1 {
+			label = "led1";
+			gpios = <&gpio0 1 0x0>;
+		};
+		led2 {
+			label = "led2";
+			gpios = <&gpio0 2 0x0>;
+		};
+		led3 {
+			label = "led3";
+			gpios = <&gpio0 3 0x0>;
+		};
+		led4 {
+			label = "led4";
+			gpios = <&gpio0 4 0x0>;
+		};
+		led5 {
+			label = "led5";
+			gpios = <&gpio0 5 0x0>;
+		};
+		led6 {
+			label = "led6";
+			gpios = <&gpio0 6 0x0>;
+		};
+		led7 {
+			label = "led7";
+			gpios = <&gpio0 7 0x0>;
+		};
+	};
+		
 };
