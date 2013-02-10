@@ -505,13 +505,25 @@ static int init_render_ring(struct intel_ring_buffer *ring)
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	int ret = init_ring_common(ring);
 
-	if (INTEL_INFO(dev)->gen > 3) {
+	if (INTEL_INFO(dev)->gen > 3)
 		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(VS_TIMER_DISPATCH));
-		if (IS_GEN7(dev))
-			I915_WRITE(GFX_MODE_GEN7,
-				   _MASKED_BIT_DISABLE(GFX_TLB_INVALIDATE_ALWAYS) |
-				   _MASKED_BIT_ENABLE(GFX_REPLAY_MODE));
-	}
+
+	/* We need to disable the AsyncFlip performance optimisations in order
+	 * to use MI_WAIT_FOR_EVENT within the CS. It should already be
+	 * programmed to '1' on all products.
+	 */
+	if (INTEL_INFO(dev)->gen >= 6)
+		I915_WRITE(MI_MODE, _MASKED_BIT_ENABLE(ASYNC_FLIP_PERF_DISABLE));
+
+	/* Required for the hardware to program scanline values for waiting */
+	if (INTEL_INFO(dev)->gen == 6)
+		I915_WRITE(GFX_MODE,
+			   _MASKED_BIT_ENABLE(GFX_TLB_INVALIDATE_ALWAYS));
+
+	if (IS_GEN7(dev))
+		I915_WRITE(GFX_MODE_GEN7,
+			   _MASKED_BIT_DISABLE(GFX_TLB_INVALIDATE_ALWAYS) |
+			   _MASKED_BIT_ENABLE(GFX_REPLAY_MODE));
 
 	if (INTEL_INFO(dev)->gen >= 5) {
 		ret = init_pipe_control(ring);
@@ -547,8 +559,13 @@ static int init_render_ring(struct intel_ring_buffer *ring)
 
 static void render_ring_cleanup(struct intel_ring_buffer *ring)
 {
+	struct drm_device *dev = ring->dev;
+
 	if (!ring->private)
 		return;
+
+	if (HAS_BROKEN_CS_TLB(dev))
+		drm_gem_object_unreference(to_gem_object(ring->private));
 
 	cleanup_pipe_control(ring);
 }
@@ -969,6 +986,8 @@ i965_dispatch_execbuffer(struct intel_ring_buffer *ring,
 	return 0;
 }
 
+/* Just userspace ABI convention to limit the wa batch bo to a resonable size */
+#define I830_BATCH_LIMIT (256*1024)
 static int
 i830_dispatch_execbuffer(struct intel_ring_buffer *ring,
 				u32 offset, u32 len,
@@ -976,15 +995,47 @@ i830_dispatch_execbuffer(struct intel_ring_buffer *ring,
 {
 	int ret;
 
-	ret = intel_ring_begin(ring, 4);
-	if (ret)
-		return ret;
+	if (flags & I915_DISPATCH_PINNED) {
+		ret = intel_ring_begin(ring, 4);
+		if (ret)
+			return ret;
 
-	intel_ring_emit(ring, MI_BATCH_BUFFER);
-	intel_ring_emit(ring, offset | (flags & I915_DISPATCH_SECURE ? 0 : MI_BATCH_NON_SECURE));
-	intel_ring_emit(ring, offset + len - 8);
-	intel_ring_emit(ring, 0);
-	intel_ring_advance(ring);
+		intel_ring_emit(ring, MI_BATCH_BUFFER);
+		intel_ring_emit(ring, offset | (flags & I915_DISPATCH_SECURE ? 0 : MI_BATCH_NON_SECURE));
+		intel_ring_emit(ring, offset + len - 8);
+		intel_ring_emit(ring, MI_NOOP);
+		intel_ring_advance(ring);
+	} else {
+		struct drm_i915_gem_object *obj = ring->private;
+		u32 cs_offset = obj->gtt_offset;
+
+		if (len > I830_BATCH_LIMIT)
+			return -ENOSPC;
+
+		ret = intel_ring_begin(ring, 9+3);
+		if (ret)
+			return ret;
+		/* Blit the batch (which has now all relocs applied) to the stable batch
+		 * scratch bo area (so that the CS never stumbles over its tlb
+		 * invalidation bug) ... */
+		intel_ring_emit(ring, XY_SRC_COPY_BLT_CMD |
+				XY_SRC_COPY_BLT_WRITE_ALPHA |
+				XY_SRC_COPY_BLT_WRITE_RGB);
+		intel_ring_emit(ring, BLT_DEPTH_32 | BLT_ROP_GXCOPY | 4096);
+		intel_ring_emit(ring, 0);
+		intel_ring_emit(ring, (DIV_ROUND_UP(len, 4096) << 16) | 1024);
+		intel_ring_emit(ring, cs_offset);
+		intel_ring_emit(ring, 0);
+		intel_ring_emit(ring, 4096);
+		intel_ring_emit(ring, offset);
+		intel_ring_emit(ring, MI_FLUSH);
+
+		/* ... and execute it. */
+		intel_ring_emit(ring, MI_BATCH_BUFFER);
+		intel_ring_emit(ring, cs_offset | (flags & I915_DISPATCH_SECURE ? 0 : MI_BATCH_NON_SECURE));
+		intel_ring_emit(ring, cs_offset + len - 8);
+		intel_ring_advance(ring);
+	}
 
 	return 0;
 }
@@ -1595,6 +1646,27 @@ int intel_init_render_ring_buffer(struct drm_device *dev)
 		ring->dispatch_execbuffer = i915_dispatch_execbuffer;
 	ring->init = init_render_ring;
 	ring->cleanup = render_ring_cleanup;
+
+	/* Workaround batchbuffer to combat CS tlb bug. */
+	if (HAS_BROKEN_CS_TLB(dev)) {
+		struct drm_i915_gem_object *obj;
+		int ret;
+
+		obj = i915_gem_alloc_object(dev, I830_BATCH_LIMIT);
+		if (obj == NULL) {
+			DRM_ERROR("Failed to allocate batch bo\n");
+			return -ENOMEM;
+		}
+
+		ret = i915_gem_object_pin(obj, 0, true, false);
+		if (ret != 0) {
+			drm_gem_object_unreference(&obj->base);
+			DRM_ERROR("Failed to ping batch bo\n");
+			return ret;
+		}
+
+		ring->private = obj;
+	}
 
 	return intel_init_ring_buffer(dev, ring);
 }

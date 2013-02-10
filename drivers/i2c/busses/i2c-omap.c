@@ -803,7 +803,7 @@ static int errata_omap3_i462(struct omap_i2c_dev *dev)
 			if (stat & OMAP_I2C_STAT_AL) {
 				dev_err(dev->dev, "Arbitration lost\n");
 				dev->cmd_err |= OMAP_I2C_STAT_AL;
-				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_NACK);
+				omap_i2c_ack_stat(dev, OMAP_I2C_STAT_AL);
 			}
 
 			return -EIO;
@@ -963,7 +963,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
 				i2c_omap_errata_i207(dev, stat);
 
 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_RDR);
-			break;
+			continue;
 		}
 
 		if (stat & OMAP_I2C_STAT_RRDY) {
@@ -989,7 +989,7 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
 				break;
 
 			omap_i2c_ack_stat(dev, OMAP_I2C_STAT_XDR);
-			break;
+			continue;
 		}
 
 		if (stat & OMAP_I2C_STAT_XRDY) {
@@ -1069,7 +1069,7 @@ MODULE_DEVICE_TABLE(of, omap_i2c_of_match);
 #define OMAP_I2C_SCHEME_0		0
 #define OMAP_I2C_SCHEME_1		1
 
-static int __devinit
+static int
 omap_i2c_probe(struct platform_device *pdev)
 {
 	struct omap_i2c_dev	*dev;
@@ -1267,7 +1267,7 @@ err_free_mem:
 	return r;
 }
 
-static int __devexit omap_i2c_remove(struct platform_device *pdev)
+static int omap_i2c_remove(struct platform_device *pdev)
 {
 	struct omap_i2c_dev	*dev = platform_get_drvdata(pdev);
 	int ret;
@@ -1333,7 +1333,7 @@ static struct dev_pm_ops omap_i2c_pm_ops = {
 
 static struct platform_driver omap_i2c_driver = {
 	.probe		= omap_i2c_probe,
-	.remove		= __devexit_p(omap_i2c_remove),
+	.remove		= omap_i2c_remove,
 	.driver		= {
 		.name	= "omap_i2c",
 		.owner	= THIS_MODULE,

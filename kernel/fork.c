@@ -1166,6 +1166,14 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 				current->signal->flags & SIGNAL_UNKILLABLE)
 		return ERR_PTR(-EINVAL);
 
+	/*
+	 * If the new process will be in a different pid namespace
+	 * don't allow the creation of threads.
+	 */
+	if ((clone_flags & (CLONE_VM|CLONE_NEWPID)) &&
+	    (task_active_pid_ns(current) != current->nsproxy->pid_ns))
+		return ERR_PTR(-EINVAL);
+
 	retval = security_task_create(clone_flags);
 	if (retval)
 		goto fork_out;
@@ -1660,8 +1668,10 @@ SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
 		 int, tls_val)
 #endif
 {
-	return do_fork(clone_flags, newsp, 0,
-		parent_tidptr, child_tidptr);
+	long ret = do_fork(clone_flags, newsp, 0, parent_tidptr, child_tidptr);
+	asmlinkage_protect(5, ret, clone_flags, newsp,
+			parent_tidptr, child_tidptr, tls_val);
+	return ret;
 }
 #endif
 

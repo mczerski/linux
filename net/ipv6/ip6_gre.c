@@ -758,8 +758,6 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 		skb_dst_set_noref(skb, dst);
 	}
 
-	skb->transport_header = skb->network_header;
-
 	proto = NEXTHDR_GRE;
 	if (encap_limit >= 0) {
 		init_tel_txopt(&opt, encap_limit);
@@ -768,6 +766,7 @@ static netdev_tx_t ip6gre_xmit2(struct sk_buff *skb,
 
 	skb_push(skb, gre_hlen);
 	skb_reset_network_header(skb);
+	skb_set_transport_header(skb, sizeof(*ipv6h));
 
 	/*
 	 *	Push down and install the IP header.
@@ -961,7 +960,7 @@ static netdev_tx_t ip6gre_tunnel_xmit(struct sk_buff *skb,
 	int ret;
 
 	if (!ip6_tnl_xmit_ctl(t))
-		return -1;
+		goto tx_err;
 
 	switch (skb->protocol) {
 	case htons(ETH_P_IP):
