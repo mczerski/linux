@@ -142,6 +142,22 @@ typedef struct {
 	compat_sigset_word	sig[_COMPAT_NSIG_WORDS];
 } compat_sigset_t;
 
+#ifdef CONFIG_GENERIC_COMPAT_RT_SIGACTION
+struct compat_sigaction {
+#ifndef __ARCH_HAS_ODD_SIGACTION
+	compat_uptr_t			sa_handler;
+	compat_ulong_t			sa_flags;
+#else
+	compat_ulong_t			sa_flags;
+	compat_uptr_t			sa_handler;
+#endif
+#ifdef __ARCH_HAS_SA_RESTORER
+	compat_uptr_t			sa_restorer;
+#endif
+	compat_sigset_t			sa_mask __packed;
+};
+#endif
+
 /*
  * These functions operate strictly on struct compat_time*
  */
@@ -283,6 +299,15 @@ struct compat_robust_list_head {
 	compat_uptr_t			list_op_pending;
 };
 
+#ifdef CONFIG_COMPAT_OLD_SIGACTION
+struct compat_old_sigaction {
+	compat_uptr_t			sa_handler;
+	compat_old_sigset_t		sa_mask;
+	compat_ulong_t			sa_flags;
+	compat_uptr_t			sa_restorer;
+};
+#endif
+
 struct compat_statfs;
 struct compat_statfs64;
 struct compat_old_linux_dirent;
@@ -367,6 +392,11 @@ int get_compat_sigevent(struct sigevent *event,
 		const struct compat_sigevent __user *u_event);
 long compat_sys_rt_tgsigqueueinfo(compat_pid_t tgid, compat_pid_t pid, int sig,
 				  struct compat_siginfo __user *uinfo);
+#ifdef CONFIG_COMPAT_OLD_SIGACTION
+asmlinkage long compat_sys_sigaction(int sig,
+                                   const struct compat_old_sigaction __user *act,
+                                   struct compat_old_sigaction __user *oact);
+#endif
 
 static inline int compat_timeval_compare(struct compat_timeval *lhs,
 					struct compat_timeval *rhs)
@@ -401,7 +431,8 @@ asmlinkage long compat_sys_settimeofday(struct compat_timeval __user *tv,
 asmlinkage long compat_sys_adjtimex(struct compat_timex __user *utp);
 
 extern int compat_printk(const char *fmt, ...);
-extern void sigset_from_compat(sigset_t *set, compat_sigset_t *compat);
+extern void sigset_from_compat(sigset_t *set, const compat_sigset_t *compat);
+extern void sigset_to_compat(compat_sigset_t *compat, const sigset_t *set);
 
 asmlinkage long compat_sys_migrate_pages(compat_pid_t pid,
 		compat_ulong_t maxnode, const compat_ulong_t __user *old_nodes,
@@ -503,7 +534,7 @@ asmlinkage long compat_sys_vmsplice(int fd, const struct compat_iovec __user *,
 				    unsigned int nr_segs, unsigned int flags);
 asmlinkage long compat_sys_open(const char __user *filename, int flags,
 				umode_t mode);
-asmlinkage long compat_sys_openat(unsigned int dfd, const char __user *filename,
+asmlinkage long compat_sys_openat(int dfd, const char __user *filename,
 				  int flags, umode_t mode);
 asmlinkage long compat_sys_open_by_handle_at(int mountdirfd,
 					     struct file_handle __user *handle,
@@ -592,6 +623,27 @@ asmlinkage long compat_sys_rt_sigtimedwait(compat_sigset_t __user *uthese,
 		struct compat_timespec __user *uts, compat_size_t sigsetsize);
 asmlinkage long compat_sys_rt_sigsuspend(compat_sigset_t __user *unewset,
 					 compat_size_t sigsetsize);
+#ifdef CONFIG_GENERIC_COMPAT_RT_SIGPROCMASK
+asmlinkage long compat_sys_rt_sigprocmask(int how, compat_sigset_t __user *set,
+					  compat_sigset_t __user *oset,
+					  compat_size_t sigsetsize);
+#endif
+#ifdef CONFIG_GENERIC_COMPAT_RT_SIGPENDING
+asmlinkage long compat_sys_rt_sigpending(compat_sigset_t __user *uset,
+					 compat_size_t sigsetsize);
+#endif
+#ifndef CONFIG_ODD_RT_SIGACTION
+#ifdef CONFIG_GENERIC_COMPAT_RT_SIGACTION
+asmlinkage long compat_sys_rt_sigaction(int,
+				 const struct compat_sigaction __user *,
+				 struct compat_sigaction __user *,
+				 compat_size_t);
+#endif
+#endif
+#ifdef CONFIG_GENERIC_COMPAT_RT_SIGQUEUEINFO
+asmlinkage long compat_sys_rt_sigqueueinfo(compat_pid_t pid, int sig,
+				struct compat_siginfo __user *uinfo);
+#endif
 asmlinkage long compat_sys_sysinfo(struct compat_sysinfo __user *info);
 asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 				 unsigned long arg);

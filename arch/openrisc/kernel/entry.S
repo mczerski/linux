@@ -1099,10 +1099,6 @@ ENTRY(sys_vfork)
 	l.j	_fork_save_extra_regs_and_call
 	 l.addi	r3,r1,0
 
-ENTRY(sys_sigaltstack)
-	l.j	_sys_sigaltstack
-	 l.addi	r5,r1,0
-
 ENTRY(sys_rt_sigreturn)
 	l.j	_sys_rt_sigreturn
 	 l.addi	r3,r1,0
