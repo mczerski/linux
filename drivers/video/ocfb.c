@@ -52,7 +52,7 @@
 
 #define OCFB_NAME     "OC VGA/LCD"
 
-static char *mode_option __devinitdata = NULL;
+static char *mode_option = NULL;
 
 static const struct fb_videomode default_mode = {
 	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
