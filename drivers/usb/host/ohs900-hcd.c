@@ -1552,7 +1552,7 @@ static struct hc_driver ohs900h_hc_driver = {
 
 /*-------------------------------------------------------------------------*/
 
-static int __devexit ohs900h_remove(struct platform_device *dev)
+static int ohs900h_remove(struct platform_device *dev)
 {
 	struct usb_hcd *hcd = platform_get_drvdata(dev);
 	struct ohs900 *ohs900 = hcd_to_ohs900(hcd);
@@ -1569,7 +1569,7 @@ static int __devexit ohs900h_remove(struct platform_device *dev)
 	return 0;
 }
 
-static int __devinit ohs900h_probe(struct platform_device *pdev)
+static int ohs900h_probe(struct platform_device *pdev)
 {
 
 	struct usb_hcd *hcd;
@@ -1786,7 +1786,7 @@ MODULE_DEVICE_TABLE(of, ocores_ohs900_match);
 MODULE_ALIAS("platform:ohs900");
 struct platform_driver ohs900h_driver = {
 	.probe = ohs900h_probe,
-	.remove = __devexit_p(ohs900h_remove),
+	.remove = ohs900h_remove,
 
 	.suspend = ohs900h_suspend,
 	.resume = ohs900h_resume,
