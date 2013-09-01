@@ -41,6 +41,7 @@ SECTIONS
 	/* _s_kernel_ro must be page aligned */
 	. = ALIGN(PAGE_SIZE);
 	_s_kernel_ro = .;
+	_text = .;
 
         .text                   : AT(ADDR(.text) - LOAD_OFFSET)
 	{
