@@ -624,6 +624,13 @@ config MMC_WMT
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called wmt-sdmmc.
+	  
+config MMC_OCSDC
+        tristate "Wishbone SD Card Controller IP Core support"
+        depends on OPENRISC
+        help
+          This selects support for the Wishbone SD Card Controller 
+          IP Core. If unsure, say N.
 
 config MMC_REALTEK_PCI
 	tristate "Realtek PCI-E SD/MMC Card Interface Driver"

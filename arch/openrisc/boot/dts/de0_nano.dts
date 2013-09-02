@@ -92,14 +92,14 @@
 		interrupts = <28>;
 	};
 	
-	ohs900: ocores@9c000000 {
-		compatible = "opencores,ohs900-ocores";
-		reg = <0x9c000000 0x100>;
-		interrupts = <20 21>;
-		can_wakeup = <1>;
-		potpg = <10>;
-		power = <250>;
-	};
+//	ohs900: ocores@9c000000 {
+//		compatible = "opencores,ohs900-ocores";
+//		reg = <0x9c000000 0x100>;
+//		interrupts = <20 21>;
+//		can_wakeup = <1>;
+//		potpg = <10>;
+//		power = <250>;
+//	};
 	
 	spi0: spi0@b0000000 {
 		compatible = "opencores,spi-simple";
@@ -208,6 +208,11 @@
 			label = "led7";
 			gpios = <&gpio0 7 0x0>;
 		};
+	};
+	
+	ocsdc0: ocsdc@9e000000 {
+		compatible = "opencores,ocsdc";
+		reg = <0x9e000000 0x64>;
 	};
 		
 };
