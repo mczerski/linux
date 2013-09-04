@@ -54,16 +54,22 @@
 #define OCSDC_CMD_INT_STATUS_CTE  0x0004
 #define OCSDC_CMD_INT_STATUS_CCRC 0x0008
 #define OCSDC_CMD_INT_STATUS_CIE  0x0010
+#define OCSDC_CMD_INT_ENABLE_ALL  0x001F
 
 // SDCMSC_DAT_INT_STATUS
-#define SDCMSC_DAT_INT_STATUS_TRS 0x01
-#define SDCMSC_DAT_INT_STATUS_CRC 0x02
-#define SDCMSC_DAT_INT_STATUS_OV  0x04
-
+#define OCSDC_DAT_INT_STATUS_TRS  0x01
+#define OCSDC_DAT_INT_STATUS_CRC  0x02
+#define OCSDC_DAT_INT_STATUS_OV   0x04
+#define OCSDC_DAT_INT_ENABLE_ALL  0x07
 
 struct ocsdc_dev {
 	void __iomem *iobase;
+	int irq_cmd;
+	int irq_data;
 	unsigned int clk_freq;
+	struct mmc_request *curr_mrq;
+	struct mmc_command *curr_cmd;
+	struct mmc_data * curr_data;
 };
 
 static inline uint32_t ocsdc_read(struct ocsdc_dev * dev, int offset)
@@ -208,70 +214,173 @@ static uint32_t ocsdc_prepare_cmd(struct ocsdc_dev * dev, struct mmc_command *cm
 	return command;
 }
 
-static void ocsdc_cmd_finish(struct ocsdc_dev * dev, struct mmc_command *cmd) {
+//static void ocsdc_cmd_finish(struct ocsdc_dev * dev, struct mmc_command *cmd) {
+//
+//	while (1) {
+//		int int_stat = ocsdc_read(dev, OCSDC_CMD_INT_STATUS);
+//		//debug("ocsdc_finish: cmd %d, status %x\n", cmd->cmdidx, r2);
+//		if (int_stat & OCSDC_CMD_INT_STATUS_EI) {
+//			//clear interrupts
+//			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
+//			if (int_stat & OCSDC_CMD_INT_STATUS_CTE)
+//				cmd->error = -ETIMEDOUT;
+//			else if (int_stat & OCSDC_CMD_INT_STATUS_CCRC)
+//				cmd->error = -EILSEQ;
+//			else if (int_stat & OCSDC_CMD_INT_STATUS_CIE)
+//				cmd->error = -EILSEQ;
+//			//printk("ocsdc_cmd_finish: cmd %d, status %x\n", cmd->opcode, int_stat);
+//			break;
+//		}
+//		else if (int_stat & OCSDC_CMD_INT_STATUS_CC) {
+//			//clear interrupts
+//			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
+//			//get response
+//			cmd->resp[0] = ocsdc_read(dev, OCSDC_RESPONSE_1);
+//			if (cmd->flags & MMC_RSP_136) {
+//				cmd->resp[1] = ocsdc_read(dev, OCSDC_RESPONSE_2);
+//				cmd->resp[2] = ocsdc_read(dev, OCSDC_RESPONSE_3);
+//				cmd->resp[3] = ocsdc_read(dev, OCSDC_RESPONSE_4);
+//			}
+//			//printk("ocsdc_cmd_finish:  %d ok\n", cmd->opcode);
+//			break;
+//		}
+//		cpu_relax();
+//		//else if (!(int_stat & OCSDC_CMD_INT_STATUS_CIE)) {
+//		//	debug("ocsdc_finish: cmd %d no exec %x\n", cmd->cmdidx, r2);
+//		//}
+//	}
+//	return;
+//}
 
-	while (1) {
-		int int_stat = ocsdc_read(dev, OCSDC_CMD_INT_STATUS);
-		//debug("ocsdc_finish: cmd %d, status %x\n", cmd->cmdidx, r2);
-		if (int_stat & OCSDC_CMD_INT_STATUS_EI) {
-			//clear interrupts
-			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
-			if (int_stat & OCSDC_CMD_INT_STATUS_CTE)
-				cmd->error = -ETIMEDOUT;
-			else if (int_stat & OCSDC_CMD_INT_STATUS_CCRC)
-				cmd->error = -EILSEQ;
-			else if (int_stat & OCSDC_CMD_INT_STATUS_CIE)
-				cmd->error = -EILSEQ;
-			//printk("ocsdc_cmd_finish: cmd %d, status %x\n", cmd->opcode, int_stat);
-			break;
-		}
-		else if (int_stat & OCSDC_CMD_INT_STATUS_CC) {
-			//clear interrupts
-			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
-			//get response
-			cmd->resp[0] = ocsdc_read(dev, OCSDC_RESPONSE_1);
-			if (cmd->flags & MMC_RSP_136) {
-				cmd->resp[1] = ocsdc_read(dev, OCSDC_RESPONSE_2);
-				cmd->resp[2] = ocsdc_read(dev, OCSDC_RESPONSE_3);
-				cmd->resp[3] = ocsdc_read(dev, OCSDC_RESPONSE_4);
-			}
-			//printk("ocsdc_cmd_finish:  %d ok\n", cmd->opcode);
-			break;
-		}
-		cpu_relax();
-		//else if (!(int_stat & OCSDC_CMD_INT_STATUS_CIE)) {
-		//	debug("ocsdc_finish: cmd %d no exec %x\n", cmd->cmdidx, r2);
-		//}
-	}
-	return;
-}
-
-static void ocsdc_start_cmd(struct ocsdc_dev * dev, struct mmc_command *cmd, struct mmc_data * data) {
+static void ocsdc_start_cmd(struct ocsdc_dev * dev, struct mmc_command * cmd, struct mmc_data * data) {
 	unsigned int command = ocsdc_prepare_cmd(dev, cmd, data);
+	if (dev->curr_cmd || dev->curr_data)
+		printk("ocsdc_start_cmd: curr_cmd %p, curr_data %p\n", dev->curr_cmd, dev->curr_data);
+	dev->curr_cmd = cmd;
+	dev->curr_data = data;
 	ocsdc_write(dev, OCSDC_COMMAND, command);
 	ocsdc_write(dev, OCSDC_ARGUMENT, cmd->arg);
-	ocsdc_cmd_finish(dev, cmd);
+	//enable command interrupt
+	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, OCSDC_CMD_INT_ENABLE_ALL);
+//	ocsdc_cmd_finish(dev, cmd);
 }
 
-static void ocsdc_data_finish(struct ocsdc_dev * dev, struct mmc_data * data) {
-	uint32_t status;
+static void ocsdc_end_request(struct mmc_host * mmc) {
+	struct ocsdc_dev * dev = mmc_priv(mmc);
+	mmc_request_done(mmc, dev->curr_mrq);
+	dev->curr_mrq = NULL;
+}
 
-    while ((status = ocsdc_read(dev, OCSDC_DAT_INT_STATUS)) == 0);
-    ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
+//static void ocsdc_data_finish(struct mmc_host * mmc, struct mmc_data * data) {
+//	uint32_t status;
+//	struct ocsdc_dev * dev = mmc_priv(mmc);
+//
+//    while ((status = ocsdc_read(dev, OCSDC_DAT_INT_STATUS)) == 0);
+//    ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
+//
+//    dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len, (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+//
+//    if (status & OCSDC_DAT_INT_STATUS_TRS) {
+//    	//printk("ocsdc_data_finish: ok\n");
+//    	data->bytes_xfered = data->blocks * data->blksz;
+//    	return;
+//    }
+//    else {
+//    	if (status & OCSDC_DAT_INT_STATUS_CRC)
+//    		data->error = EILSEQ;
+//    	else if (status & OCSDC_DAT_INT_STATUS_OV)
+//    		data->error = EILSEQ;
+//    	//printk("ocsdc_data_finish: status %x\n", status);
+//    	return;
+//    }
+//}
 
-    if (status & SDCMSC_DAT_INT_STATUS_TRS) {
-    	//printk("ocsdc_data_finish: ok\n");
+static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
+	struct ocsdc_dev * dev = mmc_priv(mmc);
+	struct mmc_command * cmd = dev->curr_cmd;
+	struct mmc_data	* data = dev->curr_data;
+
+	uint32_t status = ocsdc_read(dev, OCSDC_CMD_INT_STATUS);
+	if (status & OCSDC_CMD_INT_STATUS_EI) {
+		if (status & OCSDC_CMD_INT_STATUS_CTE)
+			cmd->error = -ETIMEDOUT;
+		else if (status & OCSDC_CMD_INT_STATUS_CCRC)
+			cmd->error = -EILSEQ;
+		else if (status & OCSDC_CMD_INT_STATUS_CIE)
+			cmd->error = -EILSEQ;
+		}
+	else if (status & OCSDC_CMD_INT_STATUS_CC) {
+		//get response
+		cmd->resp[0] = ocsdc_read(dev, OCSDC_RESPONSE_1);
+		if (cmd->flags & MMC_RSP_136) {
+			cmd->resp[1] = ocsdc_read(dev, OCSDC_RESPONSE_2);
+			cmd->resp[2] = ocsdc_read(dev, OCSDC_RESPONSE_3);
+			cmd->resp[3] = ocsdc_read(dev, OCSDC_RESPONSE_4);
+		}
+	}
+	else if (!status) {
+		dev_dbg(mmc_dev(mmc), "Spurious interrupt\n");
+		return IRQ_NONE;
+	}
+	else {
+		dev_err(mmc_dev(mmc), "Wrong cmd interrupt status 0x%x\n", status);
+		return IRQ_NONE;
+	}
+
+	//disable interrupts
+	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, 0);
+	//clear interrupts
+	ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
+
+	dev->curr_cmd = NULL;
+
+	if (cmd->error || !data || !data->blocks) {
+		ocsdc_end_request(mmc);
+	}
+	else {
+		//enable data interrupt
+		ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, OCSDC_DAT_INT_ENABLE_ALL);
+	}
+
+	return IRQ_HANDLED;
+}
+
+static irqreturn_t ocsdc_irq_data(int irq, struct mmc_host *mmc) {
+	struct ocsdc_dev * dev = mmc_priv(mmc);
+	struct mmc_data	* data = dev->curr_data;
+
+	uint32_t status = ocsdc_read(dev, OCSDC_DAT_INT_STATUS);
+
+    if (status & OCSDC_DAT_INT_STATUS_TRS) {
     	data->bytes_xfered = data->blocks * data->blksz;
-    	return;
     }
     else {
-    	if (status & SDCMSC_DAT_INT_STATUS_CRC)
+    	if (status & OCSDC_DAT_INT_STATUS_CRC)
     		data->error = EILSEQ;
-    	else if (status & SDCMSC_DAT_INT_STATUS_OV)
+    	else if (status & OCSDC_DAT_INT_STATUS_OV)
     		data->error = EILSEQ;
-    	//printk("ocsdc_data_finish: status %x\n", status);
-    	return;
+    	else {
+    		dev_err(mmc_dev(mmc), "Wrong data interrupt status 0x%x\n", status);
+    		return IRQ_NONE;
+    	}
     }
+
+	//disable interrupts
+	ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, 0);
+    //clear interrupts
+    ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
+
+    dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len, (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+    dev->curr_data = NULL;
+
+    if (data->error || !dev->curr_mrq->stop) {
+    	ocsdc_end_request(mmc);
+    }
+    else {
+    	ocsdc_start_cmd(dev, dev->curr_mrq->stop, NULL);
+    }
+
+	return IRQ_HANDLED;
 }
 
 static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
@@ -281,6 +390,8 @@ static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
 
 	//printk("sbc %p, cmd %p, data %p, stop %p\n", mrq->sbc, mrq->cmd, mrq->data, mrq->stop);
 
+	if (dev->curr_mrq)
+		goto ERROR;
 	if (!mrq->cmd)
 		goto ERROR;
 	if (mrq->stop && !mrq->data)
@@ -288,19 +399,19 @@ static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
 	if (mrq->sbc)
 		goto ERROR;
 
-
-	if (mrq->data)
+	if (mrq->data && mrq->data->blocks)
 		ocsdc_setup_data_xfer(mmc, mrq->data);
 
+	dev->curr_mrq = mrq;
 	ocsdc_start_cmd(dev, mrq->cmd, mrq->data);
 
-	if (!mrq->cmd->error && mrq->data && mrq->data->blocks) {
-		ocsdc_data_finish(dev, mrq->data);
-		if (!mrq->data->error && mrq->stop)
-			ocsdc_start_cmd(dev, mrq->stop, NULL);
-	}
-
-	mmc_request_done(mmc, mrq);
+//	if (!mrq->cmd->error && mrq->data && mrq->data->blocks) {
+//		ocsdc_data_finish(mmc, mrq->data);
+//		if (!mrq->data->error && mrq->stop)
+//			ocsdc_start_cmd(dev, mrq->stop, NULL);
+//	}
+//
+//	mmc_request_done(mmc, mrq);
 
 	return;
 
@@ -348,41 +459,44 @@ static int __init ocsdc_probe(struct platform_device *pdev)
 	struct mmc_host * mmc;
 	struct ocsdc_dev * dev;
 	struct resource *res;
-	struct resource *mmio;
 
 	mmc = mmc_alloc_host(sizeof(struct ocsdc_dev), &pdev->dev);
-	if (!mmc) {
-		ret = -ENOMEM;
-		goto MMC_ALLOC_HOST_FAIL;
-	}
+	if (!mmc)
+		return -ENOMEM;
 
 	dev = mmc_priv(mmc);
 	dev->clk_freq = 50000000;
 
-	/* obtain I/O memory space */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res) {
 		dev_err(&pdev->dev, "cannot obtain I/O memory space\n");
 		ret = -ENXIO;
-		goto IORESOURCE_MEM_FAIL;
+		goto ERROR;
 	}
 
-	mmio = devm_request_mem_region(&pdev->dev, res->start,
-			resource_size(res), res->name);
-	if (!mmio) {
+	dev->iobase = devm_request_and_ioremap(&pdev->dev, res);
+	if (!dev->iobase) {
 		dev_err(&pdev->dev, "cannot request I/O memory space\n");
 		ret = -ENXIO;
-		goto IORESOURCE_MEM_FAIL;
+		goto ERROR;
 	}
 
-	dev->iobase = devm_ioremap_nocache(&pdev->dev, mmio->start, resource_size(mmio));
-	if (!dev->iobase) {
-		dev_err(&pdev->dev, "cannot remap I/O memory space\n");
+	dev->irq_cmd = platform_get_irq(pdev, 0);
+	dev->irq_data = platform_get_irq(pdev, 1);
+	if (dev->irq_cmd < 0 || dev->irq_data < 0) {
 		ret = -ENXIO;
-		goto IOREMAP_FAIL;
+		goto ERROR;
 	}
 
 	ocsdc_init(dev);
+
+	ret = devm_request_irq(&pdev->dev, dev->irq_cmd, (irq_handler_t)ocsdc_irq_cmd, 0, mmc_hostname(mmc), mmc);
+	if (ret)
+		goto ERROR;
+
+	ret = devm_request_irq(&pdev->dev, dev->irq_data, (irq_handler_t)ocsdc_irq_data, 0, mmc_hostname(mmc), mmc);
+	if (ret)
+		goto ERROR;
 
 	mmc->ops = &ocsdc_ops;
 	mmc->f_min = dev->clk_freq/6;
@@ -398,7 +512,7 @@ static int __init ocsdc_probe(struct platform_device *pdev)
 
 	ret = mmc_add_host(mmc);
 	if (ret < 0)
-		goto MMC_ADD_HOST_FAIL;
+		goto ERROR;
 
 	platform_set_drvdata(pdev, mmc);
 
@@ -406,14 +520,8 @@ static int __init ocsdc_probe(struct platform_device *pdev)
 
 	return 0;
 
-MMC_ADD_HOST_FAIL:
-	devm_iounmap(&pdev->dev, dev->iobase);
-IOREMAP_FAIL:
-	devm_release_region(&pdev->dev, mmio->start, resource_size(mmio));
-IORESOURCE_MEM_FAIL:
+ERROR:
 	mmc_free_host(mmc);
-
-MMC_ALLOC_HOST_FAIL:
 	return ret;
 }
 
@@ -424,12 +532,7 @@ static int __exit ocsdc_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 
 	if (mmc) {
-		struct ocsdc_dev * dev;
-
 		mmc_remove_host(mmc);
-
-		dev = mmc_priv(mmc);
-		devm_iounmap(&pdev->dev, dev->iobase);
 		mmc_free_host(mmc);
 	}
 

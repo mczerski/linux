@@ -213,6 +213,7 @@
 	ocsdc0: ocsdc@9e000000 {
 		compatible = "opencores,ocsdc";
 		reg = <0x9e000000 0x64>;
+		interrupts = <14 15>;
 	};
 		
 };
