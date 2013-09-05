@@ -138,11 +138,8 @@ static void ocsdc_set_clock(struct ocsdc_dev * dev, unsigned int clock)
 		clk_div = 0;
 
 	//printk("ocsdc_set_clock %d, div %d\n", clock, clk_div);
-	//software reset
 	ocsdc_write(dev, OCSDC_SOFTWARE_RESET, 1);
-	//set clock devider
 	ocsdc_write(dev, OCSDC_CLOCK_DIVIDER, clk_div);
-	//clear software reset
 	ocsdc_write(dev, OCSDC_SOFTWARE_RESET, 0);
 }
 
@@ -150,15 +147,12 @@ static void ocsdc_set_clock(struct ocsdc_dev * dev, unsigned int clock)
 static int ocsdc_init(struct ocsdc_dev * dev)
 {
 
-	//set timeout
 	ocsdc_write(dev, OCSDC_TIMEOUT, 0x7FFF);
-	//disable all interrupts
 	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, 0);
 	ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, 0);
-	//clear all interrupts
 	ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
 	ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
-	//set clock to maximum
+	/* set clock to maximum */
 	ocsdc_set_clock(dev, dev->clk_freq/2);
 
 	return 0;
@@ -169,8 +163,6 @@ static void ocsdc_set_buswidth(struct ocsdc_dev * dev, unsigned char width) {
 		ocsdc_write(dev, OCSDC_CONTROL, 1);
 	else if (width == MMC_BUS_WIDTH_1)
 		ocsdc_write(dev, OCSDC_CONTROL, 0);
-//	else
-		//printk("ocsdc_set_buswidth %x\n", (unsigned)width);
 }
 
 static void ocsdc_setup_data_xfer(struct mmc_host *mmc, struct mmc_data * data) {
@@ -178,14 +170,16 @@ static void ocsdc_setup_data_xfer(struct mmc_host *mmc, struct mmc_data * data) 
 
 	dma_map_sg(mmc_dev(mmc), data->sg, data->sg_len, ((data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE));
 
+	if (sg_dma_len(data->sg) != data->blksz * data->blocks) {
+		printk("ocsdc_setup_data_xfer sg mismatch");
+	}
+
 	ocsdc_write(dev, OCSDC_DST_SRC_ADDR, sg_dma_address(data->sg));
 
 	ocsdc_write(dev, OCSDC_BLOCK_SIZE, data->blksz);
 	ocsdc_write(dev, OCSDC_BLOCK_COUNT, data->blocks-1);
-
-	//printk("sg_len %d, next sg %p, addr %x\n", data->sg_len, sg_next(data->sg), sg_dma_address(data->sg));
-	//debug("ocsdc_setup_read: addr: %x\n", (u32)data->dest);
-
+//	printk("sg_len %d, next sg %p, addr %x\n", data->sg_len, sg_next(data->sg), sg_dma_address(data->sg));
+//	printk("%d blksize %x, blocks %x, arg %x\n", (data->flags & MMC_DATA_WRITE) ? 1 : 0, data->blksz, data->blocks, dev->curr_mrq->cmd->arg);
 }
 
 static uint32_t ocsdc_prepare_cmd(struct ocsdc_dev * dev, struct mmc_command *cmd, struct mmc_data * data) {
@@ -214,55 +208,13 @@ static uint32_t ocsdc_prepare_cmd(struct ocsdc_dev * dev, struct mmc_command *cm
 	return command;
 }
 
-//static void ocsdc_cmd_finish(struct ocsdc_dev * dev, struct mmc_command *cmd) {
-//
-//	while (1) {
-//		int int_stat = ocsdc_read(dev, OCSDC_CMD_INT_STATUS);
-//		//debug("ocsdc_finish: cmd %d, status %x\n", cmd->cmdidx, r2);
-//		if (int_stat & OCSDC_CMD_INT_STATUS_EI) {
-//			//clear interrupts
-//			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
-//			if (int_stat & OCSDC_CMD_INT_STATUS_CTE)
-//				cmd->error = -ETIMEDOUT;
-//			else if (int_stat & OCSDC_CMD_INT_STATUS_CCRC)
-//				cmd->error = -EILSEQ;
-//			else if (int_stat & OCSDC_CMD_INT_STATUS_CIE)
-//				cmd->error = -EILSEQ;
-//			//printk("ocsdc_cmd_finish: cmd %d, status %x\n", cmd->opcode, int_stat);
-//			break;
-//		}
-//		else if (int_stat & OCSDC_CMD_INT_STATUS_CC) {
-//			//clear interrupts
-//			ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
-//			//get response
-//			cmd->resp[0] = ocsdc_read(dev, OCSDC_RESPONSE_1);
-//			if (cmd->flags & MMC_RSP_136) {
-//				cmd->resp[1] = ocsdc_read(dev, OCSDC_RESPONSE_2);
-//				cmd->resp[2] = ocsdc_read(dev, OCSDC_RESPONSE_3);
-//				cmd->resp[3] = ocsdc_read(dev, OCSDC_RESPONSE_4);
-//			}
-//			//printk("ocsdc_cmd_finish:  %d ok\n", cmd->opcode);
-//			break;
-//		}
-//		cpu_relax();
-//		//else if (!(int_stat & OCSDC_CMD_INT_STATUS_CIE)) {
-//		//	debug("ocsdc_finish: cmd %d no exec %x\n", cmd->cmdidx, r2);
-//		//}
-//	}
-//	return;
-//}
-
 static void ocsdc_start_cmd(struct ocsdc_dev * dev, struct mmc_command * cmd, struct mmc_data * data) {
 	unsigned int command = ocsdc_prepare_cmd(dev, cmd, data);
-	if (dev->curr_cmd || dev->curr_data)
-		printk("ocsdc_start_cmd: curr_cmd %p, curr_data %p\n", dev->curr_cmd, dev->curr_data);
 	dev->curr_cmd = cmd;
 	dev->curr_data = data;
 	ocsdc_write(dev, OCSDC_COMMAND, command);
 	ocsdc_write(dev, OCSDC_ARGUMENT, cmd->arg);
-	//enable command interrupt
 	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, OCSDC_CMD_INT_ENABLE_ALL);
-//	ocsdc_cmd_finish(dev, cmd);
 }
 
 static void ocsdc_end_request(struct mmc_host * mmc) {
@@ -270,30 +222,6 @@ static void ocsdc_end_request(struct mmc_host * mmc) {
 	mmc_request_done(mmc, dev->curr_mrq);
 	dev->curr_mrq = NULL;
 }
-
-//static void ocsdc_data_finish(struct mmc_host * mmc, struct mmc_data * data) {
-//	uint32_t status;
-//	struct ocsdc_dev * dev = mmc_priv(mmc);
-//
-//    while ((status = ocsdc_read(dev, OCSDC_DAT_INT_STATUS)) == 0);
-//    ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
-//
-//    dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len, (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-//
-//    if (status & OCSDC_DAT_INT_STATUS_TRS) {
-//    	//printk("ocsdc_data_finish: ok\n");
-//    	data->bytes_xfered = data->blocks * data->blksz;
-//    	return;
-//    }
-//    else {
-//    	if (status & OCSDC_DAT_INT_STATUS_CRC)
-//    		data->error = EILSEQ;
-//    	else if (status & OCSDC_DAT_INT_STATUS_OV)
-//    		data->error = EILSEQ;
-//    	//printk("ocsdc_data_finish: status %x\n", status);
-//    	return;
-//    }
-//}
 
 static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
 	struct ocsdc_dev * dev = mmc_priv(mmc);
@@ -310,7 +238,6 @@ static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
 			cmd->error = -EILSEQ;
 		}
 	else if (status & OCSDC_CMD_INT_STATUS_CC) {
-		//get response
 		cmd->resp[0] = ocsdc_read(dev, OCSDC_RESPONSE_1);
 		if (cmd->flags & MMC_RSP_136) {
 			cmd->resp[1] = ocsdc_read(dev, OCSDC_RESPONSE_2);
@@ -327,9 +254,7 @@ static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
 		return IRQ_NONE;
 	}
 
-	//disable interrupts
 	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, 0);
-	//clear interrupts
 	ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
 
 	dev->curr_cmd = NULL;
@@ -338,10 +263,9 @@ static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
 		ocsdc_end_request(mmc);
 	}
 	else {
-		//enable data interrupt
+		/* waiting for data interrupt */
 		ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, OCSDC_DAT_INT_ENABLE_ALL);
 	}
-
 	return IRQ_HANDLED;
 }
 
@@ -365,9 +289,7 @@ static irqreturn_t ocsdc_irq_data(int irq, struct mmc_host *mmc) {
     	}
     }
 
-	//disable interrupts
 	ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, 0);
-    //clear interrupts
     ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
 
     dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len, (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
@@ -379,7 +301,6 @@ static irqreturn_t ocsdc_irq_data(int irq, struct mmc_host *mmc) {
     else {
     	ocsdc_start_cmd(dev, dev->curr_mrq->stop, NULL);
     }
-
 	return IRQ_HANDLED;
 }
 
@@ -387,7 +308,6 @@ static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
 	struct ocsdc_dev * dev = mmc_priv(mmc);
 
 	//printk("ocsdc_request\n");
-
 	//printk("sbc %p, cmd %p, data %p, stop %p\n", mrq->sbc, mrq->cmd, mrq->data, mrq->stop);
 
 	if (dev->curr_mrq)
@@ -399,19 +319,12 @@ static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
 	if (mrq->sbc)
 		goto ERROR;
 
+	dev->curr_mrq = mrq;
+
 	if (mrq->data && mrq->data->blocks)
 		ocsdc_setup_data_xfer(mmc, mrq->data);
 
-	dev->curr_mrq = mrq;
 	ocsdc_start_cmd(dev, mrq->cmd, mrq->data);
-
-//	if (!mrq->cmd->error && mrq->data && mrq->data->blocks) {
-//		ocsdc_data_finish(mmc, mrq->data);
-//		if (!mrq->data->error && mrq->stop)
-//			ocsdc_start_cmd(dev, mrq->stop, NULL);
-//	}
-//
-//	mmc_request_done(mmc, mrq);
 
 	return;
 
@@ -424,7 +337,6 @@ static void ocsdc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios) {
 	struct ocsdc_dev * dev = mmc_priv(mmc);
 
 	//printk("ocsdc_set_ios\n");
-
 	if (ios->power_mode != MMC_POWER_ON)
 		return;
 
