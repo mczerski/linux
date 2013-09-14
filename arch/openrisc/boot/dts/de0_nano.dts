@@ -7,6 +7,7 @@
 
 	chosen {
 		bootargs = "console=uart,mmio,0x90000000,115200 ip=::::de0_nano::dhcp root=/dev/nfs rw nfsroot=192.168.0.101:/nfsroot/root";
+		//bootargs = "console=uart,mmio,0x90000000,115200 ip=::::de0_nano::dhcp root=/dev/mmcblk0p1 rw rootdelay=1";
 	};
 
 	memory@0 {
@@ -132,7 +133,7 @@
 				read-only;
 			};
 			partition@100000 {
-				label = "free space";
+				label = "kernel";
 				reg = <0x00100000 0x00700000>;
 			};
 		};

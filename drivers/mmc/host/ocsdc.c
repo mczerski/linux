@@ -23,8 +23,9 @@
 #define OCSDC_RESPONSE_2         0x0c
 #define OCSDC_RESPONSE_3         0x10
 #define OCSDC_RESPONSE_4         0x14
+#define OCSDC_DATA_TIMEOUT       0x18
 #define OCSDC_CONTROL 			 0x1C
-#define OCSDC_TIMEOUT            0x20
+#define OCSDC_CMD_TIMEOUT        0x20
 #define OCSDC_CLOCK_DIVIDER      0x24
 #define OCSDC_SOFTWARE_RESET     0x28
 #define OCSDC_POWER_CONTROL      0x2C
@@ -57,10 +58,12 @@
 #define OCSDC_CMD_INT_ENABLE_ALL  0x001F
 
 // SDCMSC_DAT_INT_STATUS
-#define OCSDC_DAT_INT_STATUS_TRS  0x01
-#define OCSDC_DAT_INT_STATUS_CRC  0x02
-#define OCSDC_DAT_INT_STATUS_OV   0x04
-#define OCSDC_DAT_INT_ENABLE_ALL  0x07
+#define OCSDC_DAT_INT_STATUS_CC   0x01
+#define OCSDC_DAT_INT_STATUS_EI   0x02
+#define OCSDC_DAT_INT_STATUS_CTE  0x04
+#define OCSDC_DAT_INT_STATUS_CCRC 0x08
+#define OCSDC_DAT_INT_STATUS_CFE  0x10
+#define OCSDC_DAT_INT_ENABLE_ALL  0x1F
 
 struct ocsdc_dev {
 	void __iomem *iobase;
@@ -147,7 +150,8 @@ static void ocsdc_set_clock(struct ocsdc_dev * dev, unsigned int clock)
 static int ocsdc_init(struct ocsdc_dev * dev)
 {
 
-	ocsdc_write(dev, OCSDC_TIMEOUT, 0x7FFF);
+	ocsdc_write(dev, OCSDC_CMD_TIMEOUT, 0x7FFF);
+	ocsdc_write(dev, OCSDC_DATA_TIMEOUT, 0xFFFFFF);
 	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, 0);
 	ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, 0);
 	ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
@@ -165,21 +169,47 @@ static void ocsdc_set_buswidth(struct ocsdc_dev * dev, unsigned char width) {
 		ocsdc_write(dev, OCSDC_CONTROL, 0);
 }
 
+static uint32_t get_timeout_reg_val(struct ocsdc_dev * dev, unsigned int t_ns, unsigned int t_clks) {
+	uint32_t clkd;
+	uint32_t timeout_ms;
+	uint32_t freq_kHz;
+	uint32_t timeout_clks;
+
+	clkd = 2*(ocsdc_read(dev, OCSDC_CLOCK_DIVIDER) + 1);
+	timeout_ms = 1 + t_ns / 1000000;
+	freq_kHz = 1 + dev->clk_freq / (1000*clkd);
+	timeout_clks = t_clks + timeout_ms * freq_kHz;
+	if (timeout_clks > 0xFFFFFF)
+		timeout_clks = 0xFFFFFF;
+	return 0;
+}
+
 static void ocsdc_setup_data_xfer(struct mmc_host *mmc, struct mmc_data * data) {
 	struct ocsdc_dev * dev = mmc_priv(mmc);
 
+	//host doesn't support block sizes other than multiple of 4 bytes
+	//if (data->blksz % 4) return -1;
+	uint32_t timeout;
+
 	dma_map_sg(mmc_dev(mmc), data->sg, data->sg_len, ((data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE));
 
-	if (sg_dma_len(data->sg) != data->blksz * data->blocks) {
-		printk("ocsdc_setup_data_xfer sg mismatch");
-	}
+	//host doesn't support start address badly aligned
+	//if (sg_dma_address(data->sg) % 4) {
+	//	dma_unmap_sg(mmc_dev(mmc), data->sg, data->sg_len, (data->flags & MMC_DATA_WRITE) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
+	//	return -1;
+	//}
 
 	ocsdc_write(dev, OCSDC_DST_SRC_ADDR, sg_dma_address(data->sg));
 
-	ocsdc_write(dev, OCSDC_BLOCK_SIZE, data->blksz);
+	ocsdc_write(dev, OCSDC_BLOCK_SIZE, data->blksz-1);
 	ocsdc_write(dev, OCSDC_BLOCK_COUNT, data->blocks-1);
-//	printk("sg_len %d, next sg %p, addr %x\n", data->sg_len, sg_next(data->sg), sg_dma_address(data->sg));
-//	printk("%d blksize %x, blocks %x, arg %x\n", (data->flags & MMC_DATA_WRITE) ? 1 : 0, data->blksz, data->blocks, dev->curr_mrq->cmd->arg);
+
+	//setup timeout
+	timeout = get_timeout_reg_val(dev, data->timeout_ns, data->timeout_clks);
+	ocsdc_write(dev, OCSDC_DATA_TIMEOUT, timeout);
+	//printk("sg_len %d, next sg %p, addr %x\n", data->sg_len, sg_next(data->sg), sg_dma_address(data->sg));
+	//printk("%d blksize %x, blocks %x, arg %x\n", (data->flags & MMC_DATA_WRITE) ? 1 : 0, data->blksz, data->blocks, dev->curr_mrq->cmd->arg);
+	//printk("timeout %dns, clks %d, reg %x\n", data->timeout_ns, data->timeout_clks, timeout);
 }
 
 static uint32_t ocsdc_prepare_cmd(struct ocsdc_dev * dev, struct mmc_command *cmd, struct mmc_data * data) {
@@ -254,6 +284,8 @@ static irqreturn_t ocsdc_irq_cmd(int irq, struct mmc_host *mmc) {
 		return IRQ_NONE;
 	}
 
+	//printk("ocsdc_irq_cmd %x, cmd %d\n", status, dev->curr_cmd->opcode);
+
 	ocsdc_write(dev, OCSDC_CMD_INT_ENABLE, 0);
 	ocsdc_write(dev, OCSDC_CMD_INT_STATUS, 0);
 
@@ -275,19 +307,23 @@ static irqreturn_t ocsdc_irq_data(int irq, struct mmc_host *mmc) {
 
 	uint32_t status = ocsdc_read(dev, OCSDC_DAT_INT_STATUS);
 
-    if (status & OCSDC_DAT_INT_STATUS_TRS) {
+    if (status & OCSDC_DAT_INT_STATUS_CC) {
     	data->bytes_xfered = data->blocks * data->blksz;
     }
     else {
-    	if (status & OCSDC_DAT_INT_STATUS_CRC)
-    		data->error = EILSEQ;
-    	else if (status & OCSDC_DAT_INT_STATUS_OV)
-    		data->error = EILSEQ;
+    	if (status & OCSDC_DAT_INT_STATUS_CTE)
+    		data->error = -ETIMEDOUT;
+    	else if (status & OCSDC_DAT_INT_STATUS_CCRC)
+    		data->error = -EILSEQ;
+    	else if (status & OCSDC_DAT_INT_STATUS_CFE)
+    		data->error = -EILSEQ;
     	else {
     		dev_err(mmc_dev(mmc), "Wrong data interrupt status 0x%x\n", status);
     		return IRQ_NONE;
     	}
     }
+
+    //printk("ocsdc_irq_data %x\n", status);
 
 	ocsdc_write(dev, OCSDC_DAT_INT_ENABLE, 0);
     ocsdc_write(dev, OCSDC_DAT_INT_STATUS, 0);
@@ -319,10 +355,10 @@ static void ocsdc_request(struct mmc_host *mmc, struct mmc_request *mrq) {
 	if (mrq->sbc)
 		goto ERROR;
 
-	dev->curr_mrq = mrq;
-
-	if (mrq->data && mrq->data->blocks)
+	if (mrq->data && mrq->data->blocks && mrq->data->blksz)
 		ocsdc_setup_data_xfer(mmc, mrq->data);
+
+	dev->curr_mrq = mrq;
 
 	ocsdc_start_cmd(dev, mrq->cmd, mrq->data);
 
@@ -411,13 +447,13 @@ static int __init ocsdc_probe(struct platform_device *pdev)
 		goto ERROR;
 
 	mmc->ops = &ocsdc_ops;
-	mmc->f_min = dev->clk_freq/6;
+	mmc->f_min = dev->clk_freq/64;
 	mmc->f_max = dev->clk_freq/2;
 	mmc->caps = MMC_CAP_4_BIT_DATA;
 	mmc->caps2 = 0;
 	mmc->max_segs = 1;
-	mmc->max_blk_size = (1 << 11);
-	mmc->max_blk_count = (1 << 16) - 1;
+	mmc->max_blk_size = 1 << 12;
+	mmc->max_blk_count = 1 << 16;
 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
 	mmc->max_seg_size = mmc->max_req_size;
 	mmc->ocr_avail = ocsdc_get_voltage(dev);
@@ -437,7 +473,7 @@ ERROR:
 	return ret;
 }
 
-static int __exit ocsdc_remove(struct platform_device *pdev)
+static int ocsdc_remove(struct platform_device *pdev)
 {
 	struct mmc_host *mmc = platform_get_drvdata(pdev);
 
