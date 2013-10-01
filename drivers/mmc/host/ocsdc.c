@@ -181,7 +181,7 @@ static uint32_t get_timeout_reg_val(struct ocsdc_dev * dev, unsigned int t_ns, u
 	timeout_clks = t_clks + timeout_ms * freq_kHz;
 	if (timeout_clks > 0xFFFFFF)
 		timeout_clks = 0xFFFFFF;
-	return 0;
+	return timeout_clks;
 }
 
 static void ocsdc_setup_data_xfer(struct mmc_host *mmc, struct mmc_data * data) {
