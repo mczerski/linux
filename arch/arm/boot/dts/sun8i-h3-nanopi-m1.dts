@@ -45,6 +45,14 @@
 / {
 	model = "FriendlyElec NanoPi-M1";
 	compatible = "friendlyarm,nanopi-m1", "allwinner,sun8i-h3";
+
+	power_ctrl: power_ctrl {
+		compatible = "lltc,ltc2952";
+		trigger-gpios = <&pio 6 8 GPIO_ACTIVE_LOW>;
+		kill-gpios = <&pio 6 11 GPIO_ACTIVE_LOW>;
+		watchdog-gpios = <&pio 6 9 GPIO_ACTIVE_HIGH>;
+		trigger-delay-ms = <0>;
+	};
 };
 
 &ehci1 {
