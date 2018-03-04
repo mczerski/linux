@@ -75,7 +75,7 @@
 };
 
 &i2c1 {
-    status = "okay";
+    status = "disable";
 };
 
 &i2c2 {
@@ -84,4 +84,25 @@
 
 &spi1 {
     status = "okay";
+};
+
+&i2s0 {
+    sound-dai = <&pcm5102a>;
+    status = "okay";
+};
+
+&pcm5102a {
+    status = "okay";
+};
+
+&codec {
+    status = "disable";
+};
+
+&pitft {
+    status = "disable";
+};
+
+&pitft_ts {
+    status = "disable";
 };

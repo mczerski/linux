@@ -64,10 +64,26 @@
 
 &i2c1 {
     /* no I2C1 for I2S0 */
-    status = "okay";
+    status = "disable";
 };
 
 &i2s0 {
     sound-dai = <&pcm5102a>;
-    status = "disabled";
+    status = "okay";
+};
+
+&pcm5102a {
+    status = "okay";
+};
+
+&codec {
+    status = "disable";
+};
+
+&pitft {
+    status = "disable";
+};
+
+&pitft_ts {
+    status = "disable";
 };
