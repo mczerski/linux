@@ -47,6 +47,7 @@ dtbo-$(CONFIG_ARCH_BCM2835) += \
 	gpio-no-bank0-irq.dtbo \
 	gpio-no-irq.dtbo \
 	gpio-poweroff.dtbo \
+	gpios.dtbo \
 	ltc2952-poweroff.dtbo \
 	gpio-shutdown.dtbo \
 	hd44780-lcd.dtbo \

@@ -1,0 +1,20 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2708";
+
+    fragment@0 {
+        target = <&gpio>;
+        __overlay__ {
+            pinctrl-names = "default";
+            pinctrl-0 = <&window_pins>;
+
+            window_pins: window_pins {
+                brcm,pins = <21 20 16 12 26 19 13 6>;
+                brcm,function = <0 0 0 0 0 0 0 0>;
+                brcm,pull = <2 2 2 2 2 2 2 2>;
+            };
+        };
+    };
+};
