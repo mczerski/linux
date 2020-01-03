@@ -70,6 +70,8 @@
 struct ltc2952_poweroff {
 	struct hrtimer timer_trigger;
 	struct hrtimer timer_wde;
+	int max_wde_ticks;
+	int wde_ticks_left;
 
 	ktime_t trigger_delay;
 	ktime_t wde_interval;
@@ -111,6 +113,14 @@ static enum hrtimer_restart ltc2952_poweroff_timer_wde(struct hrtimer *timer)
 	if (data->kernel_panic)
 		return HRTIMER_NORESTART;
 
+	if (data->wde_ticks_left == 0) {
+		dev_err(data->dev, "failed to shutdown gracefully\n");
+		return HRTIMER_NORESTART;
+	}
+
+	if (data->wde_ticks_left > 0)
+		data->wde_ticks_left--;
+
 	state = gpiod_get_value(data->gpio_watchdog);
 	gpiod_set_value(data->gpio_watchdog, !state);
 
@@ -122,6 +132,7 @@ static enum hrtimer_restart ltc2952_poweroff_timer_wde(struct hrtimer *timer)
 
 static void ltc2952_poweroff_start_wde(struct ltc2952_poweroff *data)
 {
+	data->wde_ticks_left = data->max_wde_ticks;
 	hrtimer_start(&data->timer_wde, data->wde_interval, HRTIMER_MODE_REL);
 }
 
@@ -130,7 +141,6 @@ ltc2952_poweroff_timer_trigger(struct hrtimer *timer)
 {
 	struct ltc2952_poweroff *data = to_ltc2952(timer, timer_trigger);
 
-	ltc2952_poweroff_start_wde(data);
 	dev_info(data->dev, "executing shutdown\n");
 	orderly_poweroff(true);
 
@@ -156,9 +166,11 @@ static irqreturn_t ltc2952_poweroff_handler(int irq, void *dev_id)
 	}
 
 	if (gpiod_get_value(data->gpio_trigger)) {
+		ltc2952_poweroff_start_wde(data);
 		hrtimer_start(&data->timer_trigger, data->trigger_delay,
 			      HRTIMER_MODE_REL);
 	} else {
+		hrtimer_cancel(&data->timer_wde);
 		hrtimer_cancel(&data->timer_trigger);
 	}
 	return IRQ_HANDLED;
@@ -173,6 +185,7 @@ static void ltc2952_poweroff_default(struct ltc2952_poweroff *data)
 {
 	data->wde_interval = 300L * 1E6L;
 	data->trigger_delay = ktime_set(2, 500L*1E6L);
+	data->max_wde_ticks = -1;
 
 	hrtimer_init(&data->timer_trigger, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	data->timer_trigger.function = ltc2952_poweroff_timer_trigger;
@@ -185,6 +198,7 @@ static int ltc2952_poweroff_init(struct platform_device *pdev)
 {
 	int ret;
 	u32 trigger_delay_ms;
+	u32 max_wait_ms;
 	struct ltc2952_poweroff *data = platform_get_drvdata(pdev);
 
 	ltc2952_poweroff_default(data);
@@ -193,6 +207,11 @@ static int ltc2952_poweroff_init(struct platform_device *pdev)
 				  &trigger_delay_ms)) {
 		data->trigger_delay = ktime_set(trigger_delay_ms / MSEC_PER_SEC,
 			(trigger_delay_ms % MSEC_PER_SEC) * NSEC_PER_MSEC);
+	}
+
+	if (!of_property_read_u32(pdev->dev.of_node, "max-wait-ms", &max_wait_ms)) {
+		data->max_wde_ticks = (trigger_delay_ms + max_wait_ms) / 300 + 1;
+		dev_info(&pdev->dev, "max wde ticks set to %d\n", data->max_wde_ticks);
 	}
 
 	data->gpio_watchdog = devm_gpiod_get(&pdev->dev, "watchdog",
