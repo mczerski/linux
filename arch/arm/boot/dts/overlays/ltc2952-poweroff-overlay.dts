@@ -1,0 +1,45 @@
+// Definitions for ltc2952-poweroff module
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2708";
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			power_ctrl: power_ctrl {
+				compatible = "lltc,ltc2952";
+				pinctrl-names = "default";
+  				pinctrl-0 = <&power_ctrl_pins>;
+                                trigger-gpios = <&gpio 23 1>;
+                                kill-gpios = <&gpio 4 1>;
+                                watchdog-gpios = <&gpio 24 0>;
+                                trigger-delay-ms = <10000>;
+				max-wait-ms = <300000>;
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&gpio>;
+		__overlay__ {
+                        // setup pull ups for trigger pin 
+			power_ctrl_pins: power_ctrl_pins {
+				brcm,pins = <23>;
+				brcm,function = <0>;
+                                brcm,pull = <2>;
+			};
+		};
+	};
+
+	__overrides__ {
+		trigger-pin = 	<&power_ctrl>,"trigger-gpios:4",
+				<&power_ctrl_pins>,"brcm,pins:0";
+		kill-pin = 	<&power_ctrl>,"kill-gpios:4",
+				<&power_ctrl_pins>,"brcm,pins:4";
+		watchdog-pin = 	<&power_ctrl>,"watchdog-gpios:4";
+		trigger-delay-ms =	<&power_ctrl>,"trigger-delay-ms:0";
+		max-wait-ms =   <&power_ctrl>,"max-wait-ms:0";
+	};
+};
