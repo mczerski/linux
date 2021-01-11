@@ -449,14 +449,17 @@ static int litex_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_exit;
 
-	mmc->caps = MMC_CAP_NEEDS_POLL | /* FIXME: we need this if no IRQ! */
-		    MMC_CAP_WAIT_WHILE_BUSY |
-		    MMC_CAP_DRIVER_TYPE_D;
-	mmc->caps2 = MMC_CAP2_NO_SDIO |
-		     MMC_CAP2_FULL_PWR_CYCLE |
-		     MMC_CAP2_NO_WRITE_PROTECT;
-	mmc->ops = &litex_mmc_ops;
+	/* add set-by-default capabilities */
+	mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_DRIVER_TYPE_D;
+	/* FIXME: set "broken-cd" in dt, or somehow handle through irq? */
+	mmc->caps |= MMC_CAP_NEEDS_POLL;
+	/* default to "disable-wp", "full-pwr-cycle", "no-sdio" */
+	mmc->caps2 |= MMC_CAP2_NO_WRITE_PROTECT |
+		      MMC_CAP2_FULL_PWR_CYCLE |
+		      MMC_CAP2_NO_SDIO;
+
 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+	mmc->ops = &litex_mmc_ops;
 
 	mmc->max_blk_size = DATA_BLOCK_SIZE;
 	mmc->max_blk_count = MAX_NR_BLOCKS;
