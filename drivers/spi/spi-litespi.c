@@ -46,15 +46,26 @@ static inline void litespi_wait_xfer_end(struct litespi_hw *hw)
 		cpu_relax();
 }
 
+static void litespi_cs(struct spi_device *spi, bool enable)
+{
+	struct litespi_hw *hw = spi_master_get_devdata(spi->master);
+	u8 cs = litex_read8(hw->base + LITESPI_OFF_CS);
+	if (!enable) {// inversed logic
+		cs |= BIT(spi->chip_select);
+	}
+	else {
+		cs &= ~BIT(spi->chip_select);
+	}
+
+	litex_write8(hw->base + LITESPI_OFF_CS, cs);
+}
+
 static int litespi_rxtx(struct spi_master *master, struct spi_device *spi,
 			struct spi_transfer *t)
 {
 	struct litespi_hw *hw = spi_master_get_devdata(master);
 	u16 ctl_word = t->bits_per_word << LITESPI_CTRL_SHIFT_BPW;
 	int i;
-
-	/* set chip select */
-	litex_write8(hw->base + LITESPI_OFF_CS, BIT(spi->chip_select));
 
 	/* set word size */
 	litex_write16(hw->base + LITESPI_OFF_CTRL, ctl_word);
@@ -137,6 +148,7 @@ static int litespi_probe(struct platform_device *pdev)
 
 	master->dev.of_node = pdev->dev.of_node;
 	master->bus_num = pdev->id;
+	master->set_cs = litespi_cs;
 	master->transfer_one = litespi_rxtx;
 	master->mode_bits = SPI_MODE_0 | SPI_CS_HIGH;
 	master->flags = SPI_CONTROLLER_MUST_RX | SPI_CONTROLLER_MUST_TX;
