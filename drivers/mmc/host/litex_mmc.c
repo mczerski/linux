@@ -168,6 +168,13 @@ static int send_cmd(struct litex_mmc_host *host, u8 cmd, u32 arg,
 	return status;
 }
 
+// CMD12
+static inline int send_stop_tx_cmd(struct litex_mmc_host *host) {
+	return send_cmd(host, MMC_STOP_TRANSMISSION, 0,
+			SDCARD_CTRL_RESPONSE_SHORT,
+			SDCARD_CTRL_DATA_TRANSFER_NONE);
+}
+
 // CMD55
 static inline int send_app_cmd(struct litex_mmc_host *host) {
 	return send_cmd(host, MMC_APP_CMD, host->rca << 16,
@@ -315,6 +322,16 @@ static void litex_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		status = send_cmd(host, cmd->opcode, cmd->arg,
 				response_len, transfer);
 	} while (status != SD_OK && retries-- > 0);
+
+	/* Each multi-block data transfer MUST be followed by a cmd12
+	 * (MMC_STOP_TRANSMISSION).
+	 * FIXME: figure out why we need to do this here explicitly, and
+	 * whether there's a way (e.g., capability flag, possibly set via
+	 * some DT property) to get the driver to do this automatically!
+	 */
+	if (cmd->opcode == MMC_READ_MULTIPLE_BLOCK ||
+	    cmd->opcode == MMC_WRITE_MULTIPLE_BLOCK)
+		send_stop_tx_cmd(host);
 
 	switch (status) {
 	case SD_OK:
