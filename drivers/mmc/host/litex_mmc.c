@@ -435,6 +435,11 @@ static int litex_mmc_probe(struct platform_device *pdev)
 	if (!mmc)
 		return -ENOMEM;
 
+	/* force single-block transfers only */
+	mmc->max_blk_count = 1;
+	mmc->max_seg_size = mmc->max_req_size =
+		mmc->max_blk_size * mmc->max_blk_count;
+
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
 	host->dev = pdev;
