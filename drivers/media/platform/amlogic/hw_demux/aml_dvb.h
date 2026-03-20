@@ -54,10 +54,7 @@
 
 #include <linux/of.h>
 #include <linux/pinctrl/consumer.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-#include "linux/dvb/aml_ca_ext.h"
-#endif
+#include <linux/dvb/aml_ca_ext.h>
 
 #include "aml_demod_gt.h"
 
@@ -289,6 +286,7 @@ struct aml_swfilter {
 };
 
 struct aml_dvb {
+    void __iomem *base;
 	struct dvb_device    dvb_dev;
 	int ts_in_total_count;
 	struct aml_ts_input  ts[TS_IN_COUNT];
@@ -370,7 +368,8 @@ extern u32 aml_dmx_get_first_audio_pts(struct aml_dvb *dvb);
 
 /*Get the DVB device*/
 extern struct aml_dvb *aml_get_dvb_device(void);
-struct device *aml_get_device(void);
+extern struct device *aml_get_device(void);
+extern struct dvb_adapter *aml_get_dvb_adapter(void);
 
 extern int aml_regist_dmx_class(void);
 extern int aml_unregist_dmx_class(void);

@@ -40,9 +40,9 @@
 #include <linux/dma-mapping.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/vmalloc.h>
-#include <linux/amlogic/media/codec_mm/codec_mm.h>
-#include <linux/amlogic/media/codec_mm/configs.h>
-#include "../../amports/streambuf.h"
+//#include <linux/amlogic/media/codec_mm/codec_mm.h>
+//#include <linux/amlogic/media/codec_mm/configs.h>
+//#include "../../amports/streambuf.h"
 #include "c_stb_define.h"
 #include "c_stb_regs_define.h"
 #include "aml_dvb.h"
@@ -50,6 +50,7 @@
 #include "linux/dvb/aml_dmx_ext.h"
 #endif
 #include "aml_dvb_reg.h"
+#include "cpu_version.h"
 #include <linux/sched/signal.h>
 
 
@@ -104,6 +105,17 @@ static u32 last_pr_error_time;
 		} \
 		printk("\n"); \
 	} while (0)
+
+
+static void aml_write_cbus(unsigned int reg, unsigned int val)
+{
+    writel(val, aml_get_dvb_device()->base + reg);
+}
+
+static int aml_read_cbus(unsigned int reg)
+{
+    return readl(aml_get_dvb_device()->base + reg);
+}
 
 MODULE_PARM_DESC(debug_dmx, "\n\t\t Enable demux debug information");
 static int debug_dmx;
@@ -528,7 +540,7 @@ int dmx_phyreg_access(unsigned int reg, unsigned int writeval,
 /*Section buffer watchdog*/
 static void section_buffer_watchdog_func(struct timer_list * timer)
 {
-	struct aml_dvb *dvb = from_timer(dvb,timer,watchdog_timer);
+    struct aml_dvb *dvb = container_of(timer, struct aml_dvb, watchdog_timer);
 	struct aml_dmx *dmx;
 	u32 section_busy32 = 0, om_cmd_status32 = 0,
 	    demux_channel_activity32 = 0;
@@ -1765,7 +1777,7 @@ int dsc_set_pid(struct aml_dsc_channel *ch, int pid)
 	return 0;
 }
 
-int dsc_get_pid(struct aml_dsc_channel *ch, int *pid)
+static int dsc_get_pid(struct aml_dsc_channel *ch, int *pid)
 {
 	struct aml_dsc *dsc = ch->dsc;
 	int is_dsc2 = (dsc->id == 1) ? 1 : 0;
@@ -1838,7 +1850,7 @@ END:
 	return ret;
 }
 
-int dsc_set_keys(struct aml_dsc_channel *ch)
+static int dsc_set_keys(struct aml_dsc_channel *ch)
 {
 	int types = ch->set & 0xFFFFFF;
 	int flag = (ch->set >> 24) & 0xFF;
@@ -1974,7 +1986,7 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
  *	AM_DSC_KEY_TYPE_AES_ODD    IV odd key
  *	AM_DSC_KEY_TYPE_AES_EVEN  IV even key
  */
-void aml_ci_plus_set_iv(struct aml_dsc_channel *ch, enum ca_cw_type type,
+static void aml_ci_plus_set_iv(struct aml_dsc_channel *ch, enum ca_cw_type type,
 			u8 *key)
 {
 	unsigned int k0, k1, k2, k3;
@@ -2344,7 +2356,7 @@ void dsc_release(void)
 {
 }
 /************************* AES DESC************************************/
-void set_ciplus_input_source(struct aml_dsc *dsc)
+static void set_ciplus_input_source(struct aml_dsc *dsc)
 {
 	u32 data;
 	u32 in = 0;
@@ -2378,7 +2390,7 @@ void set_ciplus_input_source(struct aml_dsc *dsc)
 	}
 }
 
-int dsc_enable(struct aml_dsc *dsc, int enable)
+static int dsc_enable(struct aml_dsc *dsc, int enable)
 {
 	if (dsc->id == 0) {
 		WRITE_MPEG_REG(STB_TOP_CONFIG,
@@ -2644,7 +2656,7 @@ static void asyncfifo_put_buffer(struct aml_asyncfifo *afifo)
 	}
 }
 
-int async_fifo_init(struct aml_asyncfifo *afifo, int initirq,
+static int async_fifo_init(struct aml_asyncfifo *afifo, int initirq,
 			int buf_len, unsigned long buf)
 {
 	int ret = 0;
@@ -2682,7 +2694,7 @@ int async_fifo_init(struct aml_asyncfifo *afifo, int initirq,
 	return ret;
 }
 
-int async_fifo_deinit(struct aml_asyncfifo *afifo, int freeirq)
+static int async_fifo_deinit(struct aml_asyncfifo *afifo, int freeirq)
 {
 	struct aml_dvb *dvb = afifo->dvb;
 	unsigned long flags;
@@ -2952,7 +2964,7 @@ static int dmx_deinit(struct aml_dmx *dmx)
 	if (!dvb->dmx_init) {
 		dmx_reset_hw(dvb);
 #ifdef ENABLE_SEC_BUFF_WATCHDOG
-		del_timer_sync(&dvb->watchdog_timer);
+		timer_delete_sync(&dvb->watchdog_timer);
 #endif
 	}
 
@@ -4001,7 +4013,7 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 	}
 #ifdef ENABLE_SEC_BUFF_WATCHDOG
 	if (reset_irq)
-		del_timer_sync(&dvb->watchdog_timer);
+		timer_delete_sync(&dvb->watchdog_timer);
 #endif
 	/*RESET_TOP will clear the dsc pid , save all dsc pid that setting in TA*/
 	for (id = 0; id < DSC_DEV_COUNT; id++) {
@@ -5212,7 +5224,7 @@ int aml_dmx_hw_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
 	return 0;
 }
 
-int sf_dmx_track_source(struct aml_dmx *dmx)
+static int sf_dmx_track_source(struct aml_dmx *dmx)
 {
 	struct aml_dvb *dvb = (struct aml_dvb *)dmx->demux.priv;
 	struct aml_swfilter *sf = &dvb->swfilter;
@@ -5689,7 +5701,7 @@ int aml_dmx_set_demux(struct aml_dvb *dvb, int id)
 	return 0;
 }
 
-int _set_tsfile_clkdiv(struct aml_dvb *dvb, int clkdiv)
+static int _set_tsfile_clkdiv(struct aml_dvb *dvb, int clkdiv)
 {
 	if (tsfile_clkdiv != clkdiv) {
 		pr_dbg("set ts file clock div %d\n", clkdiv);
@@ -5700,8 +5712,8 @@ int _set_tsfile_clkdiv(struct aml_dvb *dvb, int clkdiv)
 	return 0;
 }
 
-static ssize_t tsfile_clkdiv_store(struct class *class,
-				     struct class_attribute *attr,
+static ssize_t tsfile_clkdiv_store(const struct class *class,
+				     const struct class_attribute *attr,
 				     const char *buf, size_t size)
 {
 	long div;
@@ -5711,8 +5723,8 @@ static ssize_t tsfile_clkdiv_store(struct class *class,
 	return size;
 }
 
-static ssize_t tsfile_clkdiv_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
+static ssize_t tsfile_clkdiv_show(const struct class *class,
+				     const struct class_attribute *attr, char *buf)
 {
 	ssize_t ret;
 
@@ -5723,8 +5735,8 @@ static ssize_t tsfile_clkdiv_show(struct class *class,
 
 static int dmx_id;
 
-static ssize_t dmx_smallsec_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
+static ssize_t dmx_smallsec_show(const struct class *class,
+				     const struct class_attribute *attr, char *buf)
 {
 	ssize_t ret;
 	struct aml_dvb *dvb = aml_get_dvb_device();
@@ -5733,8 +5745,8 @@ static ssize_t dmx_smallsec_show(struct class *class,
 					dvb->dmx[dmx_id].smallsec.bufsize);
 	return ret;
 }
-static ssize_t dmx_smallsec_store(struct class *class,
-				     struct class_attribute *attr,
+static ssize_t dmx_smallsec_store(const struct class *class,
+				     const struct class_attribute *attr,
 				     const char *buf, size_t size)
 {
 	int i, e, s = 0, f = 0;
@@ -5748,8 +5760,8 @@ static ssize_t dmx_smallsec_store(struct class *class,
 	return size;
 }
 
-static ssize_t dmx_timeout_show(struct class *class,
-				     struct class_attribute *attr, char *buf)
+static ssize_t dmx_timeout_show(const struct class *class,
+				     const struct class_attribute *attr, char *buf)
 {
 	ssize_t ret;
 	struct aml_dvb *dvb = aml_get_dvb_device();
@@ -5764,8 +5776,8 @@ static ssize_t dmx_timeout_show(struct class *class,
 	DMX_WRITE_REG(dmx_id, STB_INT_STATUS, (1<<INPUT_TIME_OUT));
 	return ret;
 }
-static ssize_t dmx_timeout_store(struct class *class,
-				     struct class_attribute *attr,
+static ssize_t dmx_timeout_store(const struct class *class,
+				     const struct class_attribute *attr,
 				     const char *buf, size_t size)
 {
 	int i, e, t = 0, c = 0, m = 0, f = 0;
@@ -5781,8 +5793,8 @@ static ssize_t dmx_timeout_store(struct class *class,
 
 
 #define DEMUX_SCAMBLE_FUNC_DECL(i)  \
-static ssize_t demux##i##_scramble_show(struct class *class,  \
-struct class_attribute *attr, char *buf)\
+static ssize_t demux##i##_scramble_show(const struct class *class,  \
+const struct class_attribute *attr, char *buf)\
 {\
 	int data = 0;\
 	int aflag = 0;\
@@ -5806,8 +5818,8 @@ DEMUX_SCAMBLE_FUNC_DECL(1)
 #if DMX_DEV_COUNT > 2
 DEMUX_SCAMBLE_FUNC_DECL(2)
 #endif
-static ssize_t ciplus_output_ctrl_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t ciplus_output_ctrl_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf)
 {
 	int ret;
@@ -5837,8 +5849,8 @@ static ssize_t ciplus_output_ctrl_show(struct class *class,
 	return ret;
 }
 
-static ssize_t ciplus_output_ctrl_store(struct class *class,
-					  struct class_attribute *attr,
+static ssize_t ciplus_output_ctrl_store(const struct class *class,
+					  const struct class_attribute *attr,
 					  const char *buf, size_t size)
 {
 	struct aml_dvb *dvb = aml_get_dvb_device();
@@ -5880,15 +5892,15 @@ static ssize_t ciplus_output_ctrl_store(struct class *class,
 
 	return size;
 }
-static ssize_t reset_fec_input_ctrl_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t reset_fec_input_ctrl_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf)
 {
 	return 0;
 }
 
-static ssize_t reset_fec_input_ctrl_store(struct class *class,
-					  struct class_attribute *attr,
+static ssize_t reset_fec_input_ctrl_store(const struct class *class,
+					  const struct class_attribute *attr,
 					  const char *buf, size_t size)
 {
 	u32 v;
@@ -5901,25 +5913,25 @@ static ssize_t reset_fec_input_ctrl_store(struct class *class,
 
 	return size;
 }
-static ssize_t register_addr_show(struct class *class,
-					struct class_attribute *attr,
+static ssize_t register_addr_show(const struct class *class,
+					const struct class_attribute *attr,
 					char *buf);
-static ssize_t register_addr_store(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t register_addr_store(const struct class *class,
+					 const struct class_attribute *attr,
 					 const char *buf, size_t size);
-static ssize_t dmx_id_show(struct class *class,
-				  struct class_attribute *attr, char *buf);
-static ssize_t dmx_id_store(struct class *class,
-				   struct class_attribute *attr,
+static ssize_t dmx_id_show(const struct class *class,
+				  const struct class_attribute *attr, char *buf);
+static ssize_t dmx_id_store(const struct class *class,
+				   const struct class_attribute *attr,
 				   const char *buf, size_t size);
-static ssize_t register_value_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t register_value_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf);
-static ssize_t register_value_store(struct class *class,
-					  struct class_attribute *attr,
+static ssize_t register_value_store(const struct class *class,
+					  const struct class_attribute *attr,
 					  const char *buf, size_t size);
-static ssize_t dmx_sec_statistics_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t dmx_sec_statistics_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf);
 static int reg_addr;
 
@@ -5979,8 +5991,8 @@ static struct class aml_dmx_class = {
 	.class_groups = aml_dmx_class_groups,
 };
 
-static ssize_t dmx_id_show(struct class *class,
-				  struct class_attribute *attr, char *buf)
+static ssize_t dmx_id_show(const struct class *class,
+				  const struct class_attribute *attr, char *buf)
 {
 	int ret;
 
@@ -5988,8 +6000,8 @@ static ssize_t dmx_id_show(struct class *class,
 	return ret;
 }
 
-static ssize_t dmx_id_store(struct class *class,
-				   struct class_attribute *attr,
+static ssize_t dmx_id_store(const struct class *class,
+				   const struct class_attribute *attr,
 				   const char *buf, size_t size)
 {
 	int id = 0;
@@ -6006,8 +6018,8 @@ static ssize_t dmx_id_store(struct class *class,
 	return size;
 }
 
-static ssize_t register_addr_show(struct class *class,
-					struct class_attribute *attr,
+static ssize_t register_addr_show(const struct class *class,
+					const struct class_attribute *attr,
 					 char *buf)
 {
 	int ret;
@@ -6016,8 +6028,8 @@ static ssize_t register_addr_show(struct class *class,
 	return ret;
 }
 
-static ssize_t register_addr_store(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t register_addr_store(const struct class *class,
+					 const struct class_attribute *attr,
 					 const char *buf, size_t size)
 {
 	int addr = 0;
@@ -6029,8 +6041,8 @@ static ssize_t register_addr_store(struct class *class,
 	return size;
 }
 
-static ssize_t register_value_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t register_value_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf)
 {
 	int ret, value;
@@ -6040,8 +6052,8 @@ static ssize_t register_value_show(struct class *class,
 	return ret;
 }
 
-static ssize_t register_value_store(struct class *class,
-					  struct class_attribute *attr,
+static ssize_t register_value_store(const struct class *class,
+					  const struct class_attribute *attr,
 					  const char *buf, size_t size)
 {
 	int value = 0;
@@ -6053,8 +6065,8 @@ static ssize_t register_value_store(struct class *class,
 	return size;
 }
 
-static ssize_t dmx_sec_statistics_show(struct class *class,
-					 struct class_attribute *attr,
+static ssize_t dmx_sec_statistics_show(const struct class *class,
+					 const struct class_attribute *attr,
 					 char *buf)
 {
 	ssize_t ret;
@@ -6092,17 +6104,18 @@ int aml_unregist_dmx_class(void)
 	return 0;
 }
 
-static struct mconfig parser_configs[] = {
-	MC_PU32("video_pts", &video_pts),
-	MC_PU32("audio_pts", &audio_pts),
-	MC_PU32("video_pts_bit32", &video_pts_bit32),
-	MC_PU32("audio_pts_bit32", &audio_pts_bit32),
-	MC_PU32("first_video_pts", &first_video_pts),
-	MC_PU32("first_audio_pts", &first_audio_pts),
-};
-
-void aml_register_parser_mconfig(void)
-{
-	REG_PATH_CONFIGS("media.parser", parser_configs);
-}
+//TODO
+//static struct mconfig parser_configs[] = {
+//	MC_PU32("video_pts", &video_pts),
+//	MC_PU32("audio_pts", &audio_pts),
+//	MC_PU32("video_pts_bit32", &video_pts_bit32),
+//	MC_PU32("audio_pts_bit32", &audio_pts_bit32),
+//	MC_PU32("first_video_pts", &first_video_pts),
+//	MC_PU32("first_audio_pts", &first_audio_pts),
+//};
+//
+//void aml_register_parser_mconfig(void)
+//{
+//	REG_PATH_CONFIGS("media.parser", parser_configs);
+//}
 
