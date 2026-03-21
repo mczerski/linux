@@ -40,6 +40,7 @@ obj-$(CONFIG_DVB_CXD2099) += cxd2099.o
 obj-$(CONFIG_DVB_CXD2820R) += cxd2820r.o
 obj-$(CONFIG_DVB_CXD2841ER) += cxd2841er.o
 obj-$(CONFIG_DVB_CXD2880) += cxd2880/
+obj-$(CONFIG_DVB_CXD2878) += cxd2878.o
 obj-$(CONFIG_DVB_DIB3000MB) += dib3000mb.o
 obj-$(CONFIG_DVB_DIB3000MC) += dib3000mc.o dibx000_common.o
 obj-$(CONFIG_DVB_DIB7000M) += dib7000m.o dibx000_common.o
