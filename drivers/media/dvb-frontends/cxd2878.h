@@ -1,6 +1,8 @@
 #ifndef _CXD2878_H_
 #define _CXD2878_H_
 
+#include <linux/i2c.h>
+
  enum sony_demod_xtal_t{
     SONY_DEMOD_XTAL_16000KHz = 0,       /**< 16 MHz */
     SONY_DEMOD_XTAL_24000KHz = 1,       /**< 24 MHz */
