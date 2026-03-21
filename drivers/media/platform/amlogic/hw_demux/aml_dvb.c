@@ -179,8 +179,8 @@ long aml_stb_get_base(int id)
 		return 0x9800;
 	case ID_ASYNC_FIFO2_REG_BASE:
 		return (newbase) ? 0x2400 : 0x2314;
-	case ID_RESET_BASE:
-		return (newbase) ? 0x0400 : 0x1100;
+	//case ID_RESET_BASE:
+	//	return (newbase) ? 0x0400 : 0x1100;
 	case ID_PARSER_SUB_START_PTR_BASE:
 		return (newbase) ? 0x3800 : 0x2900;
 	default:
@@ -191,12 +191,25 @@ long aml_stb_get_base(int id)
 
 static void aml_write_cbus(unsigned int reg, unsigned int val)
 {
-    writel(val, aml_dvb_device.base + reg);
+	//pr_dbg("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
+    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
+        writel(val, aml_dvb_device.base + ((reg - 0x1600) << 2));
+    }
+    else {
+        pr_err("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
+    }
 }
 
 static int aml_read_cbus(unsigned int reg)
 {
-    return readl(aml_dvb_device.base + reg);
+	//pr_dbg("aml_read_cbus: reg=0x%x\n", reg);
+    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
+        return readl(aml_dvb_device.base + ((reg - 0x1600) << 2));
+    }
+    else {
+        pr_err("aml_read_cbus: reg=0x%x\n", reg);
+        return 0;
+    }
 }
 
 static void aml_dvb_dmx_release(struct aml_dvb *advb, struct aml_dmx *dmx)
@@ -2313,37 +2326,37 @@ static int aml_dvb_probe(struct platform_device *pdev)
     //TODO
 	//if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
 	//{
-	//	aml_dvb_demux_clk =
-	//		devm_clk_get(&pdev->dev, "demux");
-	//	if (IS_ERR_OR_NULL(aml_dvb_demux_clk)) {
-	//		dev_err(&pdev->dev, "get demux clk fail\n");
-	//		return -1;
-	//	}
-	//	clk_prepare_enable(aml_dvb_demux_clk);
+		aml_dvb_demux_clk =
+			devm_clk_get(&pdev->dev, "demux");
+		if (IS_ERR_OR_NULL(aml_dvb_demux_clk)) {
+			dev_err(&pdev->dev, "get demux clk fail\n");
+			return -1;
+		}
+		clk_prepare_enable(aml_dvb_demux_clk);
 
-	//	aml_dvb_afifo_clk =
-	//		devm_clk_get(&pdev->dev, "asyncfifo");
-	//	if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
-	//		dev_err(&pdev->dev, "get asyncfifo clk fail\n");
-	//		return -1;
-	//	}
-	//	clk_prepare_enable(aml_dvb_afifo_clk);
+		aml_dvb_afifo_clk =
+			devm_clk_get(&pdev->dev, "asyncfifo");
+		if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
+			dev_err(&pdev->dev, "get asyncfifo clk fail\n");
+			return -1;
+		}
+		clk_prepare_enable(aml_dvb_afifo_clk);
 
-	//	aml_dvb_ahbarb0_clk =
-	//		devm_clk_get(&pdev->dev, "ahbarb0");
-	//	if (IS_ERR_OR_NULL(aml_dvb_ahbarb0_clk)) {
-	//		dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
-	//		return -1;
-	//	}
-	//	clk_prepare_enable(aml_dvb_ahbarb0_clk);
+		aml_dvb_ahbarb0_clk =
+			devm_clk_get(&pdev->dev, "ahbarb0");
+		if (IS_ERR_OR_NULL(aml_dvb_ahbarb0_clk)) {
+			dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
+			return -1;
+		}
+		clk_prepare_enable(aml_dvb_ahbarb0_clk);
 
-	//	aml_dvb_uparsertop_clk =
-	//		devm_clk_get(&pdev->dev, "uparsertop");
-	//	if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
-	//		dev_err(&pdev->dev, "get uparsertop clk fail\n");
-	//		return -1;
-	//	}
-	//	clk_prepare_enable(aml_dvb_uparsertop_clk);
+		aml_dvb_uparsertop_clk =
+			devm_clk_get(&pdev->dev, "uparsertop");
+		if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
+			dev_err(&pdev->dev, "get uparsertop clk fail\n");
+			return -1;
+		}
+		clk_prepare_enable(aml_dvb_uparsertop_clk);
 	//}
 	//else
 	//{
@@ -2368,6 +2381,34 @@ static int aml_dvb_probe(struct platform_device *pdev)
     if (IS_ERR(advb->base)) {
         return PTR_ERR(advb->base);
     }
+
+    advb->dmx_rst = devm_reset_control_get(&pdev->dev, "demux_rst");
+    if (IS_ERR(advb->dmx_rst))
+        return PTR_ERR(advb->dmx_rst);
+
+    advb->des_rst = devm_reset_control_get(&pdev->dev, "des_rst");
+    if (IS_ERR(advb->des_rst))
+        return PTR_ERR(advb->des_rst);
+
+    advb->demux_rst[0] = devm_reset_control_get(&pdev->dev, "demux0_rst");
+    if (IS_ERR(advb->demux_rst[0]))
+        return PTR_ERR(advb->demux_rst[0]);
+
+    advb->demux_rst[1] = devm_reset_control_get(&pdev->dev, "demux1_rst");
+    if (IS_ERR(advb->demux_rst[1]))
+        return PTR_ERR(advb->demux_rst[1]);
+
+    advb->demux_rst[2] = devm_reset_control_get(&pdev->dev, "demux2_rst");
+    if (IS_ERR(advb->demux_rst[2]))
+        return PTR_ERR(advb->demux_rst[2]);
+
+    advb->async_rst[0] = devm_reset_control_get(&pdev->dev, "async0_rst");
+    if (IS_ERR(advb->async_rst[0]))
+        return PTR_ERR(advb->async_rst[0]);
+
+    advb->async_rst[1] = devm_reset_control_get(&pdev->dev, "async1_rst");
+    if (IS_ERR(advb->async_rst[1]))
+        return PTR_ERR(advb->async_rst[1]);
 
 	spin_lock_init(&advb->slock);
 
@@ -2625,10 +2666,10 @@ static void aml_dvb_remove(struct platform_device *pdev)
     //TODO
 	//if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
 	//{
-	//	clk_disable_unprepare(aml_dvb_uparsertop_clk);
-	//	clk_disable_unprepare(aml_dvb_ahbarb0_clk);
-	//	clk_disable_unprepare(aml_dvb_afifo_clk);
-	//	clk_disable_unprepare(aml_dvb_demux_clk);
+		clk_disable_unprepare(aml_dvb_uparsertop_clk);
+		clk_disable_unprepare(aml_dvb_ahbarb0_clk);
+		clk_disable_unprepare(aml_dvb_afifo_clk);
+		clk_disable_unprepare(aml_dvb_demux_clk);
 	//}
 	//else
 	//{

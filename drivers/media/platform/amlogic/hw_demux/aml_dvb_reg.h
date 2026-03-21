@@ -25,7 +25,7 @@
 #define ID_ASYNC_FIFO_REG_BASE		2
 #define ID_ASYNC_FIFO1_REG_BASE		3
 #define ID_ASYNC_FIFO2_REG_BASE	4
-#define ID_RESET_BASE			5
+//#define ID_RESET_BASE			5
 #define ID_PARSER_SUB_START_PTR_BASE	6
 
 long aml_stb_get_base(int id);
