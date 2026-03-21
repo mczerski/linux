@@ -48,6 +48,7 @@
 #include <linux/of_irq.h>
 #include <linux/compat.h>
 #include <dvb-frontends/cxd2878.h>
+#include <tuners/mxl603.h>
 
 #include "c_stb_define.h"
 #include "c_stb_regs_define.h"
@@ -2331,6 +2332,24 @@ static struct cxd2878_config cxd2878cfg = {
 	.read_properties = NULL,
 };
 
+static struct mxl603_config mxl603cfg = {
+	.xtal_freq_hz = MXL603_XTAL_16MHz,
+	.if_freq_hz = MXL603_IF_5MHz,
+	.agc_type = MXL603_AGC_SELF,
+	.xtal_cap = 16,
+	.gain_level = 11,
+	.if_out_gain_level = 11,
+	.agc_set_point = 66,
+	.agc_invert_pol = 0,
+	.invert_if = 1,
+	.loop_thru_enable = 0,
+	.clk_out_enable = 1,
+	.clk_out_div = 0,
+	.clk_out_ext = 0,
+	.xtal_sharing_mode = 0,
+	.single_supply_3_3V = 1,
+};
+
 static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
@@ -2623,20 +2642,15 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	pr_inf("Found i2c-0 adapter: %s\n", i2c->name);
     advb->dmx[0].fe = cxd2878_attach(&cxd2878cfg, i2c);
 	if (advb->dmx[0].fe != NULL) {
-		//// GTMEDIA GTT-2 box uses 16MHz xtal for mxl603
-		//mxl603cfg.xtal_freq_hz = MXL603_XTAL_16MHz;
-		//if (mxl603_attach(meson_dvb.fe[i], meson_dvb.i2c[i], 0x63, &mxl603cfg) == NULL) {
-		//	dev_info(&pdev->dev, "Failed to find MxL603 tuner!\n");
-		//	dev_info(&pdev->dev, "Detaching Sony CXD2878 DVB-C/T/T2 frontend!\n");
-		//	dvb_frontend_detach(meson_dvb.fe[i]);
-		//	continue;
-		//}
-		//meson_dvb.total_nims++;
-		//continue;
-        ret = dvb_register_frontend(padapter, advb->dmx[0].fe);
-        if (ret < 0) {
-            pr_error("dvb frontend register error: %d", ret); 
+		if (mxl603_attach(advb->dmx[0].fe, i2c, 0x63, &mxl603cfg) != NULL) {
+            ret = dvb_register_frontend(padapter, advb->dmx[0].fe);
+            if (ret < 0) {
+                pr_error("dvb frontend register error: %d", ret); 
+            }
         }
+        else {
+            pr_error("dvb tuner attach error\n");
+		}
 	}
     else {
         pr_error("dvb demodulator attach error\n");
