@@ -36,6 +36,7 @@
 #include <linux/mutex.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/reset.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
@@ -287,6 +288,10 @@ struct aml_swfilter {
 
 struct aml_dvb {
     void __iomem *base;
+    struct reset_control *dmx_rst;
+    struct reset_control *demux_rst[3];
+    struct reset_control *des_rst;
+    struct reset_control *async_rst[2];
 	struct dvb_device    dvb_dev;
 	int ts_in_total_count;
 	struct aml_ts_input  ts[TS_IN_COUNT];

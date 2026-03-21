@@ -107,16 +107,6 @@ static u32 last_pr_error_time;
 	} while (0)
 
 
-static void aml_write_cbus(unsigned int reg, unsigned int val)
-{
-    writel(val, aml_get_dvb_device()->base + reg);
-}
-
-static int aml_read_cbus(unsigned int reg)
-{
-    return readl(aml_get_dvb_device()->base + reg);
-}
-
 MODULE_PARM_DESC(debug_dmx, "\n\t\t Enable demux debug information");
 static int debug_dmx;
 module_param(debug_dmx, int, 0644);
@@ -227,6 +217,29 @@ static int have_old_stb_top_config = 1;
 static int have_old_fec_input_control = 1;
 static long pes_off_pre[DMX_DEV_COUNT];
 
+static void aml_write_cbus(unsigned int reg, unsigned int val)
+{
+	//pr_dbg("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
+    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
+        writel(val, aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
+    }
+    else {
+        pr_err("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
+    }
+}
+
+static int aml_read_cbus(unsigned int reg)
+{
+	//pr_dbg("aml_read_cbus: reg=0x%x\n", reg);
+    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
+        return readl(aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
+        }
+    else {
+        pr_err("aml_read_cbus: reg=0x%x\n", reg);
+        return 0;
+    }
+}
+
 static void
 dmx_write_reg(int r, u32 v)
 {
@@ -255,17 +268,18 @@ dmx_write_reg(int r, u32 v)
 			mask = (1<<15);
 			v   &= ~mask;
 			v   |= (oldv & mask);
-		} else if ((r == RESET1_REGISTER) || (r == RESET3_REGISTER)) {
-			if (!have_old_stb_top_config) {
-				have_old_stb_top_config = 1;
-				old_stb_top_config =
-					READ_MPEG_REG(STB_TOP_CONFIG);
-			}
-			if (!have_old_fec_input_control) {
-				have_old_fec_input_control = 1;
-				old_fec_input_control =
-					READ_MPEG_REG(FEC_INPUT_CONTROL);
-			}
+        //TODO
+		//} else if ((r == RESET1_REGISTER) || (r == RESET3_REGISTER)) {
+		//	if (!have_old_stb_top_config) {
+		//		have_old_stb_top_config = 1;
+		//		old_stb_top_config =
+		//			READ_MPEG_REG(STB_TOP_CONFIG);
+		//	}
+		//	if (!have_old_fec_input_control) {
+		//		have_old_fec_input_control = 1;
+		//		old_fec_input_control =
+		//			READ_MPEG_REG(FEC_INPUT_CONTROL);
+		//	}
 		} else if ((r == TS_PL_PID_INDEX) || (r == TS_PL_PID_DATA)
 					|| (r == COMM_DESC_KEY0)
 					|| (r == COMM_DESC_KEY1)
@@ -2909,6 +2923,10 @@ static int dmx_init(struct aml_dmx *dmx)
 				IRQF_SHARED|IRQF_TRIGGER_RISING,
 				"dmx irq",
 				dmx);
+        if (irq) {
+            pr_err("failed to request irq(%d): %d\n", dmx->dmx_irq, irq);
+            return irq;
+        }
 	}
 
 	/*Allocate buffer */
@@ -4029,7 +4047,7 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 		}
 	}
 
-	WRITE_MPEG_REG(RESET1_REGISTER, RESET_DEMUXSTB);
+    reset_control_reset(dvb->dmx_rst);
 
 	for (id = 0; id < DMX_DEV_COUNT; id++) {
 		times = 0;
@@ -4258,11 +4276,8 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 #endif
 
 	pr_error("dmx_reset_dmx_hw_ex_unlock into\n");
-	WRITE_MPEG_REG(RESET3_REGISTER,
-		       (dmx->id) ? ((dmx->id ==
-				     1) ? RESET_DEMUX1 : RESET_DEMUX2) :
-		       RESET_DEMUX0);
-	WRITE_MPEG_REG(RESET3_REGISTER, RESET_DES);
+    reset_control_reset(dvb->demux_rst[dmx->id]);
+    reset_control_reset(dvb->des_rst);
 
 	{
 		int times;
@@ -5142,7 +5157,7 @@ int aml_asyncfifo_hw_init(struct aml_asyncfifo *afifo)
 	if (!buf)
 		return -1;
 
-	WRITE_MPEG_REG(RESET6_REGISTER, (1<<11)|(1<<12));
+    reset_control_reset(afifo->dvb->async_rst[afifo->id]);
 	ret = async_fifo_init(afifo, 1, len, buf);
 
 	if (ret < 0)
