@@ -288,6 +288,7 @@ struct aml_swfilter {
 
 struct aml_dvb {
     void __iomem *base;
+    void __iomem *base2;
     struct reset_control *dmx_rst;
     struct reset_control *demux_rst[3];
     struct reset_control *des_rst;

@@ -223,6 +223,9 @@ static void aml_write_cbus(unsigned int reg, unsigned int val)
     if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
         writel(val, aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
     }
+    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
+        writel(val, aml_get_dvb_device()->base2 + ((reg - 0x2310) << 2));
+    }
     else {
         pr_err("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
     }
@@ -233,7 +236,10 @@ static int aml_read_cbus(unsigned int reg)
 	//pr_dbg("aml_read_cbus: reg=0x%x\n", reg);
     if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
         return readl(aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
-        }
+    }
+    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
+        return readl(aml_get_dvb_device()->base2 + ((reg - 0x2310) << 2));
+    }
     else {
         pr_err("aml_read_cbus: reg=0x%x\n", reg);
         return 0;
