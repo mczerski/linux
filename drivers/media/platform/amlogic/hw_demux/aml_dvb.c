@@ -47,6 +47,7 @@
 #include <linux/clk.h>
 #include <linux/of_irq.h>
 #include <linux/compat.h>
+#include <dvb-frontends/cxd2878.h>
 
 #include "c_stb_define.h"
 #include "c_stb_regs_define.h"
@@ -2314,12 +2315,29 @@ static struct class aml_stb_class = {
 	.class_groups = aml_stb_class_groups,
 };
 
+static struct cxd2878_config cxd2878cfg = {
+	.addr_slvt = 0x6c,
+	.xtal = SONY_DEMOD_XTAL_24000KHz,
+	.tuner_addr = 0x60,
+	.tuner_xtal = SONY_ASCOT3_XTAL_24000KHz,
+	.ts_mode = 1,
+	.ts_ser_data = 0,
+	.ts_clk = 1,
+	.ts_clk_mask = 1,
+	.ts_valid = 0,
+	.atscCoreDisable = 0,
+	.lock_flag = 1,
+	.write_properties = NULL,
+	.read_properties = NULL,
+};
+
 static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
 	int i, ret = 0;
 	struct devio_aml_platform_data *pd_dvb;
 	struct dvb_adapter *padapter;
+    struct i2c_adapter *i2c;
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
 
@@ -2383,32 +2401,39 @@ static int aml_dvb_probe(struct platform_device *pdev)
     }
 
     advb->dmx_rst = devm_reset_control_get(&pdev->dev, "demux_rst");
-    if (IS_ERR(advb->dmx_rst))
+    if (IS_ERR(advb->dmx_rst)) {
         return PTR_ERR(advb->dmx_rst);
+    }
 
     advb->des_rst = devm_reset_control_get(&pdev->dev, "des_rst");
-    if (IS_ERR(advb->des_rst))
+    if (IS_ERR(advb->des_rst)) {
         return PTR_ERR(advb->des_rst);
+    }
 
     advb->demux_rst[0] = devm_reset_control_get(&pdev->dev, "demux0_rst");
-    if (IS_ERR(advb->demux_rst[0]))
+    if (IS_ERR(advb->demux_rst[0])) {
         return PTR_ERR(advb->demux_rst[0]);
+    }
 
     advb->demux_rst[1] = devm_reset_control_get(&pdev->dev, "demux1_rst");
-    if (IS_ERR(advb->demux_rst[1]))
+    if (IS_ERR(advb->demux_rst[1])) {
         return PTR_ERR(advb->demux_rst[1]);
+    }
 
     advb->demux_rst[2] = devm_reset_control_get(&pdev->dev, "demux2_rst");
-    if (IS_ERR(advb->demux_rst[2]))
+    if (IS_ERR(advb->demux_rst[2])) {
         return PTR_ERR(advb->demux_rst[2]);
+    }
 
     advb->async_rst[0] = devm_reset_control_get(&pdev->dev, "async0_rst");
-    if (IS_ERR(advb->async_rst[0]))
+    if (IS_ERR(advb->async_rst[0])) {
         return PTR_ERR(advb->async_rst[0]);
+    }
 
     advb->async_rst[1] = devm_reset_control_get(&pdev->dev, "async1_rst");
-    if (IS_ERR(advb->async_rst[1]))
+    if (IS_ERR(advb->async_rst[1])) {
         return PTR_ERR(advb->async_rst[1]);
+    }
 
 	spin_lock_init(&advb->slock);
 
@@ -2594,6 +2619,28 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		goto error;
 	}
 
+	i2c = i2c_get_adapter(0);
+	pr_inf("Found i2c-0 adapter: %s\n", i2c->name);
+    advb->dmx[0].fe = cxd2878_attach(&cxd2878cfg, i2c);
+	if (advb->dmx[0].fe != NULL) {
+		//// GTMEDIA GTT-2 box uses 16MHz xtal for mxl603
+		//mxl603cfg.xtal_freq_hz = MXL603_XTAL_16MHz;
+		//if (mxl603_attach(meson_dvb.fe[i], meson_dvb.i2c[i], 0x63, &mxl603cfg) == NULL) {
+		//	dev_info(&pdev->dev, "Failed to find MxL603 tuner!\n");
+		//	dev_info(&pdev->dev, "Detaching Sony CXD2878 DVB-C/T/T2 frontend!\n");
+		//	dvb_frontend_detach(meson_dvb.fe[i]);
+		//	continue;
+		//}
+		//meson_dvb.total_nims++;
+		//continue;
+        ret = dvb_register_frontend(padapter, advb->dmx[0].fe);
+        if (ret < 0) {
+            pr_error("dvb frontend register error: %d", ret); 
+        }
+	}
+    else {
+        pr_error("dvb demodulator attach error\n");
+    }
 //TODO
 //	aml_register_parser_mconfig();
 //#ifdef ENABLE_DEMUX_DRIVER
