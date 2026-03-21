@@ -197,6 +197,9 @@ static void aml_write_cbus(unsigned int reg, unsigned int val)
     if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
         writel(val, aml_dvb_device.base + ((reg - 0x1600) << 2));
     }
+    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
+        writel(val, aml_dvb_device.base2 + ((reg - 0x2310) << 2));
+    }
     else {
         pr_err("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
     }
@@ -207,6 +210,9 @@ static int aml_read_cbus(unsigned int reg)
 	//pr_dbg("aml_read_cbus: reg=0x%x\n", reg);
     if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
         return readl(aml_dvb_device.base + ((reg - 0x1600) << 2));
+    }
+    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
+        return readl(aml_dvb_device.base2 + ((reg - 0x2310) << 2));
     }
     else {
         pr_err("aml_read_cbus: reg=0x%x\n", reg);
@@ -2353,7 +2359,7 @@ static struct mxl603_config mxl603cfg = {
 static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
-	int i, ret = 0;
+	int i, ts, ret = 0;
 	struct devio_aml_platform_data *pd_dvb;
 	struct dvb_adapter *padapter;
     struct i2c_adapter *i2c;
@@ -2417,6 +2423,11 @@ static int aml_dvb_probe(struct platform_device *pdev)
     advb->base = devm_platform_ioremap_resource(pdev, 0);
     if (IS_ERR(advb->base)) {
         return PTR_ERR(advb->base);
+    }
+
+    advb->base2 = devm_platform_ioremap_resource(pdev, 1);
+    if (IS_ERR(advb->base2)) {
+        return PTR_ERR(advb->base2);
     }
 
     advb->dmx_rst = devm_reset_control_get(&pdev->dev, "demux_rst");
@@ -2629,6 +2640,17 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		ret = aml_dvb_asyncfifo_init(advb, &advb->asyncfifo[i], i);
 		if (ret < 0)
 			goto error;
+
+		aml_asyncfifo_hw_set_source(&advb->asyncfifo[i], AM_DMX_0 + min(i, advb->async_fifo_total_count));
+	}
+
+	/* assign TS inputs to DMX starting at DMX0 */
+	for (ts = 0, i = 0; i < advb->ts_in_total_count; i++) {
+		if (advb->ts[i].mode == AM_TS_DISABLE)
+			continue;
+		aml_dmx_hw_set_source(advb->dmx[ts].dmxdev.demux, DMX_SOURCE_FRONT0 + i);
+		aml_dmx_hw_set_dump_ts_select(aml_dvb_device.dmx[ts].dmxdev.demux, 1);
+		ts++;
 	}
 
 	aml_regist_dmx_class();
