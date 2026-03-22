@@ -75,6 +75,8 @@ module_param(debug_dvb, int, 0644);
 #define TSINB_DEGLITCH1 0xff634590
 static int has_tsin_deglitch;
 
+DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
+
 MODULE_PARM_DESC(dsc_max, "max number of dsc");
 static int dsc_max = DSC_DEV_COUNT;
 module_param(dsc_max, int, 0644);
@@ -89,40 +91,6 @@ static struct clk *aml_dvb_demux_clk;
 static struct clk *aml_dvb_afifo_clk;
 static struct clk *aml_dvb_ahbarb0_clk;
 static struct clk *aml_dvb_uparsertop_clk;
-
-static struct dvb_adapter frontend_adapter;
-static int ref_count;
-DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
-static struct dvb_adapter *aml_dvb_get_adapter(struct device *dev)
-{
-    //TODO
-    //mutex_lock(&frontend_mutex);
-    if (!ref_count) {
-        pr_err("%s need register adapter first.\n", __func__);
-        dvb_register_adapter(&frontend_adapter, "amlogic-dvb", THIS_MODULE,
-                dev, adapter_nr);
-    }
-    ref_count++;
-    //mutex_unlock(&frontend_mutex);
-    return &frontend_adapter;
-}
-
-static int aml_dvb_put_adapter(struct dvb_adapter *adapter)
-{
-    //TODO
-    //mutex_lock(&frontend_mutex);
-
-    if (ref_count > 0)
-        ref_count--;
-
-    if (!ref_count && adapter == &frontend_adapter) {
-        pr_err("%s dvb unregister adapter.\n", __func__);
-        dvb_unregister_adapter(&frontend_adapter);
-    }
-
-    //mutex_unlock(&frontend_mutex);
-    return 0;
-}
 
 long aml_stb_get_base(int id)
 {
@@ -189,7 +157,6 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 	int i, ret;
 	struct device_node *node_dmx = NULL;
 	char buf[32];
-	struct dvb_adapter *padapter = aml_dvb_get_adapter(advb->dev);
 
 	switch (id) {
 	case 0:
@@ -237,7 +204,7 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 	dmx->dmxdev.filternum = dmx->demux.feednum;
 	dmx->dmxdev.demux = &dmx->demux.dmx;
 	dmx->dmxdev.capabilities = 0;
-	ret = dvb_dmxdev_init(&dmx->dmxdev, padapter);
+	ret = dvb_dmxdev_init(&dmx->dmxdev, &advb->dvb_adapter);
 	if (ret < 0) {
 		pr_error("dvb_dmxdev_init failed: error %d\n", ret);
 		goto error_dmxdev_init;
@@ -300,7 +267,7 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 		goto error_dmx_hw_init;
 	}
 
-	dvb_net_init(padapter, &dmx->dvb_net, &dmx->demux.dmx);
+	dvb_net_init(&advb->dvb_adapter, &dmx->dvb_net, &dmx->demux.dmx);
 
 	return 0;
 error_dmx_hw_init:
@@ -325,18 +292,6 @@ struct aml_dvb *aml_get_dvb_device(void)
 	return &aml_dvb_device;
 }
 EXPORT_SYMBOL(aml_get_dvb_device);
-
-struct device *aml_get_device(void)
-{
-	return aml_dvb_device.dev;
-}
-
-struct dvb_adapter *aml_get_dvb_adapter(void)
-{
-	struct device *dev = aml_get_device();
-	return aml_dvb_get_adapter(dev);
-}
-EXPORT_SYMBOL(aml_get_dvb_adapter);
 
 static int dvb_dsc_open(struct inode *inode, struct file *file)
 {
@@ -754,7 +709,6 @@ static int aml_dvb_dsc_init(struct aml_dvb *advb,
 				  struct aml_dsc *dsc, int id)
 {
 	int i;
-	struct dvb_adapter *padapter = aml_dvb_get_adapter(advb->dev);
 
 	for (i = 0; i < DSC_COUNT; i++) {
 		dsc->channel[i].id    = i;
@@ -769,7 +723,7 @@ static int aml_dvb_dsc_init(struct aml_dvb *advb,
 	dsc->dst = -1;
 
 	/*Register descrambler device */
-	return dvb_register_device(padapter, &dsc->dev,
+	return dvb_register_device(&advb->dvb_adapter, &dsc->dev,
 				  &dvbdev_dsc, dsc, DVB_DEVICE_CA, 0);
 }
 static void aml_dvb_dsc_release(struct aml_dvb *advb,
@@ -2291,8 +2245,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
 	int i, ts, ret = 0;
-	struct devio_aml_platform_data *pd_dvb;
-	struct dvb_adapter *padapter;
     struct i2c_adapter *i2c;
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
@@ -2532,16 +2484,12 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	}
 #endif
 
-	pd_dvb = (struct devio_aml_platform_data *)advb->dev->platform_data;
-	padapter = aml_dvb_get_adapter(advb->dev);
-
-/*
 	ret =
 	    dvb_register_adapter(&advb->dvb_adapter, CARD_NAME, THIS_MODULE,
 				 advb->dev, adapter_nr);
 	if (ret < 0)
 		return ret;
-*/
+
 	for (i = 0; i < DMX_DEV_COUNT; i++)
 		advb->dmx[i].id = -1;
 
@@ -2551,7 +2499,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	for (i = 0; i < advb->async_fifo_total_count; i++)
 		advb->asyncfifo[i].id = -1;
 
-	//advb->dvb_adapter.priv = advb;
+	advb->dvb_adapter.priv = advb;
 	dev_set_drvdata(advb->dev, advb);
 
 	for (i = 0; i < DSC_DEV_COUNT; i++) {
@@ -2591,12 +2539,13 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		goto error;
 	}
 
+    //TODO: handle frotnend registration the proper way
 	i2c = i2c_get_adapter(0);
 	pr_inf("Found i2c-0 adapter: %s\n", i2c->name);
     advb->dmx[0].fe = cxd2878_attach(&cxd2878cfg, i2c);
 	if (advb->dmx[0].fe != NULL) {
 		if (mxl603_attach(advb->dmx[0].fe, i2c, 0x63, &mxl603cfg) != NULL) {
-            ret = dvb_register_frontend(padapter, advb->dmx[0].fe);
+            ret = dvb_register_frontend(&advb->dvb_adapter, advb->dmx[0].fe);
             if (ret < 0) {
                 pr_error("dvb frontend register error: %d", ret); 
             }
@@ -2627,7 +2576,7 @@ error:
 			aml_dvb_dsc_release(advb, &advb->dsc[i]);
 	}
 
-	aml_dvb_put_adapter(padapter);
+    dvb_unregister_adapter(&advb->dvb_adapter);
 
 	return ret;
 }
@@ -2636,11 +2585,8 @@ static void aml_dvb_remove(struct platform_device *pdev)
 {
 	struct aml_dvb *advb = (struct aml_dvb *)dev_get_drvdata(&pdev->dev);
 	int i;
-	struct dvb_adapter *padapter;
 
 	pr_inf("[dmx_kpi] %s Enter.\n", __func__);
-
-	padapter = aml_dvb_get_adapter(advb->dev);
 
 	aml_unregist_dmx_class();
 	class_unregister(&aml_stb_class);
@@ -2660,7 +2606,7 @@ static void aml_dvb_remove(struct platform_device *pdev)
 		if (advb->dsc[i].id != -1)
 			aml_dvb_dsc_release(advb, &advb->dsc[i]);
 	}
-	aml_dvb_put_adapter(padapter);
+    dvb_unregister_adapter(&advb->dvb_adapter);
 
 	for (i = 0; i < advb->ts_in_total_count; i++) {
 		if (advb->ts[i].pinctrl && !IS_ERR_VALUE(advb->ts[i].pinctrl))
