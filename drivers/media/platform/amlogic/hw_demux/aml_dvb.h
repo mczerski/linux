@@ -338,7 +338,7 @@ struct aml_dvb {
 	struct aml_dsc       dsc[DSC_DEV_COUNT];
 	int async_fifo_total_count;
 	struct aml_asyncfifo asyncfifo[ASYNCFIFO_COUNT];
-	//struct dvb_adapter   dvb_adapter;
+	struct dvb_adapter   dvb_adapter;
 	struct device       *dev;
 	struct platform_device *pdev;
 	enum aml_ts_source_t      stb_source;
