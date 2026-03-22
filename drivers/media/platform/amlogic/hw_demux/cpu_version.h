@@ -44,6 +44,7 @@ enum meson_cpuid_type_e {
 	MESON_CPU_MAJOR_ID_UNKNOWN,
 };
 
+//TODO
 static inline int get_cpu_type(void)
 {
     return MESON_CPU_MAJOR_ID_GXL;

@@ -2249,56 +2249,52 @@ static int aml_dvb_probe(struct platform_device *pdev)
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
 
-    //TODO
-	//if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
-	//{
-		aml_dvb_demux_clk =
-			devm_clk_get(&pdev->dev, "demux");
-		if (IS_ERR_OR_NULL(aml_dvb_demux_clk)) {
-			dev_err(&pdev->dev, "get demux clk fail\n");
-			return -1;
-		}
-		clk_prepare_enable(aml_dvb_demux_clk);
+    aml_dvb_demux_clk =
+        devm_clk_get_enabled(&pdev->dev, "demux");
+    if (IS_ERR_OR_NULL(aml_dvb_demux_clk)) {
+        dev_err(&pdev->dev, "get demux clk fail\n");
+        return -1;
+    }
+    aml_dvb_ahbarb0_clk =
+        devm_clk_get_enabled(&pdev->dev, "ahbarb0");
+    if (IS_ERR_OR_NULL(aml_dvb_ahbarb0_clk)) {
+        dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
+        return -1;
+    }
+	if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
+	{
 
 		aml_dvb_afifo_clk =
-			devm_clk_get(&pdev->dev, "asyncfifo");
+			devm_clk_get_enabled(&pdev->dev, "asyncfifo");
 		if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
 			dev_err(&pdev->dev, "get asyncfifo clk fail\n");
 			return -1;
 		}
-		clk_prepare_enable(aml_dvb_afifo_clk);
-
-		aml_dvb_ahbarb0_clk =
-			devm_clk_get(&pdev->dev, "ahbarb0");
-		if (IS_ERR_OR_NULL(aml_dvb_ahbarb0_clk)) {
-			dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
-			return -1;
-		}
-		clk_prepare_enable(aml_dvb_ahbarb0_clk);
-
 		aml_dvb_uparsertop_clk =
-			devm_clk_get(&pdev->dev, "uparsertop");
+			devm_clk_get_enabled(&pdev->dev, "uparsertop");
 		if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
 			dev_err(&pdev->dev, "get uparsertop clk fail\n");
 			return -1;
 		}
-		clk_prepare_enable(aml_dvb_uparsertop_clk);
-	//}
-	//else
-	//{
-	//	amports_switch_gate("demux", 1);
-	//	amports_switch_gate("ahbarb0", 1);
-	//	amports_switch_gate("parser_top", 1);
-	//	if (get_cpu_type() == MESON_CPU_MAJOR_ID_TL1)
-	//	{
-	//		aml_dvb_afifo_clk =
-	//			devm_clk_get(&pdev->dev, "asyncfifo");
-	//		if (IS_ERR_OR_NULL(aml_dvb_afifo_clk))
-	//			dev_err(&pdev->dev, "get asyncfifo clk fail\n");
-	//		else
-	//			clk_prepare_enable(aml_dvb_afifo_clk);
-	//	}
-	//}
+	}
+	else
+	{
+		aml_dvb_uparsertop_clk =
+			devm_clk_get_enabled(&pdev->dev, "parser_top");
+		if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
+			dev_err(&pdev->dev, "get parser_top clk fail\n");
+			return -1;
+		}
+		if (get_cpu_type() == MESON_CPU_MAJOR_ID_TL1)
+		{
+			aml_dvb_afifo_clk =
+				devm_clk_get_enabled(&pdev->dev, "asyncfifo");
+			if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
+				dev_err(&pdev->dev, "get asyncfifo clk fail\n");
+                return -1;
+            }
+		}
+	}
 
 	advb = &aml_dvb_device;
 	memset(advb, 0, sizeof(aml_dvb_device));
@@ -2612,25 +2608,6 @@ static void aml_dvb_remove(struct platform_device *pdev)
 		if (advb->ts[i].pinctrl && !IS_ERR_VALUE(advb->ts[i].pinctrl))
 			devm_pinctrl_put(advb->ts[i].pinctrl);
 	}
-
-    //TODO
-	//if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
-	//{
-		clk_disable_unprepare(aml_dvb_uparsertop_clk);
-		clk_disable_unprepare(aml_dvb_ahbarb0_clk);
-		clk_disable_unprepare(aml_dvb_afifo_clk);
-		clk_disable_unprepare(aml_dvb_demux_clk);
-	//}
-	//else
-	//{
-	//	amports_switch_gate("demux", 0);
-	//	amports_switch_gate("ahbarb0", 0);
-	//	amports_switch_gate("parser_top", 0);
-
-	//	if (!IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
-	//		clk_disable_unprepare(aml_dvb_afifo_clk);
-	//	}
-	//}
 
 	pr_inf("[dmx_kpi] %s Exit.\n", __func__);
 }
