@@ -40,19 +40,11 @@
 #include <linux/dma-mapping.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/vmalloc.h>
-//#include <linux/amlogic/media/codec_mm/codec_mm.h>
-//#include <linux/amlogic/media/codec_mm/configs.h>
-//#include "../../amports/streambuf.h"
-#include "c_stb_define.h"
-#include "c_stb_regs_define.h"
-#include "aml_dvb.h"
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
-#include "linux/dvb/aml_dmx_ext.h"
-#endif
-#include "aml_dvb_reg.h"
-#include "cpu_version.h"
 #include <linux/sched/signal.h>
 
+#include "aml_dvb.h"
+#include "aml_dvb_reg.h"
+#include "cpu_version.h"
 
 #define ENABLE_SEC_BUFF_WATCHDOG
 #define USE_AHB_MODE
@@ -375,6 +367,7 @@ MOD_PARAM_DECLARE_CHANPROC(2);
 
 #define DMX_CH_OP_CHANREC  0
 #define DMX_CH_OP_CHANPROC 1
+#define DMX_USE_SWFILTER   0x100
 
 static inline int _setbit(int v, int b) { return v|(1<<b); }
 static inline int _clrbit(int v, int b) { return v&~(1<<b); }
@@ -1997,43 +1990,6 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 #define ALGO_AES		0
 #define ALGO_SM4		1
 #define ALGO_DES		2
-
-/*
- * param:
- * key:
- *	16bytes IV key
- * type:
- *	AM_DSC_KEY_TYPE_AES_ODD    IV odd key
- *	AM_DSC_KEY_TYPE_AES_EVEN  IV even key
- */
-static void aml_ci_plus_set_iv(struct aml_dsc_channel *ch, enum ca_cw_type type,
-			u8 *key)
-{
-	unsigned int k0, k1, k2, k3;
-
-	k3 = (key[0] << 24) | (key[1] << 16) | (key[2] << 8) | key[3];
-	k2 = (key[4] << 24) | (key[5] << 16) | (key[6] << 8) | key[7];
-	k1 = (key[8] << 24) | (key[9] << 16) | (key[10] << 8) | key[11];
-	k0 = (key[12] << 24) | (key[13] << 16) | (key[14] << 8) | key[15];
-
-	if (type == CA_CW_AES_EVEN_IV ||
-		type == CA_CW_SM4_EVEN_IV) {
-		WRITE_MPEG_REG(CIPLUS_KEY0, k0);
-		WRITE_MPEG_REG(CIPLUS_KEY1, k1);
-		WRITE_MPEG_REG(CIPLUS_KEY2, k2);
-		WRITE_MPEG_REG(CIPLUS_KEY3, k3);
-		WRITE_MPEG_REG(CIPLUS_KEY_WR,
-			(ch->id << 9) | (1<<KEY_WR_AES_IV_A));
-	} else if (type == CA_CW_AES_ODD_IV ||
-			   type == CA_CW_SM4_ODD_IV) {
-		WRITE_MPEG_REG(CIPLUS_KEY0, k0);
-		WRITE_MPEG_REG(CIPLUS_KEY1, k1);
-		WRITE_MPEG_REG(CIPLUS_KEY2, k2);
-		WRITE_MPEG_REG(CIPLUS_KEY3, k3);
-		WRITE_MPEG_REG(CIPLUS_KEY_WR,
-			(ch->id << 9) | (1<<KEY_WR_AES_IV_B));
-	}
-}
 
 /*
  * Param:
@@ -6124,19 +6080,3 @@ int aml_unregist_dmx_class(void)
 	class_unregister(&aml_dmx_class);
 	return 0;
 }
-
-//TODO
-//static struct mconfig parser_configs[] = {
-//	MC_PU32("video_pts", &video_pts),
-//	MC_PU32("audio_pts", &audio_pts),
-//	MC_PU32("video_pts_bit32", &video_pts_bit32),
-//	MC_PU32("audio_pts_bit32", &audio_pts_bit32),
-//	MC_PU32("first_video_pts", &first_video_pts),
-//	MC_PU32("first_audio_pts", &first_audio_pts),
-//};
-//
-//void aml_register_parser_mconfig(void)
-//{
-//	REG_PATH_CONFIGS("media.parser", parser_configs);
-//}
-
