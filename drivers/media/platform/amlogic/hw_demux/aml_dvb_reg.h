@@ -19,9 +19,9 @@
  */
 #ifndef _DVB_REG_H_
 #define _DVB_REG_H_
-//#include <linux/amlogic/media/registers/register_map.h>
+
 #define ID_STB_CBUS_BASE		0
-#define ID_SMARTCARD_REG_BASE		1
+//#define ID_SMARTCARD_REG_BASE		1
 #define ID_ASYNC_FIFO_REG_BASE		2
 #define ID_ASYNC_FIFO1_REG_BASE		3
 #define ID_ASYNC_FIFO2_REG_BASE	4
