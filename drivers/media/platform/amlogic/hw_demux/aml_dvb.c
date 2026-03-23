@@ -51,9 +51,6 @@
 #include "aml_dvb_reg.h"
 #include "cpu_version.h"
 
-#include <dvb-frontends/cxd2878.h>
-#include <tuners/mxl603.h>
-
 #define pr_dbg(args...)\
 	do {\
 		if (debug_dvb)\
@@ -2207,45 +2204,12 @@ static struct class aml_stb_class = {
 	.class_groups = aml_stb_class_groups,
 };
 
-static struct cxd2878_config cxd2878cfg = {
-	.addr_slvt = 0x6c,
-	.xtal = SONY_DEMOD_XTAL_24000KHz,
-	.tuner_addr = 0x60,
-	.tuner_xtal = SONY_ASCOT3_XTAL_24000KHz,
-	.ts_mode = 1,
-	.ts_ser_data = 0,
-	.ts_clk = 1,
-	.ts_clk_mask = 1,
-	.ts_valid = 0,
-	.atscCoreDisable = 0,
-	.lock_flag = 1,
-	.write_properties = NULL,
-	.read_properties = NULL,
-};
-
-static struct mxl603_config mxl603cfg = {
-	.xtal_freq_hz = MXL603_XTAL_16MHz,
-	.if_freq_hz = MXL603_IF_5MHz,
-	.agc_type = MXL603_AGC_SELF,
-	.xtal_cap = 16,
-	.gain_level = 11,
-	.if_out_gain_level = 11,
-	.agc_set_point = 66,
-	.agc_invert_pol = 0,
-	.invert_if = 1,
-	.loop_thru_enable = 0,
-	.clk_out_enable = 1,
-	.clk_out_div = 0,
-	.clk_out_ext = 0,
-	.xtal_sharing_mode = 0,
-	.single_supply_3_3V = 1,
-};
-
 static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
 	int i, ts, ret = 0;
-    struct i2c_adapter *i2c;
+    struct device_node *fe_i2c_bus;
+    struct i2c_adapter *fe_i2c_adapter;
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
 
@@ -2535,26 +2499,30 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		goto error;
 	}
 
-    //TODO: handle frotnend registration the proper way
-	i2c = i2c_get_adapter(0);
-	pr_inf("Found i2c-0 adapter: %s\n", i2c->name);
-    advb->dmx[0].fe = cxd2878_attach(&cxd2878cfg, i2c);
-	if (advb->dmx[0].fe != NULL) {
-		if (mxl603_attach(advb->dmx[0].fe, i2c, 0x63, &mxl603cfg) != NULL) {
-            ret = dvb_register_frontend(&advb->dvb_adapter, advb->dmx[0].fe);
-            if (ret < 0) {
-                pr_error("dvb frontend register error: %d", ret); 
-            }
+
+    fe_i2c_bus = of_parse_phandle(pdev->dev.of_node, "fe_i2c_bus", 0);
+    if (fe_i2c_bus) {
+        pr_inf("Found fe i2c bus\n");
+        fe_i2c_adapter = of_find_i2c_adapter_by_node(fe_i2c_bus);
+        of_node_put(fe_i2c_bus);
+        if (!fe_i2c_adapter) {
+            pr_err("Failed to claim fe i2c adapter\n");
+            goto error;
         }
-        else {
-            pr_error("dvb tuner attach error\n");
-		}
-	}
-    else {
-        pr_error("dvb demodulator attach error\n");
+	    pr_inf("Found i2c-%d adapter: %s\n", i2c_adapter_id(fe_i2c_adapter), fe_i2c_adapter->name);
+
+        advb->i2c_client_demod = dvb_module_probe("aml-fe", NULL, fe_i2c_adapter, 0x6c, &advb->dvb_adapter);
+        if (!advb->i2c_client_demod) {
+            pr_error("dvb demodulator attach error\n");
+            goto error_demod;
+        }
     }
 
 	return 0;
+
+error_demod:
+	aml_unregist_dmx_class();
+	class_unregister(&aml_stb_class);
 
 error:
 	for (i = 0; i < advb->async_fifo_total_count; i++) {
@@ -2583,6 +2551,11 @@ static void aml_dvb_remove(struct platform_device *pdev)
 	int i;
 
 	pr_inf("[dmx_kpi] %s Enter.\n", __func__);
+
+    if (advb->i2c_client_demod) {
+        dvb_module_release(advb->i2c_client_demod);
+        advb->i2c_client_demod = NULL;
+    }
 
 	aml_unregist_dmx_class();
 	class_unregister(&aml_stb_class);

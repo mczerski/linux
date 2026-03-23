@@ -80,6 +80,8 @@
                  <&reset RESET_PERIPHS_ASYNC_0>,
                  <&reset RESET_PERIPHS_ASYNC_1>;
         reset-names = "demux_rst", "des_rst", "demux0_rst", "demux1_rst", "demux2_rst", "async0_rst", "async1_rst";
+
+        fe_i2c_bus = <&i2c_B>;
     };
 };
 

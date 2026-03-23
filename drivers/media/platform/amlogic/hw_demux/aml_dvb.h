@@ -329,6 +329,7 @@ struct aml_dvb {
     struct reset_control *demux_rst[3];
     struct reset_control *des_rst;
     struct reset_control *async_rst[2];
+    struct i2c_client    *i2c_client_demod;
 	struct dvb_device    dvb_dev;
 	int ts_in_total_count;
 	struct aml_ts_input  ts[TS_IN_COUNT];
