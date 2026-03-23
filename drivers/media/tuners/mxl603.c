@@ -151,6 +151,9 @@ struct mxl603_state {
 	u8 addr;
 	u32 frequency;
 	u32 bandwidth;
+
+	/* Copy of the config provided to the mxl603_attach */
+	struct mxl603_config _cfg;
 };
 
 static int mxl603_write_reg(struct mxl603_state *state, u8 reg, u8 val)
@@ -1003,6 +1006,7 @@ void mxl603_release(struct dvb_frontend *fe)
 	fe->tuner_priv = NULL;
 	kfree(state);
 	
+	dev_info(&state->i2c->dev, "MxL603 released\n");
 	return;
 }
 static struct dvb_tuner_ops mxl603_tuner_ops = {
@@ -1059,7 +1063,8 @@ struct dvb_frontend *mxl603_attach(struct dvb_frontend *fe,
 		goto err1;
 	}
 	
-	state->config = config;
+	memcpy(&state->_cfg, config, sizeof(state->_cfg));
+	state->config = &state->_cfg;
 	state->i2c = i2c;
 	state->addr = addr;
 	
@@ -1089,7 +1094,7 @@ err2:
 err1:
 	return NULL;
 }
-EXPORT_SYMBOL(mxl603_attach);
+EXPORT_SYMBOL_GPL(mxl603_attach);
 
 MODULE_DESCRIPTION("MaxLinear MxL603 tuner driver");
 MODULE_AUTHOR("Sasa Savic <sasa.savic.sr@gmail.com>");
