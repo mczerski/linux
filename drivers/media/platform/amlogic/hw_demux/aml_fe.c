@@ -50,30 +50,21 @@ static int aml_fe_probe(struct i2c_client *client)
     if (!dvb_attach(mxl603_attach, fe, i2c, 0x63, &mxl603cfg)) {
         dev_err(&i2c->dev,"%s: mx603_attach error\n", KBUILD_MODNAME);
         ret = -ENODEV;
-        goto err1;
+        goto err;
     }
 
     ret = dvb_register_frontend(adap, fe);
     if (ret < 0) {
         dev_err(&i2c->dev,"%s: dvb frontend register error: %d.\n", KBUILD_MODNAME, ret);
-        goto err2;
+        goto err;
     }
 
     i2c_set_clientdata(client, fe);
 
     return ret;
 
-err2:
-    if (fe->ops.tuner_ops.release) {
-        fe->ops.tuner_ops.release(fe);
-        dvb_detach(fe->ops.tuner_ops.release);
-    }
-
-err1:
-    if (fe->ops.release) {
-        fe->ops.release(fe);
-        dvb_detach(fe->ops.release);
-    }
+err:
+    dvb_frontend_detach(fe);
     return ret;
 }
 

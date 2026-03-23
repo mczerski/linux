@@ -83,12 +83,6 @@ static struct class aml_stb_class;
 
 static int dmx_reset_all_flag = 0;
 
-/*no used reset ctl,need use clk in 4.9 kernel*/
-static struct clk *aml_dvb_demux_clk;
-static struct clk *aml_dvb_afifo_clk;
-static struct clk *aml_dvb_ahbarb0_clk;
-static struct clk *aml_dvb_uparsertop_clk;
-
 long aml_stb_get_base(int id)
 {
 	int newbase = 0;
@@ -2213,47 +2207,37 @@ static int aml_dvb_probe(struct platform_device *pdev)
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
 
-    aml_dvb_demux_clk =
-        devm_clk_get_enabled(&pdev->dev, "demux");
-    if (IS_ERR_OR_NULL(aml_dvb_demux_clk)) {
+    if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "demux"))) {
         dev_err(&pdev->dev, "get demux clk fail\n");
         return -1;
     }
-    aml_dvb_ahbarb0_clk =
-        devm_clk_get_enabled(&pdev->dev, "ahbarb0");
-    if (IS_ERR_OR_NULL(aml_dvb_ahbarb0_clk)) {
+    if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "ahbarb0"))) {
         dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
         return -1;
     }
 	if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
 	{
 
-		aml_dvb_afifo_clk =
-			devm_clk_get_enabled(&pdev->dev, "asyncfifo");
-		if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
+		if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "asyncfifo"))) {
 			dev_err(&pdev->dev, "get asyncfifo clk fail\n");
 			return -1;
 		}
-		aml_dvb_uparsertop_clk =
-			devm_clk_get_enabled(&pdev->dev, "uparsertop");
-		if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
-			dev_err(&pdev->dev, "get uparsertop clk fail\n");
-			return -1;
-		}
+        //TODO: this make system crash after module unload. wierd thing is that
+        //none of those clocks needs to be enabled here for dvb to work ...
+		//if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "uparsertop"))) {
+		//	dev_err(&pdev->dev, "get uparsertop clk fail\n");
+		//	return -1;
+		//}
 	}
 	else
 	{
-		aml_dvb_uparsertop_clk =
-			devm_clk_get_enabled(&pdev->dev, "parser_top");
-		if (IS_ERR_OR_NULL(aml_dvb_uparsertop_clk)) {
+		if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "parser_top"))) {
 			dev_err(&pdev->dev, "get parser_top clk fail\n");
 			return -1;
 		}
 		if (get_cpu_type() == MESON_CPU_MAJOR_ID_TL1)
 		{
-			aml_dvb_afifo_clk =
-				devm_clk_get_enabled(&pdev->dev, "asyncfifo");
-			if (IS_ERR_OR_NULL(aml_dvb_afifo_clk)) {
+			if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "asyncfifo"))) {
 				dev_err(&pdev->dev, "get asyncfifo clk fail\n");
                 return -1;
             }
@@ -2496,6 +2480,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 
 	if (class_register(&aml_stb_class) < 0) {
 		pr_error("dvb register class error\n");
+        ret = -1;
 		goto error;
 	}
 
@@ -2507,13 +2492,15 @@ static int aml_dvb_probe(struct platform_device *pdev)
         of_node_put(fe_i2c_bus);
         if (!fe_i2c_adapter) {
             pr_err("Failed to claim fe i2c adapter\n");
-            goto error;
+            ret = -1;
+            goto error_i2c;
         }
 	    pr_inf("Found i2c-%d adapter: %s\n", i2c_adapter_id(fe_i2c_adapter), fe_i2c_adapter->name);
 
         advb->i2c_client_demod = dvb_module_probe("aml-fe", NULL, fe_i2c_adapter, 0x6c, &advb->dvb_adapter);
         if (!advb->i2c_client_demod) {
             pr_error("dvb demodulator attach error\n");
+            ret = -1;
             goto error_demod;
         }
     }
@@ -2521,6 +2508,9 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	return 0;
 
 error_demod:
+    i2c_put_adapter(fe_i2c_adapter);
+
+error_i2c:
 	aml_unregist_dmx_class();
 	class_unregister(&aml_stb_class);
 
@@ -2542,6 +2532,11 @@ error:
 
     dvb_unregister_adapter(&advb->dvb_adapter);
 
+	for (i = 0; i < advb->ts_in_total_count; i++) {
+		if (advb->ts[i].pinctrl && !IS_ERR_VALUE(advb->ts[i].pinctrl))
+			devm_pinctrl_put(advb->ts[i].pinctrl);
+	}
+
 	return ret;
 }
 
@@ -2555,6 +2550,7 @@ static void aml_dvb_remove(struct platform_device *pdev)
     if (advb->i2c_client_demod) {
         dvb_module_release(advb->i2c_client_demod);
         advb->i2c_client_demod = NULL;
+        i2c_put_adapter(advb->i2c_client_demod->adapter);
     }
 
 	aml_unregist_dmx_class();
