@@ -191,10 +191,6 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 	}
 
 	dmx->id = id;
-	dmx->aud_chan = -1;
-	dmx->vid_chan = -1;
-	dmx->sub_chan = -1;
-	dmx->pcr_chan = -1;
 
 	/*smallsec*/
 	dmx->smallsec.enable = 0;
@@ -2231,11 +2227,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
         }
     }
 
-    advb->sub_base = devm_platform_ioremap_resource_byname(pdev, "sub");
-    if (IS_ERR(advb->sub_base)) {
-        return PTR_ERR(advb->sub_base);
-    }
-
     advb->dmx_rst = devm_reset_control_get(&pdev->dev, "demux_rst");
     if (IS_ERR(advb->dmx_rst)) {
         return PTR_ERR(advb->dmx_rst);
@@ -2497,8 +2488,8 @@ static void aml_dvb_remove(struct platform_device *pdev)
 
     if (advb->i2c_client_demod) {
         dvb_module_release(advb->i2c_client_demod);
-        advb->i2c_client_demod = NULL;
         i2c_put_adapter(advb->i2c_client_demod->adapter);
+        advb->i2c_client_demod = NULL;
     }
 
 	aml_unregist_dmx_class();

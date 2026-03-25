@@ -54,12 +54,6 @@
 #define ASYNC_FIFO_REG4 (0x4)
 #define ASYNC_FIFO_REG5 (0x5)
 
-#define PARSER_SUB_START_PTR (0x8a)
-#define PARSER_SUB_END_PTR (0x8b)
-#define PARSER_SUB_WP (0x8c)
-#define PARSER_SUB_RP (0x8d)
-#define PARSER_SUB_HOLE (0x8e)
-
 
 #define STB_VERSION   (0x00)
 #define STB_TEST_REG   (0x01)
