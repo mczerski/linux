@@ -295,16 +295,6 @@ static void aml_clear_mask_asyncfifo(struct aml_dvb *dvb, unsigned int idx, unsi
     aml_write_asyncfifo(dvb, idx, reg, aml_read_asyncfifo(dvb, idx, reg) & (~mask));
 }
 
-static u32 aml_read_sub(struct aml_dvb *dvb, unsigned int reg)
-{
-    return readl(dvb->sub_base + (reg << 2));
-}
-
-static void aml_write_sub(struct aml_dvb *dvb, unsigned int reg, unsigned int val)
-{
-    writel(val, dvb->sub_base + (reg << 2));
-}
-
 #define DVR_FEED(f) \
 	((f) && ((f)->type == DMX_TYPE_TS) &&	\
 	(((f)->ts_type & (TS_PACKET | TS_DEMUX)) == TS_PACKET))
@@ -348,7 +338,6 @@ static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 			enum ca_cw_type type, u8 *key);
 static void aml_ci_plus_disable(struct aml_dvb *dvb);
 static void am_ci_plus_set_output(struct aml_dsc_channel *ch);
-static int set_subtitle_pes_buffer(struct aml_dmx *dmx);
 
 static void dmxn_op_chan(struct aml_dmx *dmx, int ch, int(*op)(int, int), int ch_op)
 {
@@ -1092,80 +1081,6 @@ static void process_section(struct aml_dmx *dmx)
 	}
 }
 
-static void process_sub(struct aml_dmx *dmx)
-{
-    struct aml_dvb *dvb = dmx->demux.priv;
-	u32 rd_ptr = 0;
-	u32 wr_ptr = aml_read_sub(dvb, PARSER_SUB_WP);
-	u32 start_ptr = aml_read_sub(dvb, PARSER_SUB_START_PTR);
-	u32 end_ptr = aml_read_sub(dvb, PARSER_SUB_END_PTR);
-	u32 buffer1 = 0, buffer2 = 0;
-	u8 *buffer1_virt = 0, *buffer2_virt = 0;
-	u32 len1 = 0, len2 = 0;
-
-	if (!dmx->sub_buf_base_virt)
-		return;
-
-	rd_ptr = aml_read_sub(dvb, PARSER_SUB_RP);
-	if (!rd_ptr)
-		return;
-	if (rd_ptr > wr_ptr) {
-		len1 = end_ptr - rd_ptr + 8;
-		buffer1 = rd_ptr;
-
-		len2 = wr_ptr - start_ptr;
-		buffer2 = start_ptr;
-
-		rd_ptr = start_ptr + len2;
-	} else if (rd_ptr < wr_ptr) {
-		len1 = wr_ptr - rd_ptr;
-		buffer1 = rd_ptr;
-		rd_ptr += len1;
-		len2 = 0;
-	} else if (rd_ptr == wr_ptr) {
-		pr_dbg("sub no data\n");
-	}
-
-	if (buffer1 && len1)
-#ifdef SUB_BUF_DMX
-		buffer1_virt = (void *)dmx->sub_pages + (buffer1 - start_ptr);
-#else
-		buffer1_virt = (void *)dmx->sub_buf_base_virt + (buffer1 - start_ptr);
-#endif
-
-	if (buffer2 && len2)
-#ifdef SUB_BUF_DMX
-		buffer2_virt = (void *)dmx->sub_pages + (buffer2 - start_ptr);
-#else
-		buffer2_virt = (void *)dmx->sub_buf_base_virt + (buffer2 - start_ptr);
-#endif
-
-	pr_dbg_irq_sub("sub: rd_ptr:%x buf1:%x len1:%d buf2:%x len2:%d\n",
-		rd_ptr, buffer1, len1, buffer2, len2);
-	pr_dbg_irq_sub("sub: buf1_virt:%p buf2_virt:%p\n",
-		buffer1_virt, buffer2_virt);
-
-	if (len1)
-		dma_sync_single_for_cpu(dmx_get_dev(dmx),
-					(dma_addr_t) buffer1, len1,
-					DMA_FROM_DEVICE);
-	if (len2)
-		dma_sync_single_for_cpu(dmx_get_dev(dmx),
-					(dma_addr_t) buffer2, len2,
-					DMA_FROM_DEVICE);
-
-	if (dmx->channel[2].used) {
-		if (dmx->channel[2].feed && dmx->channel[2].feed->cb.ts &&
-			((buffer1_virt != NULL && len1 !=0 ) || (buffer2_virt != NULL && len2 != 0)))
-		{
-			dmx->channel[2].feed->cb.ts(buffer1_virt, len1,
-						buffer2_virt, len2,
-						&dmx->channel[2].feed->feed.ts,0);
-		}
-	}
-	aml_write_sub(dvb, PARSER_SUB_RP, rd_ptr);
-}
-
 static void process_pes(struct aml_dmx *dmx)
 {
     struct aml_dvb *dvb = dmx->demux.priv;
@@ -1284,15 +1199,6 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 
 	if (status & (1 << SECTION_BUFFER_READY))
 		process_section(dmx);
-	if (sub_ttx_enable) {
-		if (status & (1 << SUB_PES_READY)) {
-			/*If the subtitle is set by tsdemux,
-			 *do not parser in demux driver.
-			 */
-			if (dmx->sub_chan == -1)
-				process_sub(dmx);
-		}
-	}
 	if (status & (1 << OTHER_PES_READY))
 		process_pes(dmx);
 	if (status & (1 << OM_CMD_READ_PENDING))
@@ -4107,20 +4013,6 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 
 		for (n = 0; n < CHANNEL_COUNT; n++) {
 			{
-				if (sub_ttx_enable) {
-#ifdef SUB_PARSER
-				/*
-				  check if subtitle channel was running,
-				  the parser will be used in amstream also,
-				  take care of the buff ptr.
-				*/
-				u32 v = dmx_get_chan_target(dmx, n);
-				if (v != 0xFFFF &&
-					(v & (0x7 << PID_TYPE))
-						== (SUB_PACKET << PID_TYPE))
-					set_subtitle_pes_buffer(dmx);
-#endif
-				}
 				{
 					u32 v = dmx_get_chan_target(dmx, n);
 					if (v != 0xFFFF &&
@@ -4334,20 +4226,6 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 
 		for (n = 0; n < CHANNEL_COUNT; n++) {
 			{
-			if (sub_ttx_enable) {
-#ifdef SUB_PARSER
-				/*
-				  check if subtitle channel was running,
-				  the parser will be used in amstream also,
-				  take care of the buff ptr.
-				*/
-				u32 v = dmx_get_chan_target(dmx, n);
-				if (v != 0xFFFF &&
-					(v & (0x7 << PID_TYPE))
-						== (SUB_PACKET << PID_TYPE))
-					set_subtitle_pes_buffer(dmx);
-#endif
-				}
 				{
 					u32 v = dmx_get_chan_target(dmx, n);
 					if (v != 0xFFFF &&
@@ -4451,33 +4329,6 @@ void dmx_reset_dmx_hw(struct aml_dvb *dvb, int id)
 	dmx_reset_dmx_id_hw_ex(dvb, id, 1);
 }
 
-static int set_subtitle_pes_buffer(struct aml_dmx *dmx)
-{
-#ifdef SUB_PARSER
-    struct aml_dvb *dvb = dmx->demux.priv;
-	if (dmx->sub_chan == -1) {
-	unsigned long addr = virt_to_phys((void *)dmx->sub_pages);
-	aml_write_sub(dvb, PARSER_SUB_RP, addr);
-	aml_write_sub(dvb, PARSER_SUB_START_PTR, addr);
-	aml_write_sub(dvb, PARSER_SUB_END_PTR, addr + dmx->sub_buf_len - 8);
-	pr_inf("set sub buff: (%d) %lx %x\n", dmx->id, addr, dmx->sub_buf_len);
-	}
-#endif
-	return 0;
-}
-
-int dmx_get_sub_buffer(unsigned long *base, unsigned long *virt)
-{
-#ifndef SUB_BUF_DMX
-	unsigned long s = aml_read_sub(dvb, PARSER_SUB_START_PTR);
-	if (base)
-		*base = s;
-	if (virt)
-		*virt = (unsigned long)codec_mm_phys_to_virt(s);
-#endif
-	return 0;
-}
-
 int dmx_init_sub_buffer(struct aml_dmx *dmx, unsigned long base, unsigned long virt)
 {
 #ifndef SUB_BUF_DMX
@@ -4495,8 +4346,6 @@ static int check_dvr_for_raw_channel(struct aml_dmx *dmx, int ch)
 	switch (ch) {
 		case 0:
 		case 1:  return 1;
-		case 2:  return dmx->sub_chan != -1 ? 1 : 0;
-		case 3:  return dmx->pcr_chan != -1 ? 1 : 0;
 		default: return 0;
 	}
 	return 0;
@@ -4522,7 +4371,6 @@ int dmx_alloc_chan(struct aml_dmx *dmx, int type, int pes_type, int pid)
 		case DMX_PES_TELETEXT:
 			if (!dmx->channel[2].used)
 				id = 2;
-			set_subtitle_pes_buffer(dmx);
 			break;
 		case DMX_PES_PCR:
 			if (!dmx->channel[3].used)
@@ -4615,14 +4463,6 @@ void dmx_free_chan(struct aml_dmx *dmx, int cid)
 	dmx->channel[cid].used = 0;
 	dmx->channel[cid].pid = 0x1fff;
 	dmx_set_chan_regs(dmx, cid);
-
-	if (cid == 2) {
-		u32 parser_sub_start_ptr;
-
-		parser_sub_start_ptr = aml_read_sub(dvb, PARSER_SUB_START_PTR);
-		aml_write_sub(dvb, PARSER_SUB_RP, parser_sub_start_ptr);
-		aml_write_sub(dvb, PARSER_SUB_WP, parser_sub_start_ptr);
-	}
 
 	set_debug_dmx_chanpids(dmx->id, cid, -1);
 	dmx->chan_count--;

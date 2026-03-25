@@ -238,10 +238,6 @@ struct aml_dmx {
 	struct aml_filter    filter[FILTER_COUNT+1];
 	irq_handler_t        irq_handler;
 	void                *irq_data;
-	int                  aud_chan;
-	int                  vid_chan;
-	int                  sub_chan;
-	int                  pcr_chan;
 	u32                  section_busy[SEC_BUF_BUSY_SIZE];
 	struct dvb_frontend *fe;
 	int                  int_check_count;
@@ -325,7 +321,6 @@ struct aml_swfilter {
 struct aml_dvb {
     void __iomem *stb_base;
     void __iomem *asyncfifo_base[ASYNCFIFO_COUNT];
-    void __iomem *sub_base;
     struct reset_control *dmx_rst;
     struct reset_control *demux_rst[DMX_DEV_COUNT];
     struct reset_control *des_rst;
