@@ -323,12 +323,13 @@ struct aml_swfilter {
 };
 
 struct aml_dvb {
-    void __iomem *base;
-    void __iomem *base2;
+    void __iomem *stb_base;
+    void __iomem *asyncfifo_base[ASYNCFIFO_COUNT];
+    void __iomem *sub_base;
     struct reset_control *dmx_rst;
-    struct reset_control *demux_rst[3];
+    struct reset_control *demux_rst[DMX_DEV_COUNT];
     struct reset_control *des_rst;
-    struct reset_control *async_rst[2];
+    struct reset_control *async_rst[ASYNCFIFO_COUNT];
     struct i2c_client    *i2c_client_demod;
 	struct dvb_device    dvb_dev;
 	int ts_in_total_count;
