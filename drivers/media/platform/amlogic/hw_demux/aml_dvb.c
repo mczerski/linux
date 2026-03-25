@@ -83,47 +83,9 @@ static struct class aml_stb_class;
 
 static int dmx_reset_all_flag = 0;
 
-long aml_stb_get_base(int id)
+static int aml_read_stb(struct aml_dvb *advb, unsigned int reg)
 {
-	int newbase = 0;
-	if (MESON_CPU_MAJOR_ID_TXL < get_cpu_type()
-		&& MESON_CPU_MAJOR_ID_GXLX != get_cpu_type()) {
-		newbase = 1;
-	}
-
-	switch (id) {
-	case ID_STB_CBUS_BASE:
-		return (newbase) ? 0x1800 : 0x1600;
-	//case ID_SMARTCARD_REG_BASE:
-	//	return (newbase) ? 0x9400 : 0x2110;
-	case ID_ASYNC_FIFO_REG_BASE:
-		return (newbase) ? 0x2800 : 0x2310;
-	case ID_ASYNC_FIFO1_REG_BASE:
-		return 0x9800;
-	case ID_ASYNC_FIFO2_REG_BASE:
-		return (newbase) ? 0x2400 : 0x2314;
-	//case ID_RESET_BASE:
-	//	return (newbase) ? 0x0400 : 0x1100;
-	case ID_PARSER_SUB_START_PTR_BASE:
-		return (newbase) ? 0x3800 : 0x2900;
-	default:
-		return 0;
-	}
-	return 0;
-}
-
-static int aml_read_cbus(unsigned int reg)
-{
-    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
-        return readl(aml_dvb_device.base + ((reg - 0x1600) << 2));
-    }
-    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
-        return readl(aml_dvb_device.base2 + ((reg - 0x2310) << 2));
-    }
-    else {
-        pr_err("aml_read_cbus: reg=0x%x\n", reg);
-        return 0;
-    }
+    return readl(advb->stb_base + (reg << 2));
 }
 
 static void aml_dvb_dmx_release(struct aml_dvb *advb, struct aml_dmx *dmx)
@@ -1057,12 +1019,7 @@ static ssize_t demux##i##_pcr_show(const struct class *class,  \
 				const struct class_attribute *attr, char *buf)\
 {\
 	int f = 0;\
-	if (i == 0)\
-		f = READ_MPEG_REG(PCR_DEMUX);\
-	else if (i == 1)\
-		f = READ_MPEG_REG(PCR_DEMUX_2);\
-	else if (i == 2)\
-		f = READ_MPEG_REG(PCR_DEMUX_3);\
+	f = aml_read_stb(&aml_dvb_device, PCR_DEMUX + i * DEMUX_X_OFFSET);\
 	return sprintf(buf, "%08x\n", f);\
 }
 
@@ -1363,12 +1320,7 @@ static ssize_t demux##i##_ts_header_show(const struct class *class,  \
 				const struct class_attribute *attr, char *buf)\
 {\
 	int hdr = 0;\
-	if (i == 0)\
-		hdr = READ_MPEG_REG(TS_HEAD_1);\
-	else if (i == 1)\
-		hdr = READ_MPEG_REG(TS_HEAD_1_2);\
-	else if (i == 2)\
-		hdr = READ_MPEG_REG(TS_HEAD_1_3);\
+	hdr = aml_read_stb(&aml_dvb_device, TS_HEAD_1 + i * DEMUX_X_OFFSET);\
 	return sprintf(buf, "%08x\n", hdr);\
 }
 
@@ -1378,12 +1330,7 @@ static ssize_t demux##i##_channel_activity_show(const struct class *class,  \
 				const struct class_attribute *attr, char *buf)\
 {\
 	int f = 0;\
-	if (i == 0)\
-		f = READ_MPEG_REG(DEMUX_CHANNEL_ACTIVITY);\
-	else if (i == 1)\
-		f = READ_MPEG_REG(DEMUX_CHANNEL_ACTIVITY_2);\
-	else if (i == 2)\
-		f = READ_MPEG_REG(DEMUX_CHANNEL_ACTIVITY_3);\
+	f = aml_read_stb(&aml_dvb_device, DEMUX_CHANNEL_ACTIVITY + i * DEMUX_X_OFFSET);\
 	return sprintf(buf, "%08x\n", f);\
 }
 
@@ -2202,10 +2149,36 @@ static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct aml_dvb *advb;
 	int i, ts, ret = 0;
+	char buf[32];
     struct device_node *fe_i2c_bus;
     struct i2c_adapter *fe_i2c_adapter;
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
+
+	advb = &aml_dvb_device;
+	memset(advb, 0, sizeof(aml_dvb_device));
+
+	spin_lock_init(&advb->slock);
+
+	advb->dev = &pdev->dev;
+	advb->pdev = pdev;
+	advb->stb_source = -1;
+	advb->tso_source = -1;
+
+	for (i = 0; i < DMX_DEV_COUNT; i++) {
+		advb->dmx[i].dmx_irq = -1;
+		advb->dmx[i].dvr_irq = -1;
+	}
+
+	if (get_cpu_type() < MESON_CPU_MAJOR_ID_TL1) {
+	  advb->ts_in_total_count = 3;
+	  advb->s2p_total_count = 2;
+	  advb->async_fifo_total_count = 2;
+	} else {
+		advb->ts_in_total_count = 4;
+		advb->s2p_total_count = 3;
+		advb->async_fifo_total_count = 3;
+	}
 
     if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "demux"))) {
         dev_err(&pdev->dev, "get demux clk fail\n");
@@ -2244,17 +2217,23 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		}
 	}
 
-	advb = &aml_dvb_device;
-	memset(advb, 0, sizeof(aml_dvb_device));
-
-    advb->base = devm_platform_ioremap_resource(pdev, 0);
-    if (IS_ERR(advb->base)) {
-        return PTR_ERR(advb->base);
+    advb->stb_base = devm_platform_ioremap_resource_byname(pdev, "stb");
+    if (IS_ERR(advb->stb_base)) {
+        return PTR_ERR(advb->stb_base);
     }
 
-    advb->base2 = devm_platform_ioremap_resource(pdev, 1);
-    if (IS_ERR(advb->base2)) {
-        return PTR_ERR(advb->base2);
+    for (i = 0; i < advb->async_fifo_total_count; i++) {
+        memset(buf, 0, 32);
+        snprintf(buf, sizeof(buf), "asyncfifo%d", i);
+        advb->asyncfifo_base[i] = devm_platform_ioremap_resource_byname(pdev, buf);
+        if (IS_ERR(advb->asyncfifo_base[i])) {
+            return PTR_ERR(advb->asyncfifo_base[i]);
+        }
+    }
+
+    advb->sub_base = devm_platform_ioremap_resource_byname(pdev, "sub");
+    if (IS_ERR(advb->sub_base)) {
+        return PTR_ERR(advb->sub_base);
     }
 
     advb->dmx_rst = devm_reset_control_get(&pdev->dev, "demux_rst");
@@ -2262,61 +2241,31 @@ static int aml_dvb_probe(struct platform_device *pdev)
         return PTR_ERR(advb->dmx_rst);
     }
 
+	for (i = 0; i < DMX_DEV_COUNT; i++) {
+        memset(buf, 0, 32);
+        snprintf(buf, sizeof(buf), "demux%d_rst", i);
+        advb->demux_rst[i] = devm_reset_control_get(&pdev->dev, buf);
+        if (IS_ERR(advb->demux_rst[i])) {
+            return PTR_ERR(advb->demux_rst[i]);
+        }
+	}
+
     advb->des_rst = devm_reset_control_get(&pdev->dev, "des_rst");
     if (IS_ERR(advb->des_rst)) {
         return PTR_ERR(advb->des_rst);
     }
 
-    advb->demux_rst[0] = devm_reset_control_get(&pdev->dev, "demux0_rst");
-    if (IS_ERR(advb->demux_rst[0])) {
-        return PTR_ERR(advb->demux_rst[0]);
+    for (i = 0; i < advb->async_fifo_total_count; i++) {
+        memset(buf, 0, 32);
+        snprintf(buf, sizeof(buf), "async%d_rst", i);
+        advb->async_rst[i] = devm_reset_control_get(&pdev->dev, buf);
+        if (IS_ERR(advb->async_rst[i])) {
+            return PTR_ERR(advb->async_rst[i]);
+        }
     }
-
-    advb->demux_rst[1] = devm_reset_control_get(&pdev->dev, "demux1_rst");
-    if (IS_ERR(advb->demux_rst[1])) {
-        return PTR_ERR(advb->demux_rst[1]);
-    }
-
-    advb->demux_rst[2] = devm_reset_control_get(&pdev->dev, "demux2_rst");
-    if (IS_ERR(advb->demux_rst[2])) {
-        return PTR_ERR(advb->demux_rst[2]);
-    }
-
-    advb->async_rst[0] = devm_reset_control_get(&pdev->dev, "async0_rst");
-    if (IS_ERR(advb->async_rst[0])) {
-        return PTR_ERR(advb->async_rst[0]);
-    }
-
-    advb->async_rst[1] = devm_reset_control_get(&pdev->dev, "async1_rst");
-    if (IS_ERR(advb->async_rst[1])) {
-        return PTR_ERR(advb->async_rst[1]);
-    }
-
-	spin_lock_init(&advb->slock);
-
-	advb->dev = &pdev->dev;
-	advb->pdev = pdev;
-	advb->stb_source = -1;
-	advb->tso_source = -1;
-
-	if (get_cpu_type() < MESON_CPU_MAJOR_ID_TL1) {
-	  advb->ts_in_total_count = 3;
-	  advb->s2p_total_count = 2;
-	  advb->async_fifo_total_count = 2;
-	} else {
-		advb->ts_in_total_count = 4;
-		advb->s2p_total_count = 3;
-		advb->async_fifo_total_count = 3;
-	}
-
-	for (i = 0; i < DMX_DEV_COUNT; i++) {
-		advb->dmx[i].dmx_irq = -1;
-		advb->dmx[i].dvr_irq = -1;
-	}
 
 	/*if async_buf_len too small, close dvr function*/
 	{
-		char buf[32];
 		u32 value;
 
 		memset(buf, 0, 32);
@@ -2332,7 +2281,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 #ifdef CONFIG_OF
 	if (pdev->dev.of_node) {
 		int s2p_id = 0;
-		char buf[32];
 		const char *str;
 		u32 value;
 

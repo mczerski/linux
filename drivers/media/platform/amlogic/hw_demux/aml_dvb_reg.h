@@ -20,26 +20,8 @@
 #ifndef _DVB_REG_H_
 #define _DVB_REG_H_
 
-#define ID_STB_CBUS_BASE		0
-//#define ID_SMARTCARD_REG_BASE		1
-#define ID_ASYNC_FIFO_REG_BASE		2
-#define ID_ASYNC_FIFO1_REG_BASE		3
-#define ID_ASYNC_FIFO2_REG_BASE	4
-//#define ID_RESET_BASE			5
-#define ID_PARSER_SUB_START_PTR_BASE	6
-
-long aml_stb_get_base(int id);
 #include "c_stb_define.h"
 #include "c_stb_regs_define.h"
-
-#define WRITE_MPEG_REG(_r, _v)   aml_write_cbus(_r, _v)
-#define READ_MPEG_REG(_r)        aml_read_cbus(_r)
-
-#define WRITE_CBUS_REG(_r, _v)   aml_write_cbus(_r, _v)
-#define READ_CBUS_REG(_r)        aml_read_cbus(_r)
-
-#define WRITE_VCBUS_REG(_r, _v)  aml_write_vcbus(_r, _v)
-#define READ_VCBUS_REG(_r)       aml_read_vcbus(_r)
 
 #define BASE_IRQ 32
 #define AM_IRQ(reg)             (reg + BASE_IRQ)

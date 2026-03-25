@@ -209,37 +209,12 @@ static int have_old_stb_top_config = 1;
 static int have_old_fec_input_control = 1;
 static long pes_off_pre[DMX_DEV_COUNT];
 
-static void aml_write_cbus(unsigned int reg, unsigned int val)
+static u32 aml_read_stb(struct aml_dvb *dvb, unsigned int reg)
 {
-	//pr_dbg("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
-    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
-        writel(val, aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
-    }
-    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
-        writel(val, aml_get_dvb_device()->base2 + ((reg - 0x2310) << 2));
-    }
-    else {
-        pr_err("aml_write_cbus: reg=0x%x val=0x%x\n", reg, val);
-    }
+    return readl(dvb->stb_base + (reg << 2));
 }
 
-static int aml_read_cbus(unsigned int reg)
-{
-	//pr_dbg("aml_read_cbus: reg=0x%x\n", reg);
-    if (reg >= 0x1600 && reg < 0x1600 + 0x800) {
-        return readl(aml_get_dvb_device()->base + ((reg - 0x1600) << 2));
-    }
-    else if (reg >= 0x2310 && reg < 0x2310 + 0x100) {
-        return readl(aml_get_dvb_device()->base2 + ((reg - 0x2310) << 2));
-    }
-    else {
-        pr_err("aml_read_cbus: reg=0x%x\n", reg);
-        return 0;
-    }
-}
-
-static void
-dmx_write_reg(int r, u32 v)
+static void aml_write_stb(struct aml_dvb *dvb, unsigned int r, u32 v)
 {
 	u32 oldv, mask;
 
@@ -249,7 +224,7 @@ dmx_write_reg(int r, u32 v)
 				oldv = old_stb_top_config;
 				have_old_stb_top_config = 0;
 			} else {
-				oldv = READ_MPEG_REG(STB_TOP_CONFIG);
+				oldv = aml_read_stb(dvb, STB_TOP_CONFIG);
 			}
 
 			mask = (1<<7)|(1<<15)|(3<<26)|(7<<28);
@@ -260,7 +235,7 @@ dmx_write_reg(int r, u32 v)
 				oldv = old_fec_input_control;
 				have_old_fec_input_control = 0;
 			} else {
-				oldv = READ_MPEG_REG(FEC_INPUT_CONTROL);
+				oldv = aml_read_stb(dvb, FEC_INPUT_CONTROL);
 			}
 
 			mask = (1<<15);
@@ -271,12 +246,12 @@ dmx_write_reg(int r, u32 v)
 		//	if (!have_old_stb_top_config) {
 		//		have_old_stb_top_config = 1;
 		//		old_stb_top_config =
-		//			READ_MPEG_REG(STB_TOP_CONFIG);
+		//			aml_read_stb(dvb, STB_TOP_CONFIG);
 		//	}
 		//	if (!have_old_fec_input_control) {
 		//		have_old_fec_input_control = 1;
 		//		old_fec_input_control =
-		//			READ_MPEG_REG(FEC_INPUT_CONTROL);
+		//			aml_read_stb(dvb, FEC_INPUT_CONTROL);
 		//	}
 		} else if ((r == TS_PL_PID_INDEX) || (r == TS_PL_PID_DATA)
 					|| (r == COMM_DESC_KEY0)
@@ -292,49 +267,43 @@ dmx_write_reg(int r, u32 v)
 			return;
 		}
 	}
-	WRITE_MPEG_REG(r, v);
+    writel(v, dvb->stb_base + (r << 2));
 }
 
-#undef WRITE_MPEG_REG
-#define WRITE_MPEG_REG(r, v) dmx_write_reg(r, v)
+static u32 aml_read_dmx(struct aml_dvb *dvb, unsigned int idx, unsigned int reg)
+{
+    return aml_read_stb(dvb, reg + DEMUX_X_OFFSET * idx);
+}
 
-#define DMX_READ_REG(i, r)\
-	((i)?((i == 1)?READ_MPEG_REG(r##_2) :\
-	READ_MPEG_REG(r##_3)) : READ_MPEG_REG(r))
+static void aml_write_dmx(struct aml_dvb *dvb, unsigned int idx, unsigned int reg, unsigned int val)
+{
+    aml_write_stb(dvb, reg + DEMUX_X_OFFSET * idx, val);
+}
 
-#define DMX_WRITE_REG(i, r, d)\
-	do {\
-		if (i == 1) {\
-			WRITE_MPEG_REG(r##_2, d);\
-		} else if (i == 2) {\
-			WRITE_MPEG_REG(r##_3, d);\
-		} \
-		else {\
-			WRITE_MPEG_REG(r, d);\
-		} \
-	} while (0)
+static u32 aml_read_asyncfifo(struct aml_dvb *dvb, unsigned int idx, unsigned int reg)
+{
+    return readl(dvb->asyncfifo_base[idx] + (reg << 2));
+}
 
-#define READ_PERI_REG			READ_CBUS_REG
-#define WRITE_PERI_REG			WRITE_CBUS_REG
+static void aml_write_asyncfifo(struct aml_dvb *dvb, unsigned int idx, unsigned int reg, unsigned int val)
+{
+    writel(val, dvb->asyncfifo_base[idx] + (reg << 2));
+}
 
-#define READ_ASYNC_FIFO_REG(i, r)\
-	((i) ? ((i-1)?READ_PERI_REG(ASYNC_FIFO1_##r):\
-	READ_PERI_REG(ASYNC_FIFO2_##r)) : READ_PERI_REG(ASYNC_FIFO_##r))
+static void aml_clear_mask_asyncfifo(struct aml_dvb *dvb, unsigned int idx, unsigned int reg, u32 mask)
+{
+    aml_write_asyncfifo(dvb, idx, reg, aml_read_asyncfifo(dvb, idx, reg) & (~mask));
+}
 
-#define WRITE_ASYNC_FIFO_REG(i, r, d)\
-	do {\
-		if (i == 2) {\
-			WRITE_PERI_REG(ASYNC_FIFO1_##r, d);\
-		} else if (i == 0) {\
-			WRITE_PERI_REG(ASYNC_FIFO_##r, d);\
-		} else {\
-			WRITE_PERI_REG(ASYNC_FIFO2_##r, d);\
-		} \
-	} while (0)
+static u32 aml_read_sub(struct aml_dvb *dvb, unsigned int reg)
+{
+    return readl(dvb->sub_base + (reg << 2));
+}
 
-#define CLEAR_ASYNC_FIFO_REG_MASK(i, reg, mask) \
-	WRITE_ASYNC_FIFO_REG(i, reg, \
-	(READ_ASYNC_FIFO_REG(i, reg)&(~(mask))))
+static void aml_write_sub(struct aml_dvb *dvb, unsigned int reg, unsigned int val)
+{
+    writel(val, dvb->sub_base + (reg << 2));
+}
 
 #define DVR_FEED(f) \
 	((f) && ((f)->type == DMX_TYPE_TS) &&	\
@@ -377,12 +346,13 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 			enum ca_cw_type type, u8 *key);
 static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 			enum ca_cw_type type, u8 *key);
-static void aml_ci_plus_disable(void);
+static void aml_ci_plus_disable(struct aml_dvb *dvb);
 static void am_ci_plus_set_output(struct aml_dsc_channel *ch);
 static int set_subtitle_pes_buffer(struct aml_dmx *dmx);
 
-static void dmxn_op_chan(int dmx, int ch, int(*op)(int, int), int ch_op)
+static void dmxn_op_chan(struct aml_dmx *dmx, int ch, int(*op)(int, int), int ch_op)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
 	int enable_0, enable_1, enable_2;
 	int *set_0, *set_1, *set_2;
 	int reg;
@@ -406,52 +376,52 @@ static void dmxn_op_chan(int dmx, int ch, int(*op)(int, int), int ch_op)
 	} else {
 		return;
 	}
-	if (dmx == 0) {
+	if (dmx->id == 0) {
 		if (enable_0) {
 			*set_0 = op(*set_0, ch);
-			WRITE_MPEG_REG(reg+DEMUX_1_OFFSET, *set_0);
+			aml_write_dmx(dvb, dmx->id, reg, *set_0);
 		}
-	} else if (dmx == 1) {
+	} else if (dmx->id == 1) {
 		if (enable_1) {
 			*set_1 = op(*set_1, ch);
-			WRITE_MPEG_REG(reg+DEMUX_2_OFFSET, *set_1);
+			aml_write_dmx(dvb, dmx->id, reg, *set_1);
 		}
-	} else if (dmx == 2) {
+	} else if (dmx->id == 2) {
 		if (enable_2) {
 			*set_2 = op(*set_2, ch);
-			WRITE_MPEG_REG(reg+DEMUX_3_OFFSET, *set_2);
+			aml_write_dmx(dvb, dmx->id, reg, *set_2);
 		}
 	}
 }
 #define dmx_add_recchan(_dmx, _chid) \
 	do { \
-		pr_dbg("dmx[%d]_add_recchan[%d]\n", _dmx, _chid); \
+		pr_dbg("dmx[%d]_add_recchan[%d]\n", _dmx->id, _chid); \
 		dmxn_op_chan(_dmx, _chid, _setbit, DMX_CH_OP_CHANREC); \
 	} while (0)
 #define dmx_rm_recchan(_dmx, _chid) \
 	do { \
-		pr_dbg("dmx[%d]_rm_recchan[%ld]\n", _dmx, _chid); \
+		pr_dbg("dmx[%d]_rm_recchan[%ld]\n", _dmx->id, _chid); \
 		dmxn_op_chan(_dmx, _chid, _clrbit, DMX_CH_OP_CHANREC); \
 	} while (0)
 #define dmx_set_recchan(_dmx, _chs) \
 	do { \
-		pr_dbg("dmx[%d]_set_recchan[%d]\n", _dmx, _chs); \
+		pr_dbg("dmx[%d]_set_recchan[%d]\n", _dmx->id, _chs); \
 		dmxn_op_chan(_dmx, _chs, _set, DMX_CH_OP_CHANREC); \
 	} while (0)
 
 #define dmx_add_procchan(_dmx, _chid) \
 	do { \
-		pr_dbg("dmx[%d]_add_procchan[%d]\n", _dmx, _chid); \
+		pr_dbg("dmx[%d]_add_procchan[%d]\n", _dmx->id, _chid); \
 		dmxn_op_chan(_dmx, _chid, _setbit, DMX_CH_OP_CHANPROC); \
 	} while (0)
 #define dmx_rm_procchan(_dmx, _chid) \
 	do { \
-		pr_dbg("dmx[%d]_rm_procchan[%ld]\n", _dmx, _chid); \
+		pr_dbg("dmx[%d]_rm_procchan[%ld]\n", _dmx->id, _chid); \
 		dmxn_op_chan(_dmx, _chid, _clrbit, DMX_CH_OP_CHANPROC); \
 	} while (0)
 #define dmx_set_procchan(_dmx, _chs) \
 	do { \
-		pr_dbg("dmx[%d]_set_procchan[%d]\n", _dmx, _chs); \
+		pr_dbg("dmx[%d]_set_procchan[%d]\n", _dmx->id, _chs); \
 		dmxn_op_chan(_dmx, _chs, _set, DMX_CH_OP_CHANPROC); \
 	} while (0)
 
@@ -532,6 +502,7 @@ static int sub_ttx_enable = 1;
 #define asyncfifo_get_dev(afifo) ((afifo)->dvb->dev)
 
 
+//TODO
 int dmx_phyreg_access(unsigned int reg, unsigned int writeval,
 		   unsigned int *readval)
 {
@@ -576,11 +547,11 @@ static void section_buffer_watchdog_func(struct timer_list * timer)
 			continue;
 
 		om_cmd_status32 =
-		    DMX_READ_REG(device_no, OM_CMD_STATUS);
+		    aml_read_dmx(dvb, device_no, OM_CMD_STATUS);
 		demux_channel_activity32 =
-		    DMX_READ_REG(device_no, DEMUX_CHANNEL_ACTIVITY);
+		    aml_read_dmx(dvb, device_no, DEMUX_CHANNEL_ACTIVITY);
 		section_busy32 =
-			DMX_READ_REG(device_no, SEC_BUFF_BUSY);
+			aml_read_dmx(dvb, device_no, SEC_BUFF_BUSY);
 
 		if (om_cmd_status32 & 0x8fc2) {
 			/* bit 15:12 -- om_cmd_count (read only) */
@@ -622,20 +593,20 @@ static void section_buffer_watchdog_func(struct timer_list * timer)
 			dmx->om_status_error_count = 0;
 		}
 		section_busy32 =
-			DMX_READ_REG(device_no, SEC_BUFF_BUSY);
+			aml_read_dmx(dvb, device_no, SEC_BUFF_BUSY);
 		if (LARGE_SEC_BUFF_MASK ==
 				(section_busy32 & LARGE_SEC_BUFF_MASK)) {
 			/*All the largest section buffers occupied,
 			 * clear buffers
 			 */
-			DMX_WRITE_REG(device_no,
+			aml_write_dmx(dvb, device_no,
 					SEC_BUFF_READY, section_busy32);
 		} else {
 			for (i = 0; i < SEC_BUF_COUNT; i++) {
 				if (!(section_busy32 & (1 << i)))
 					continue;
-				DMX_WRITE_REG(device_no, SEC_BUFF_NUMBER, i);
-				filter_number =	DMX_READ_REG(device_no,
+				aml_write_dmx(dvb, device_no, SEC_BUFF_NUMBER, i);
+				filter_number =	aml_read_dmx(dvb, device_no,
 							SEC_BUFF_NUMBER);
 				filter_number >>= 8;
 				if ((filter_number >= FILTER_COUNT)
@@ -648,7 +619,7 @@ static void section_buffer_watchdog_func(struct timer_list * timer)
 						0x7FFFFFFF :
 						LARGE_SEC_BUFF_MASK)) {
 				/*Clear invalid buffers */
-				DMX_WRITE_REG(device_no,
+				aml_write_dmx(dvb, device_no,
 						SEC_BUFF_READY,
 						section_busy32);
 				pr_error("clear invalid buffer 0x%x\n",
@@ -656,9 +627,9 @@ static void section_buffer_watchdog_func(struct timer_list * timer)
 			}
 		}
 		demux_int_status1 =
-			DMX_READ_REG(device_no, STB_INT_STATUS) & 0xfff7;
+			aml_read_dmx(dvb, device_no, STB_INT_STATUS) & 0xfff7;
 		if (demux_int_status1 & (1 << TS_ERROR_PIN)) {
-			DMX_WRITE_REG(device_no,
+			aml_write_dmx(dvb, device_no,
 				STB_INT_STATUS,
 				(1 << TS_ERROR_PIN));
 		}
@@ -960,12 +931,12 @@ static void smallsection_match_section(struct aml_dmx *dmx, u8 *p, u16 sec_num)
 }
 static void process_smallsection(struct aml_dmx *dmx)
 {
-
+    struct aml_dvb *dvb = dmx->demux.priv;
 	u32 v, wr, rd;
 	u32 data32;
 	struct aml_smallsec *ss = &dmx->smallsec;
 
-	v = DMX_READ_REG(dmx->id, DEMUX_SMALL_SEC_CTL);
+	v = aml_read_dmx(dvb, dmx->id, DEMUX_SMALL_SEC_CTL);
 	wr = (v >> 8) & 0xff;
 	rd = (v >> 16) & 0xff;
 
@@ -1011,34 +982,35 @@ static void process_smallsection(struct aml_dmx *dmx)
 		}
 
 		rd = wr;
-		data32 = (DMX_READ_REG(dmx->id,	DEMUX_SMALL_SEC_CTL)
+		data32 = (aml_read_dmx(dvb, dmx->id,	DEMUX_SMALL_SEC_CTL)
 				& 0xff00ffff)
 				| (rd << 16);
-		DMX_WRITE_REG(dmx->id, DEMUX_SMALL_SEC_CTL, data32);
+		aml_write_dmx(dvb, dmx->id, DEMUX_SMALL_SEC_CTL, data32);
 	}
 }
 
 
 static void process_section(struct aml_dmx *dmx)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
 	u32 ready, i, sec_busy;
 	u16 sec_num;
 
-	ready = DMX_READ_REG(dmx->id, SEC_BUFF_READY);
+	ready = aml_read_dmx(dvb, dmx->id, SEC_BUFF_READY);
 	if (ready) {
 		if ((ready & (1<<31)) && dmx->smallsec.enable) {
 			u32 v, wr, rd;
 
-			v = DMX_READ_REG(dmx->id, DEMUX_SMALL_SEC_CTL);
+			v = aml_read_dmx(dvb, dmx->id, DEMUX_SMALL_SEC_CTL);
 			wr = (v >> 8) & 0xff;
 			rd = (v >> 16) & 0xff;
 			if ((wr < rd) && (5 > (rd - wr)))
 				pr_error("warning: small ss buf [w%dr%d]\n",
 					wr, rd);
 			pr_dbg_irq_ss("ss>%x\n",
-				DMX_READ_REG(dmx->id, DEMUX_SMALL_SEC_CTL));
+				aml_read_dmx(dvb, dmx->id, DEMUX_SMALL_SEC_CTL));
 			process_smallsection(dmx);
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_READY, (1<<31));
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_READY, (1<<31));
 			return;
 		}
 
@@ -1047,10 +1019,10 @@ static void process_section(struct aml_dmx *dmx)
 				continue;
 
 			/* get section busy */
-			sec_busy = DMX_READ_REG(dmx->id, SEC_BUFF_BUSY);
+			sec_busy = aml_read_dmx(dvb, dmx->id, SEC_BUFF_BUSY);
 			/* get filter number */
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_NUMBER, i);
-			sec_num = (DMX_READ_REG(dmx->id, SEC_BUFF_NUMBER) >> 8);
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_NUMBER, i);
+			sec_num = (aml_read_dmx(dvb, dmx->id, SEC_BUFF_NUMBER) >> 8);
 
 			/*
 			 * sec_buf_watchdog_count dispatch:
@@ -1073,7 +1045,7 @@ static void process_section(struct aml_dmx *dmx)
 						"try software match.\n");
 					software_match_section(dmx, i);
 					dmx->sec_buf_watchdog_count[i] = 0;
-					DMX_WRITE_REG(dmx->id, SEC_BUFF_READY,
+					aml_write_dmx(dvb, dmx->id, SEC_BUFF_READY,
 							(1 << i));
 				}
 				continue;
@@ -1094,10 +1066,10 @@ static void process_section(struct aml_dmx *dmx)
 						" the buf ready & busy!\n");
 					software_match_section(dmx, i);
 					dmx->sec_buf_watchdog_count[i] = 0;
-					DMX_WRITE_REG(dmx->id,
+					aml_write_dmx(dvb, dmx->id,
 						      SEC_BUFF_READY,
 						      (1 << i));
-					DMX_WRITE_REG(dmx->id,
+					aml_write_dmx(dvb, dmx->id,
 						      SEC_BUFF_BUSY,
 						      (1 << i));
 				}
@@ -1114,19 +1086,19 @@ static void process_section(struct aml_dmx *dmx)
 			hardware_match_section(dmx, sec_num, i);
 
 			/* clear the ready & busy bit */
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_READY, (1 << i));
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_BUSY, (1 << i));
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_READY, (1 << i));
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_BUSY, (1 << i));
 		}
 	}
 }
 
 static void process_sub(struct aml_dmx *dmx)
 {
-
+    struct aml_dvb *dvb = dmx->demux.priv;
 	u32 rd_ptr = 0;
-	u32 wr_ptr = READ_MPEG_REG(PARSER_SUB_WP);
-	u32 start_ptr = READ_MPEG_REG(PARSER_SUB_START_PTR);
-	u32 end_ptr = READ_MPEG_REG(PARSER_SUB_END_PTR);
+	u32 wr_ptr = aml_read_sub(dvb, PARSER_SUB_WP);
+	u32 start_ptr = aml_read_sub(dvb, PARSER_SUB_START_PTR);
+	u32 end_ptr = aml_read_sub(dvb, PARSER_SUB_END_PTR);
 	u32 buffer1 = 0, buffer2 = 0;
 	u8 *buffer1_virt = 0, *buffer2_virt = 0;
 	u32 len1 = 0, len2 = 0;
@@ -1134,7 +1106,7 @@ static void process_sub(struct aml_dmx *dmx)
 	if (!dmx->sub_buf_base_virt)
 		return;
 
-	rd_ptr = READ_MPEG_REG(PARSER_SUB_RP);
+	rd_ptr = aml_read_sub(dvb, PARSER_SUB_RP);
 	if (!rd_ptr)
 		return;
 	if (rd_ptr > wr_ptr) {
@@ -1191,22 +1163,23 @@ static void process_sub(struct aml_dmx *dmx)
 						&dmx->channel[2].feed->feed.ts,0);
 		}
 	}
-	WRITE_MPEG_REG(PARSER_SUB_RP, rd_ptr);
+	aml_write_sub(dvb, PARSER_SUB_RP, rd_ptr);
 }
 
 static void process_pes(struct aml_dmx *dmx)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
 	long off, off_pre = pes_off_pre[dmx->id];
 	u8 *buffer1 = 0, *buffer2 = 0;
 	u8 *buffer1_phys = 0, *buffer2_phys = 0;
 	u32 len1 = 0, len2 = 0;
 	int i = 1;
 
-	off = (DMX_READ_REG(dmx->id, OTHER_WR_PTR) << 3);
+	off = (aml_read_dmx(dvb, dmx->id, OTHER_WR_PTR) << 3);
 
 	pr_dbg_irq_pes("[%d]WR:0x%x PES WR:0x%x\n", dmx->id,
-			DMX_READ_REG(dmx->id, OTHER_WR_PTR),
-			DMX_READ_REG(dmx->id, OB_PES_WR_PTR));
+			aml_read_dmx(dvb, dmx->id, OTHER_WR_PTR),
+			aml_read_dmx(dvb, dmx->id, OB_PES_WR_PTR));
 	buffer1 = (u8 *)(dmx->pes_pages + off_pre);
 	pr_dbg_irq_pes("[%d]PES WR[%02x %02x %02x %02x %02x %02x %02x %02x",
 		dmx->id,
@@ -1257,25 +1230,26 @@ static void process_pes(struct aml_dmx *dmx)
 
 static void process_om_read(struct aml_dmx *dmx)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
 	unsigned int i;
 	unsigned short om_cmd_status_data_0 = 0;
 	unsigned short om_cmd_status_data_1 = 0;
 	unsigned short om_cmd_data_out = 0;
 
-	om_cmd_status_data_0 = DMX_READ_REG(dmx->id, OM_CMD_STATUS);
-	om_cmd_status_data_1 = DMX_READ_REG(dmx->id, OM_CMD_DATA);
+	om_cmd_status_data_0 = aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS);
+	om_cmd_status_data_1 = aml_read_dmx(dvb, dmx->id, OM_CMD_DATA);
 
 	if (om_cmd_status_data_0 & 1) {
-		DMX_WRITE_REG(dmx->id, OM_DATA_RD_ADDR,
+		aml_write_dmx(dvb, dmx->id, OM_DATA_RD_ADDR,
 			(1 << 15) | ((om_cmd_status_data_1 & 0xff) << 2));
 		for (i = 0; i < (((om_cmd_status_data_1 >> 7) & 0x1fc) >> 1);
 		     i++) {
-			om_cmd_data_out = DMX_READ_REG(dmx->id, OM_DATA_RD);
+			om_cmd_data_out = aml_read_dmx(dvb, dmx->id, OM_DATA_RD);
 		}
 
-		om_cmd_data_out = DMX_READ_REG(dmx->id, OM_DATA_RD_ADDR);
-		DMX_WRITE_REG(dmx->id, OM_DATA_RD_ADDR, 0);
-		DMX_WRITE_REG(dmx->id, OM_CMD_STATUS, 1);
+		om_cmd_data_out = aml_read_dmx(dvb, dmx->id, OM_DATA_RD_ADDR);
+		aml_write_dmx(dvb, dmx->id, OM_DATA_RD_ADDR, 0);
+		aml_write_dmx(dvb, dmx->id, OM_CMD_STATUS, 1);
 	}
 }
 
@@ -1302,7 +1276,7 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dvb->slock, flags);
-	status = DMX_READ_REG(dmx->id, STB_INT_STATUS);
+	status = aml_read_dmx(dvb, dmx->id, STB_INT_STATUS);
 	if (!status)
 		goto irq_handled;
 
@@ -1327,10 +1301,10 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 		pr_error("TS_ERROR_PIN\n");
 
 	if (status & (1 << NEW_PDTS_READY)) {
-		u32 pdts_status = DMX_READ_REG(dmx->id, STB_PTS_DTS_STATUS);
+		u32 pdts_status = aml_read_dmx(dvb, dmx->id, STB_PTS_DTS_STATUS);
 
 		if (pdts_status & (1 << VIDEO_PTS_READY)) {
-			video_pts = DMX_READ_REG(dmx->id, VIDEO_PTS_DEMUX);
+			video_pts = aml_read_dmx(dvb, dmx->id, VIDEO_PTS_DEMUX);
 			video_pts_bit32 =
 				(pdts_status & (1 << VIDEO_PTS_BIT32)) ? 1 : 0;
 			if (!first_video_pts
@@ -1339,7 +1313,7 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 		}
 
 		if (pdts_status & (1 << AUDIO_PTS_READY)) {
-			audio_pts = DMX_READ_REG(dmx->id, AUDIO_PTS_DEMUX);
+			audio_pts = aml_read_dmx(dvb, dmx->id, AUDIO_PTS_DEMUX);
 			audio_pts_bit32 =
 				(pdts_status & (1 << AUDIO_PTS_BIT32)) ? 1 : 0;
 			if (!first_audio_pts
@@ -1351,7 +1325,7 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 	if (dmx->irq_handler)
 		dmx->irq_handler(dmx->dmx_irq, (void *)(long)dmx->id);
 
-	DMX_WRITE_REG(dmx->id, STB_INT_STATUS, status);
+	aml_write_dmx(dvb, dmx->id, STB_INT_STATUS, status);
 
 	{
 		if (!dmx->int_check_time) {
@@ -1369,7 +1343,7 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 					jiffies_to_msecs(jiffies -
 						      dmx->int_check_time));
 				if (dmx->fe && !dmx->in_tune)
-					DMX_WRITE_REG(dmx->id, STB_INT_MASK, 0);
+					aml_write_dmx(dvb, dmx->id, STB_INT_MASK, 0);
 				dmx_reset_hw_ex(dvb, 0);
 			}
 			dmx->int_check_time = 0;
@@ -1380,7 +1354,7 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 		if (dmx->in_tune) {
 			dmx->error_check++;
 			if (dmx->error_check > 200)
-				DMX_WRITE_REG(dmx->id, STB_INT_MASK, 0);
+				aml_write_dmx(dvb, dmx->id, STB_INT_MASK, 0);
 		}
 	}
 
@@ -1710,7 +1684,7 @@ static void stb_enable(struct aml_dvb *dvb)
 	invert0 = dvb->s2p[0].invert;
 	invert1 = dvb->s2p[1].invert;
 
-	WRITE_MPEG_REG(STB_TOP_CONFIG,
+	aml_write_stb(dvb, STB_TOP_CONFIG,
 		       (invert1 << INVERT_S2P1_FEC_CLK) |
 		       (fec_s1 << S2P1_FEC_SERIAL_SEL) |
 		       (out_src << TS_OUTPUT_SOURCE) |
@@ -1725,7 +1699,7 @@ static void stb_enable(struct aml_dvb *dvb)
 	if (get_cpu_type() >= MESON_CPU_MAJOR_ID_TL1) {
 		invert2 = dvb->s2p[2].invert;
 
-		WRITE_MPEG_REG(STB_S2P2_CONFIG,
+		aml_write_stb(dvb, STB_S2P2_CONFIG,
 		       (invert2 << INVERT_S2P2_FEC_CLK) |
 		       (fec_s2 << S2P2_FEC_SERIAL_SEL));
 	}
@@ -1735,13 +1709,13 @@ static void stb_enable(struct aml_dvb *dvb)
 	/* invert ts out clk,add ci model need add this*/
 	if (dvb->ts_out_invert) {
 		printk("ts out invert ---\r\n");
-		data = READ_MPEG_REG(TS_TOP_CONFIG);
+		data = aml_read_stb(dvb, TS_TOP_CONFIG);
 		data |= 1 << TS_OUT_CLK_INVERT;
-		WRITE_MPEG_REG(TS_TOP_CONFIG, data);
+		aml_write_stb(dvb, TS_TOP_CONFIG, data);
 	}
 
 	if (src == AM_TS_SRC_HIU1) {
-		WRITE_MPEG_REG(TS_HIU1_CONFIG,
+		aml_write_stb(dvb, TS_HIU1_CONFIG,
 			       (demux_skipbyte << FILE_M2TS_SKIP_BYTES_HIU1) |
 			       (hiu << TS_HIU_ENABLE_HIU1) |
 			       (fec_clk << FEC_CLK_DIV_HIU1) |
@@ -1749,7 +1723,7 @@ static void stb_enable(struct aml_dvb *dvb)
 				   (0x47 << FEC_SYNC_BYTE_HIU1));
 	} else {
 		/* invert ts out clk  end */
-		WRITE_MPEG_REG(TS_FILE_CONFIG,
+		aml_write_stb(dvb, TS_FILE_CONFIG,
 			       (demux_skipbyte << 16) |
 			       (6 << DES_OUT_DLY) |
 			       (3 << TRANSPORT_SCRAMBLING_CONTROL_ODD) |
@@ -1761,12 +1735,13 @@ static void stb_enable(struct aml_dvb *dvb)
 int dsc_set_pid(struct aml_dsc_channel *ch, int pid)
 {
 	struct aml_dsc *dsc = ch->dsc;
+    struct aml_dvb *dvb = dsc->dvb;
 	int is_dsc2 = (dsc->id == 1) ? 1 : 0;
 	u32 data;
 
-	WRITE_MPEG_REG(TS_PL_PID_INDEX,
+	aml_write_stb(dvb, TS_PL_PID_INDEX,
 			((ch->id & 0x0f) >> 1)+(is_dsc2 ? 4 : 0));
-	data = READ_MPEG_REG(TS_PL_PID_DATA);
+	data = aml_read_stb(dvb, TS_PL_PID_DATA);
 	if (ch->id & 1) {
 		data &= 0xFFFF0000;
 		data |= pid & 0x1fff;
@@ -1778,10 +1753,10 @@ int dsc_set_pid(struct aml_dsc_channel *ch, int pid)
 		if (!ch->used)
 			data |= 1 << PID_MATCH_DISABLE_HIGH;
 	}
-	WRITE_MPEG_REG(TS_PL_PID_INDEX,
+	aml_write_stb(dvb, TS_PL_PID_INDEX,
 			((ch->id & 0x0f) >> 1)+(is_dsc2 ? 4 : 0));
-	WRITE_MPEG_REG(TS_PL_PID_DATA, data);
-	WRITE_MPEG_REG(TS_PL_PID_INDEX, 0);
+	aml_write_stb(dvb, TS_PL_PID_DATA, data);
+	aml_write_stb(dvb, TS_PL_PID_INDEX, 0);
 
 	if (ch->used)
 		pr_dbg("set DSC %d ch %d PID %d\n", dsc->id, ch->id, pid);
@@ -1793,12 +1768,13 @@ int dsc_set_pid(struct aml_dsc_channel *ch, int pid)
 static int dsc_get_pid(struct aml_dsc_channel *ch, int *pid)
 {
 	struct aml_dsc *dsc = ch->dsc;
+    struct aml_dvb *dvb = dsc->dvb;
 	int is_dsc2 = (dsc->id == 1) ? 1 : 0;
 	u32 data;
 
-	WRITE_MPEG_REG(TS_PL_PID_INDEX,
+	aml_write_stb(dvb, TS_PL_PID_INDEX,
 			((ch->id & 0x0f) >> 1)+(is_dsc2 ? 4 : 0));
-	data = READ_MPEG_REG(TS_PL_PID_DATA);
+	data = aml_read_stb(dvb, TS_PL_PID_DATA);
 	if (ch->id & 1) {
 		*pid = data & 0x1fff;
 	} else {
@@ -1810,12 +1786,14 @@ static int dsc_get_pid(struct aml_dsc_channel *ch, int *pid)
 int dsc_set_key(struct aml_dsc_channel *ch, int flags, enum ca_cw_type type,
 			u8 *key)
 {
+    struct aml_dsc *dsc = ch->dsc;
+    struct aml_dvb *dvb = dsc->dvb;
 	int ret = -1;
 
 	switch (type) {
 	case CA_CW_DVB_CSA_EVEN:
 	case CA_CW_DVB_CSA_ODD:
-		aml_ci_plus_disable();
+		aml_ci_plus_disable(dvb);
 		ret = dsc_set_csa_key(ch, flags, type, key);
 		if (ret != 0)
 			goto END;
@@ -1909,6 +1887,7 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 			enum ca_cw_type type, u8 *key)
 {
 	struct aml_dsc *dsc = ch->dsc;
+    struct aml_dvb *dvb = dsc->dvb;
 	int is_dsc2 = (dsc->id == 1) ? 1 : 0;
 	u16 k0, k1, k2, k3;
 	u32 key0, key1;
@@ -1918,12 +1897,12 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 		k0 = k1 = k2 = k3 = 0;
 		/*dummy write to check if kl not working*/
 		key0 = key1 = 0;
-		WRITE_MPEG_REG(COMM_DESC_KEY0, key0);
-		WRITE_MPEG_REG(COMM_DESC_KEY1, key1);
+		aml_write_stb(dvb, COMM_DESC_KEY0, key0);
+		aml_write_stb(dvb, COMM_DESC_KEY1, key1);
 
 	/*tdes? :*/
 		if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXBB) {
-			WRITE_MPEG_REG(COMM_DESC_KEY_RW,
+			aml_write_stb(dvb, COMM_DESC_KEY_RW,
 				((1 << 5)) |
 				((ch->id + type * DSC_COUNT)+
 					(is_dsc2 ? 16 : 0)));
@@ -1931,7 +1910,7 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 		if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXL ||
 			get_cpu_type() == MESON_CPU_MAJOR_ID_GXM) {
 			pr_info("do kl..\n");
-			WRITE_MPEG_REG(COMM_DESC_KEY_RW,
+			aml_write_stb(dvb, COMM_DESC_KEY_RW,
 				(type ? (1 << 6) : (1 << 5)) | (1<<7) |
 				((ch->id + type * DSC_COUNT)+
 				 (is_dsc2 ? 16 : 0)));
@@ -1947,11 +1926,11 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 
 		key0 = (k0 << 16) | k1;
 		key1 = (k2 << 16) | k3;
-		WRITE_MPEG_REG(COMM_DESC_KEY0, key0);
-		WRITE_MPEG_REG(COMM_DESC_KEY1, key1);
+		aml_write_stb(dvb, COMM_DESC_KEY0, key0);
+		aml_write_stb(dvb, COMM_DESC_KEY1, key1);
 
 		reg = (ch->id + type * DSC_COUNT)+(is_dsc2 ? 16 : 0);
-		WRITE_MPEG_REG(COMM_DESC_KEY_RW, reg);
+		aml_write_stb(dvb, COMM_DESC_KEY_RW, reg);
 	}
 
 	return 0;
@@ -1999,7 +1978,7 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
  *  0 for ebc
  *  1 for cbc
  */
-static void aml_ci_plus_config(int key_endian, int mode, int algo)
+static void aml_ci_plus_config(struct aml_dvb *dvb, int key_endian, int mode, int algo)
 {
 	unsigned int data;
 	unsigned int idsa_mode = 0;
@@ -2015,7 +1994,7 @@ static void aml_ci_plus_config(int key_endian, int mode, int algo)
 	pr_dbg("%s mode:%d,alog:%d\n",__FUNCTION__,mode,algo);
 
 	if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
-		WRITE_MPEG_REG(CIPLUS_ENDIAN,
+		aml_write_stb(dvb, CIPLUS_ENDIAN,
 				(15 << AES_MSG_OUT_ENDIAN)
 				| (15 << AES_MSG_IN_ENDIAN)
 				| (key_endian << AES_KEY_ENDIAN)
@@ -2025,18 +2004,18 @@ static void aml_ci_plus_config(int key_endian, int mode, int algo)
 				| (key_endian << DES_KEY_ENDIAN)
 				);
 	} else if (algo == ALGO_DES){
-		WRITE_MPEG_REG(CIPLUS_ENDIAN,
+		aml_write_stb(dvb, CIPLUS_ENDIAN,
 				(15 << AES_IV_ENDIAN)
 				| (7 << AES_MSG_OUT_ENDIAN)
 				| (15 << AES_MSG_IN_ENDIAN)
 				| (15 << AES_KEY_ENDIAN)
 				);
-		pr_inf("CIPLUS_ENDIAN is 0x%x\n", READ_MPEG_REG(CIPLUS_ENDIAN));
+		pr_inf("CIPLUS_ENDIAN is 0x%x\n", aml_read_stb(dvb, CIPLUS_ENDIAN));
 	} else {
-		WRITE_MPEG_REG(CIPLUS_ENDIAN, 0);
+		aml_write_stb(dvb, CIPLUS_ENDIAN, 0);
 	}
 
-	data = READ_MPEG_REG(CIPLUS_ENDIAN);
+	data = aml_read_stb(dvb, CIPLUS_ENDIAN);
 
 	if (algo == ALGO_SM4) {
 		sm4_mode = 1;
@@ -2076,8 +2055,8 @@ static void aml_ci_plus_config(int key_endian, int mode, int algo)
 			(aes_enable << AES_EN) |
 			(des_enable << DES_EN);
 
-	WRITE_MPEG_REG(CIPLUS_CONFIG, data);
-	data = READ_MPEG_REG(CIPLUS_CONFIG);
+	aml_write_stb(dvb, CIPLUS_CONFIG, data);
+	data = aml_read_stb(dvb, CIPLUS_CONFIG);
 	pr_dbg("CIPLUS_CONFIG is 0x%x\n",data);
 }
 
@@ -2087,14 +2066,14 @@ static void set_fec_core_sel (struct aml_dvb *dvb)
 
 	for (i = 0; i < DMX_DEV_COUNT; i ++) {
 		int set = 0;
-		u32 ctrl = DMX_READ_REG(i, FEC_INPUT_CONTROL);
+		u32 ctrl = aml_read_dmx(dvb, i, FEC_INPUT_CONTROL);
 
 		if ((dvb->dsc[0].dst != -1) && (dvb->dsc[0].dst - AM_TS_SRC_DMX0 == i)) {
 			set = 1;
 		} else if ((dvb->dsc[1].dst != -1) && (dvb->dsc[1].dst - AM_TS_SRC_DMX0 == i)) {
 			set = 1;
 		} else {
-			u32 cfg = READ_MPEG_REG(CIPLUS_CONFIG);
+			u32 cfg = aml_read_stb(dvb, CIPLUS_CONFIG);
 
 			if (cfg & (1 << CNTL_ENABLE)) {
 				if (!ciplus_out_auto_mode) {
@@ -2110,7 +2089,7 @@ static void set_fec_core_sel (struct aml_dvb *dvb)
 			ctrl &= ~(1 << FEC_CORE_SEL);
 		}
 
-		DMX_WRITE_REG(i, FEC_INPUT_CONTROL, ctrl);
+		aml_write_dmx(dvb, i, FEC_INPUT_CONTROL, ctrl);
 	}
 }
 
@@ -2173,12 +2152,12 @@ static void am_ci_plus_set_output(struct aml_dsc_channel *ch)
 		 * if output set 0 still affects dsc output, we need to disable
 		 * ciplus module.
 		 */
-		data = READ_MPEG_REG(STB_TOP_CONFIG);
+		data = aml_read_stb(dvb, STB_TOP_CONFIG);
 		data &= ~(3<<CIPLUS_IN_SEL);
 		data |= in << CIPLUS_IN_SEL;
 		data &= ~(7<<CIPLUS_OUT_SEL);
 		data |= out << CIPLUS_OUT_SEL;
-		WRITE_MPEG_REG(STB_TOP_CONFIG, data);
+		aml_write_stb(dvb, STB_TOP_CONFIG, data);
 		pr_inf("dsc ciplus in[%x] out[%x] %s\n", in, out,
 			(ciplus_out_auto_mode) ? "" : "force");
 
@@ -2186,20 +2165,22 @@ static void am_ci_plus_set_output(struct aml_dsc_channel *ch)
 	}
 }
 
-static void aml_ci_plus_disable(void)
+static void aml_ci_plus_disable(struct aml_dvb *dvb)
 {
 	u32 data = 0;
 
-	WRITE_MPEG_REG(CIPLUS_CONFIG, 0);
+	aml_write_stb(dvb, CIPLUS_CONFIG, 0);
 
-	data = READ_MPEG_REG(STB_TOP_CONFIG);
-	WRITE_MPEG_REG(STB_TOP_CONFIG, data &
+	data = aml_read_stb(dvb, STB_TOP_CONFIG);
+	aml_write_stb(dvb, STB_TOP_CONFIG, data &
 			~((3 << CIPLUS_IN_SEL) | (7 << CIPLUS_OUT_SEL)));
 }
 
 static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 			enum ca_cw_type type, u8 *key)
 {
+	struct aml_dsc *dsc = ch->dsc;
+    struct aml_dvb *dvb = dsc->dvb;
 	unsigned int k0, k1, k2, k3;
 	int iv = 0, aes = 0, des = 0;
 	int ab_iv = 0, ab_aes = 0, ab_des = 0;
@@ -2293,23 +2274,23 @@ static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 
 	/* Set endian and cbc/ecb mode */
 	if (from_kl)
-		aml_ci_plus_config(7, ch->mode, algo);
+		aml_ci_plus_config(dvb, 7, ch->mode, algo);
 	else
-		aml_ci_plus_config(0, ch->mode, algo);
+		aml_ci_plus_config(dvb, 0, ch->mode, algo);
 
 	/* Write keys to work */
 	if (iv || aes) {
-		WRITE_MPEG_REG(CIPLUS_KEY0, k0);
-		WRITE_MPEG_REG(CIPLUS_KEY1, k1);
-		WRITE_MPEG_REG(CIPLUS_KEY2, k2);
-		WRITE_MPEG_REG(CIPLUS_KEY3, k3);
+		aml_write_stb(dvb, CIPLUS_KEY0, k0);
+		aml_write_stb(dvb, CIPLUS_KEY1, k1);
+		aml_write_stb(dvb, CIPLUS_KEY2, k2);
+		aml_write_stb(dvb, CIPLUS_KEY3, k3);
 	} else {/*des*/
-		WRITE_MPEG_REG(CIPLUS_KEY0, k2);
-		WRITE_MPEG_REG(CIPLUS_KEY1, k3);
-		WRITE_MPEG_REG(CIPLUS_KEY2, 0);
-		WRITE_MPEG_REG(CIPLUS_KEY3, 0);
+		aml_write_stb(dvb, CIPLUS_KEY0, k2);
+		aml_write_stb(dvb, CIPLUS_KEY1, k3);
+		aml_write_stb(dvb, CIPLUS_KEY2, 0);
+		aml_write_stb(dvb, CIPLUS_KEY3, 0);
 	}
-	WRITE_MPEG_REG(CIPLUS_KEY_WR,
+	aml_write_stb(dvb, CIPLUS_KEY_WR,
 		(ch->id << 9) |
 				/* bit[11:9] the key of index,
 					need match PID index*/
@@ -2334,6 +2315,7 @@ void dsc_release(void)
 /************************* AES DESC************************************/
 static void set_ciplus_input_source(struct aml_dsc *dsc)
 {
+    struct aml_dvb *dvb = dsc->dvb;
 	u32 data;
 	u32 in = 0;
 
@@ -2358,24 +2340,25 @@ static void set_ciplus_input_source(struct aml_dsc *dsc)
 
 	if (ciplus_out_auto_mode == 1) {
 		/* Set ciplus input source */
-		data = READ_MPEG_REG(STB_TOP_CONFIG);
+		data = aml_read_stb(dvb, STB_TOP_CONFIG);
 		data &= ~(3<<CIPLUS_IN_SEL);
 		data |= in << CIPLUS_IN_SEL;
-		WRITE_MPEG_REG(STB_TOP_CONFIG, data);
+		aml_write_stb(dvb, STB_TOP_CONFIG, data);
 		pr_inf("dsc ciplus in[%x]\n", in);
 	}
 }
 
 static int dsc_enable(struct aml_dsc *dsc, int enable)
 {
+    struct aml_dvb *dvb = dsc->dvb;
 	if (dsc->id == 0) {
-		WRITE_MPEG_REG(STB_TOP_CONFIG,
-			READ_MPEG_REG(STB_TOP_CONFIG) &
+		aml_write_stb(dvb, STB_TOP_CONFIG,
+			aml_read_stb(dvb, STB_TOP_CONFIG) &
 				~((0x11 << DES_INPUT_SEL)|
 				(1 << ENABLE_DES_PL)|
 				(1 << ENABLE_DES_PL_CLK)));
 	} else if (dsc->id == 1) {
-		WRITE_MPEG_REG(COMM_DESC_2_CTL, 0);
+		aml_write_stb(dvb, COMM_DESC_2_CTL, 0);
 	}
 	return 0;
 }
@@ -2383,6 +2366,7 @@ static int dsc_enable(struct aml_dsc *dsc, int enable)
 /*Set section buffer*/
 static int dmx_alloc_sec_buffer(struct aml_dmx *dmx)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
 	unsigned long base;
 	unsigned long grp_addr[SEC_BUF_GRP_COUNT];
 	int grp_len[SEC_BUF_GRP_COUNT];
@@ -2423,14 +2407,14 @@ static int dmx_alloc_sec_buffer(struct aml_dmx *dmx)
 	}
 
 	base = grp_addr[0] & 0xFFFF0000;
-	DMX_WRITE_REG(dmx->id, SEC_BUFF_BASE, base >> 16);
-	DMX_WRITE_REG(dmx->id, SEC_BUFF_01_START,
+	aml_write_dmx(dvb, dmx->id, SEC_BUFF_BASE, base >> 16);
+	aml_write_dmx(dvb, dmx->id, SEC_BUFF_01_START,
 		      (((grp_addr[0] - base) >> 8) << 16) |
 		       ((grp_addr[1] - base) >> 8));
-	DMX_WRITE_REG(dmx->id, SEC_BUFF_23_START,
+	aml_write_dmx(dvb, dmx->id, SEC_BUFF_23_START,
 		      (((grp_addr[2] - base) >> 8) << 16) |
 		       ((grp_addr[3] - base) >> 8));
-	DMX_WRITE_REG(dmx->id, SEC_BUFF_SIZE,
+	aml_write_dmx(dvb, dmx->id, SEC_BUFF_SIZE,
 			SEC_GRP_LEN_0 |
 			(SEC_GRP_LEN_1 << 4) |
 			(SEC_GRP_LEN_2 << 8) |
@@ -2470,8 +2454,8 @@ static int dmx_alloc_sub_buffer(struct aml_dvb *dvb, struct aml_dmx *dmx)
 end_alloc:
 	addr = virt_to_phys((void *)dmx->sub_pages);
 #ifndef SUB_PARSER
-	DMX_WRITE_REG(dmx->id, SB_START, addr >> 12);
-	DMX_WRITE_REG(dmx->id, SB_LAST_ADDR, (dmx->sub_buf_len >> 3) - 1);
+	aml_write_dmx(dvb, dmx->id, SB_START, addr >> 12);
+	aml_write_dmx(dvb, dmx->id, SB_LAST_ADDR, (dmx->sub_buf_len >> 3) - 1);
 #endif
 	if (dmx->sub_pages != dvb->sub_pages) {
 		pr_dbg("sub buff: (%d) %lx %x\n",
@@ -2534,8 +2518,8 @@ static int dmx_alloc_pes_buffer(struct aml_dvb *dvb, struct aml_dmx *dmx)
 					dmx->pes_buf_len, DMA_FROM_DEVICE);
 end_alloc:
 	addr = virt_to_phys((void *)dmx->pes_pages);
-	DMX_WRITE_REG(dmx->id, OB_START, addr >> 12);
-	DMX_WRITE_REG(dmx->id, OB_LAST_ADDR, (dmx->pes_buf_len >> 3) - 1);
+	aml_write_dmx(dvb, dmx->id, OB_START, addr >> 12);
+	aml_write_dmx(dvb, dmx->id, OB_LAST_ADDR, (dmx->pes_buf_len >> 3) - 1);
 
 	if (dmx->pes_pages != dvb->pes_pages) {
 		pr_dbg("pes buff: (%d) %lx %x\n",
@@ -2679,8 +2663,8 @@ static int async_fifo_deinit(struct aml_asyncfifo *afifo, int freeirq)
 		return 0;
 
 	spin_lock_irqsave(&dvb->slock, flags);
-	CLEAR_ASYNC_FIFO_REG_MASK(afifo->id, REG1, 1 << ASYNC_FIFO_FLUSH_EN);
-	CLEAR_ASYNC_FIFO_REG_MASK(afifo->id, REG2, 1 << ASYNC_FIFO_FILL_EN);
+	aml_clear_mask_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1, 1 << ASYNC_FIFO_FLUSH_EN);
+	aml_clear_mask_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2, 1 << ASYNC_FIFO_FILL_EN);
 	spin_unlock_irqrestore(&dvb->slock, flags);
 
 	asyncfifo_put_buffer(afifo);
@@ -2705,6 +2689,8 @@ static int async_fifo_deinit(struct aml_asyncfifo *afifo, int freeirq)
 
 static int _dmx_smallsec_enable(struct aml_smallsec *ss, int bufsize)
 {
+	struct aml_dvb *dvb = ss->dmx->demux.priv;
+
 	if (!ss->buf) {
 
 		ss->buf = __get_free_pages(GFP_KERNEL,
@@ -2720,9 +2706,9 @@ static int _dmx_smallsec_enable(struct aml_smallsec *ss, int bufsize)
 						 bufsize, DMA_FROM_DEVICE);
 	}
 
-	DMX_WRITE_REG(ss->dmx->id, DEMUX_SMALL_SEC_ADDR,
+	aml_write_dmx(dvb, ss->dmx->id, DEMUX_SMALL_SEC_ADDR,
 				ss->buf_map);
-	DMX_WRITE_REG(ss->dmx->id, DEMUX_SMALL_SEC_CTL,
+	aml_write_dmx(dvb, ss->dmx->id, DEMUX_SMALL_SEC_CTL,
 				((((bufsize>>8)-1)&0xff)<<24) |
 				(1<<1) |/*enable reset the wr ptr*/
 				(1<<0));
@@ -2737,7 +2723,9 @@ static int _dmx_smallsec_enable(struct aml_smallsec *ss, int bufsize)
 
 static int _dmx_smallsec_disable(struct aml_smallsec *ss)
 {
-	DMX_WRITE_REG(ss->dmx->id, DEMUX_SMALL_SEC_CTL, 0);
+	struct aml_dvb *dvb = ss->dmx->demux.priv;
+
+	aml_write_dmx(dvb, ss->dmx->id, DEMUX_SMALL_SEC_CTL, 0);
 	if (ss->buf) {
 		dma_unmap_single(dmx_get_dev(ss->dmx), ss->buf_map,
 				ss->bufsize, DMA_FROM_DEVICE);
@@ -2783,9 +2771,10 @@ static int dmx_smallsec_set(struct aml_smallsec *ss, int enable, int bufsize,
 static int _dmx_timeout_enable(struct aml_dmxtimeout *dto, int timeout,
 						int ch_dis, int match)
 {
+	struct aml_dvb *dvb = dto->dmx->demux.priv;
 
-	DMX_WRITE_REG(dto->dmx->id, DEMUX_INPUT_TIMEOUT_C, ch_dis);
-	DMX_WRITE_REG(dto->dmx->id, DEMUX_INPUT_TIMEOUT,
+	aml_write_dmx(dvb, dto->dmx->id, DEMUX_INPUT_TIMEOUT_C, ch_dis);
+	aml_write_dmx(dvb, dto->dmx->id, DEMUX_INPUT_TIMEOUT,
 				((!!match)<<31) |
 				(timeout&0x7fffffff));
 
@@ -2802,8 +2791,9 @@ static int _dmx_timeout_enable(struct aml_dmxtimeout *dto, int timeout,
 }
 static int _dmx_timeout_disable(struct aml_dmxtimeout *dto)
 {
+	struct aml_dvb *dvb = dto->dmx->demux.priv;
 
-	DMX_WRITE_REG(dto->dmx->id, DEMUX_INPUT_TIMEOUT, 0);
+	aml_write_dmx(dvb, dto->dmx->id, DEMUX_INPUT_TIMEOUT, 0);
 	dto->enable = 0;
 	dto->trigger = 0;
 	pr_inf("demux%d timeout disable\n", dto->dmx->id);
@@ -2936,7 +2926,7 @@ static int dmx_deinit(struct aml_dmx *dmx)
 	if (!dmx->init)
 		return 0;
 
-	DMX_WRITE_REG(dmx->id, DEMUX_CONTROL, 0);
+	aml_write_dmx(dvb, dmx->id, DEMUX_CONTROL, 0);
 
 	dvb->dmx_init--;
 
@@ -3052,7 +3042,7 @@ find_done:
 	return record_flag;
 }
 
-static void dmx_cascade_set(int cur_dmx, int source) {
+static void dmx_cascade_set(struct aml_dvb *dvb, int cur_dmx, int source) {
 	int fec_sel_demux = 0;
 	int data;
 
@@ -3067,10 +3057,10 @@ static void dmx_cascade_set(int cur_dmx, int source) {
 			break;
 	}
 
-	data = READ_MPEG_REG(TS_TOP_CONFIG1);
+	data = aml_read_stb(dvb, TS_TOP_CONFIG1);
 	data &= ~(0x3 << (cur_dmx*2));
 	data |= (fec_sel_demux << (cur_dmx*2));
-	WRITE_MPEG_REG(TS_TOP_CONFIG1,data);
+	aml_write_stb(dvb, TS_TOP_CONFIG1,data);
 
 	pr_dbg("%s id:%d, source:%d data:0x%0x\n",__FUNCTION__,cur_dmx,fec_sel_demux,data);
 }
@@ -3210,7 +3200,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 		if (!des_out)
 			en_des = 0;
 
-		WRITE_MPEG_REG(COMM_DESC_2_CTL,
+		aml_write_stb(dvb, COMM_DESC_2_CTL,
 				(6 << 8) |/*des_out_dly_2*/
 				((!!en_des) << 6) |/* des_pl_clk_2*/
 				((!!en_des) << 5) |/* des_pl_2*/
@@ -3218,7 +3208,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 				(des_in)/*des_i_sel_2*/
 				);
 		fec_core_sel = 1;
-		pr_dbg("dsc2 ctrl: 0x%x\n", READ_MPEG_REG(COMM_DESC_2_CTL));
+		pr_dbg("dsc2 ctrl: 0x%x\n", aml_read_stb(dvb, COMM_DESC_2_CTL));
 	}
 
 	pr_dbg("[dmx-%d]src: %d, rec: %d, hi_bsf: %d, dsc: %d\n",
@@ -3226,7 +3216,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 
 	if (dmx->chan_count) {
 		if (set_stb) {
-			u32 v = READ_MPEG_REG(STB_TOP_CONFIG);
+			u32 v = aml_read_stb(dvb, STB_TOP_CONFIG);
 			int i;
 
 			for (i = 0; i < dvb->ts_in_total_count; i++) {
@@ -3250,24 +3240,24 @@ static int dmx_enable(struct aml_dmx *dmx)
 			    (invert0 << INVERT_S2P0_FEC_CLK) |
 			    (fec_s1 << S2P1_FEC_SERIAL_SEL) |
 			    (invert1 << INVERT_S2P1_FEC_CLK);
-			WRITE_MPEG_REG(STB_TOP_CONFIG, v);
+			aml_write_stb(dvb, STB_TOP_CONFIG, v);
 
 			if (get_cpu_type() >= MESON_CPU_MAJOR_ID_TL1) {
 			    invert2 = dvb->s2p[2].invert;
 
 			//add s2p2 config
-			v = READ_MPEG_REG(STB_S2P2_CONFIG);
+			v = aml_read_stb(dvb, STB_S2P2_CONFIG);
 			v &= ~((0x3 << S2P2_FEC_SERIAL_SEL) |
 			       (0x1f << INVERT_S2P2_FEC_CLK));
 			    v |= (fec_s2 << S2P2_FEC_SERIAL_SEL) |
 				   (invert2 << INVERT_S2P2_FEC_CLK);
-			    WRITE_MPEG_REG(STB_S2P2_CONFIG, v);
+			    aml_write_stb(dvb, STB_S2P2_CONFIG, v);
 			}
 		}
 
 		/*Initialize the registers */
-		DMX_WRITE_REG(dmx->id, STB_INT_MASK, DEMUX_INT_MASK);
-		DMX_WRITE_REG(dmx->id, DEMUX_MEM_REQ_EN,
+		aml_write_dmx(dvb, dmx->id, STB_INT_MASK, DEMUX_INT_MASK);
+		aml_write_dmx(dvb, dmx->id, DEMUX_MEM_REQ_EN,
 #ifdef USE_AHB_MODE
 			      (1 << SECTION_AHB_DMA_EN) |
 			      (0 << SUB_AHB_DMA_EN) |
@@ -3279,8 +3269,8 @@ static int dmx_enable(struct aml_dmx *dmx)
 			      (1 << SUB_PACKET) |
 			      (1 << SCR_ONLY_PACKET) |
 				(1 << OTHER_PES_PACKET));
-		DMX_WRITE_REG(dmx->id, PES_STRONG_SYNC, 0x1234);
-		DMX_WRITE_REG(dmx->id, DEMUX_ENDIAN,
+		aml_write_dmx(dvb, dmx->id, PES_STRONG_SYNC, 0x1234);
+		aml_write_dmx(dvb, dmx->id, DEMUX_ENDIAN,
 			      (1<<SEPARATE_ENDIAN) |
 			      (0<<OTHER_PES_ENDIAN) |
 			      (7<<SCR_ENDIAN) |
@@ -3290,16 +3280,16 @@ static int dmx_enable(struct aml_dmx *dmx)
 			      (7 << OTHER_ENDIAN) |
 			      (7 << BYPASS_ENDIAN) | (0 << SECTION_ENDIAN));
 		if (fec_sel != 8) {
-			DMX_WRITE_REG(dmx->id, TS_HIU_CTL,
+			aml_write_dmx(dvb, dmx->id, TS_HIU_CTL,
 			   (hi_bsf << USE_HI_BSF_INTERFACE));
 		} else {
-			DMX_WRITE_REG(dmx->id, TS_HIU_CTL,
+			aml_write_dmx(dvb, dmx->id, TS_HIU_CTL,
 				  (1 << PDTS_WR_SEL) |
 			   (hi_bsf << USE_HI_BSF_INTERFACE));
 		}
 
 		if (!fec_core_sel) {
-			u32 cfg = READ_MPEG_REG(CIPLUS_CONFIG);
+			u32 cfg = aml_read_stb(dvb, CIPLUS_CONFIG);
 
 			if (cfg & (1 << CNTL_ENABLE)) {
 				if (!ciplus_out_auto_mode) {
@@ -3312,23 +3302,23 @@ static int dmx_enable(struct aml_dmx *dmx)
 		}
 
 		if (fec_sel == -1) {
-			dmx_cascade_set(dmx->id,dmx->source);
-			DMX_WRITE_REG(dmx->id, FEC_INPUT_CONTROL,
+			dmx_cascade_set(dvb, dmx->id,dmx->source);
+			aml_write_dmx(dvb, dmx->id, FEC_INPUT_CONTROL,
 			      (fec_core_sel << FEC_CORE_SEL) |
 			      (0 << FEC_SEL) | (fec_ctrl << 0));
 		} else {
-			dmx_cascade_set(dmx->id,dmx->source);
+			dmx_cascade_set(dvb, dmx->id,dmx->source);
 			if (fec_sel != 8) {
-				DMX_WRITE_REG(dmx->id, FEC_INPUT_CONTROL,
+				aml_write_dmx(dvb, dmx->id, FEC_INPUT_CONTROL,
 				      (fec_core_sel << FEC_CORE_SEL) |
 				      (fec_sel << FEC_SEL) | (fec_ctrl << 0));
 			} else {
-				DMX_WRITE_REG(dmx->id, FEC_INPUT_CONTROL,
+				aml_write_dmx(dvb, dmx->id, FEC_INPUT_CONTROL,
 				      (fec_core_sel << FEC_CORE_SEL) |
 				      (1 << FEC_SEL_3BIT) | (fec_ctrl << 0));
 			}
 		}
-		DMX_WRITE_REG(dmx->id, STB_OM_CTL,
+		aml_write_dmx(dvb, dmx->id, STB_OM_CTL,
 			      (0x40 << MAX_OM_DMA_COUNT) |
 			      (0x7f << LAST_OM_ADDR));
 
@@ -3339,10 +3329,10 @@ static int dmx_enable(struct aml_dmx *dmx)
 		  bit[24:22] video2_type*/
 		#define VIDEO2_FOR_RECORDER_STREAM (1 << 25 | 7 << 22)
 
-		DMX_WRITE_REG(dmx->id, VIDEO_STREAM_ID,
+		aml_write_dmx(dvb, dmx->id, VIDEO_STREAM_ID,
 				((record) ? 0xFFFF0000 : 0));
 
-		DMX_WRITE_REG(dmx->id, DEMUX_CONTROL,
+		aml_write_dmx(dvb, dmx->id, DEMUX_CONTROL,
 			      (0 << BYPASS_USE_RECODER_PATH) |
 			      (0 << INSERT_AUDIO_PES_STRONG_SYNC) |
 			      (0 << INSERT_VIDEO_PES_STRONG_SYNC) |
@@ -3358,40 +3348,42 @@ static int dmx_enable(struct aml_dmx *dmx)
 			      (use_sop << NOT_USE_OF_SOP_INPUT) |
 			      ((record)? VIDEO2_FOR_RECORDER_STREAM : 0));
 		pr_dbg("dmx control[%#x]\n",
-			DMX_READ_REG(dmx->id, DEMUX_CONTROL));
+			aml_read_dmx(dvb, dmx->id, DEMUX_CONTROL));
 	} else {
-		DMX_WRITE_REG(dmx->id, STB_INT_MASK, 0);
+		aml_write_dmx(dvb, dmx->id, STB_INT_MASK, 0);
 		/* if disable FEC_INPUT_CONTROL, background and unattended record will fail */
-		DMX_WRITE_REG(dmx->id, DEMUX_CONTROL, 0);
+		aml_write_dmx(dvb, dmx->id, DEMUX_CONTROL, 0);
 		//dmx not used, but it can cascade for other dmx
 		if ((dmx->source == AM_TS_SRC_DMX0 ||
 			dmx->source == AM_TS_SRC_DMX1 ||
 			dmx->source == AM_TS_SRC_DMX2 ) &&
 			(dmx->id != dmx->source-AM_TS_SRC_DMX0))
-			dmx_cascade_set(dmx->id,dmx->source);
+			dmx_cascade_set(dvb, dmx->id,dmx->source);
 	}
 	return 0;
 }
 
 static int dmx_set_misc(struct aml_dmx *dmx, int hi_bsf, int en_dsc)
 {
+	struct aml_dvb *dvb = dmx->demux.priv;
+
 	if (hi_bsf >= 0) {
-		DMX_WRITE_REG(dmx->id, TS_HIU_CTL,
+		aml_write_dmx(dvb, dmx->id, TS_HIU_CTL,
 					hi_bsf ?
-					(DMX_READ_REG(dmx->id, TS_HIU_CTL) |
+					(aml_read_dmx(dvb, dmx->id, TS_HIU_CTL) |
 					(1 << USE_HI_BSF_INTERFACE))
 					:
-					(DMX_READ_REG(dmx->id, TS_HIU_CTL) &
+					(aml_read_dmx(dvb, dmx->id, TS_HIU_CTL) &
 					(~(1 << USE_HI_BSF_INTERFACE))));
 	}
 
 	if (en_dsc >= 0) {
-		DMX_WRITE_REG(dmx->id, FEC_INPUT_CONTROL,
+		aml_write_dmx(dvb, dmx->id, FEC_INPUT_CONTROL,
 				en_dsc ?
-				(DMX_READ_REG(dmx->id, FEC_INPUT_CONTROL) |
+				(aml_read_dmx(dvb, dmx->id, FEC_INPUT_CONTROL) |
 				(1 << FEC_CORE_SEL))
 				:
-				(DMX_READ_REG(dmx->id, FEC_INPUT_CONTROL) &
+				(aml_read_dmx(dvb, dmx->id, FEC_INPUT_CONTROL) &
 				(~(1 << FEC_CORE_SEL))));
 	}
 
@@ -3464,12 +3456,13 @@ static inline u32 dmx_get_chan_advance(struct aml_dmx *dmx, int cid)
 /*Set the channel registers*/
 static int dmx_set_chan_regs(struct aml_dmx *dmx, int cid)
 {
+	struct aml_dvb *dvb = dmx->demux.priv;
 	u32 data, addr, advance, max;
 
 	pr_dbg("set channel (id:%d PID:0x%x) registers\n", cid,
 	       dmx->channel[cid].pid);
 
-	while (DMX_READ_REG(dmx->id, FM_WR_ADDR) & 0x8000)
+	while (aml_read_dmx(dvb, dmx->id, FM_WR_ADDR) & 0x8000)
 		udelay(1);
 
 	if (cid & 1) {
@@ -3496,8 +3489,8 @@ static int dmx_set_chan_regs(struct aml_dmx *dmx, int cid)
 				dmx->channel[cid + 1].pkt_type);
 	}
 	addr = cid >> 1;
-	DMX_WRITE_REG(dmx->id, FM_WR_DATA, data);
-	DMX_WRITE_REG(dmx->id, FM_WR_ADDR, (advance << 16) | 0x8000 | addr);
+	aml_write_dmx(dvb, dmx->id, FM_WR_DATA, data);
+	aml_write_dmx(dvb, dmx->id, FM_WR_ADDR, (advance << 16) | 0x8000 | addr);
 
 	pr_dbg("write fm %x:%x\n", (advance << 16) | 0x8000 | addr, data);
 
@@ -3506,14 +3499,14 @@ static int dmx_set_chan_regs(struct aml_dmx *dmx, int cid)
 			break;
 	}
 
-	data = DMX_READ_REG(dmx->id, MAX_FM_COMP_ADDR) & 0xF0;
-	DMX_WRITE_REG(dmx->id, MAX_FM_COMP_ADDR, data | (max >> 1));
+	data = aml_read_dmx(dvb, dmx->id, MAX_FM_COMP_ADDR) & 0xF0;
+	aml_write_dmx(dvb, dmx->id, MAX_FM_COMP_ADDR, data | (max >> 1));
 
 	pr_dbg("write fm comp %x\n", data | (max >> 1));
 
-	if (DMX_READ_REG(dmx->id, OM_CMD_STATUS) & 0x8e00) {
+	if (aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS) & 0x8e00) {
 		pr_error("warning: send cmd %x\n",
-			 DMX_READ_REG(dmx->id, OM_CMD_STATUS));
+			 aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS));
 	}
 
 	if (cid == 0) {
@@ -3644,6 +3637,7 @@ static int dmx_get_filter_target(struct aml_dmx *dmx, int fid, u32 *target,
 /*Set the filter registers*/
 static int dmx_set_filter_regs(struct aml_dmx *dmx, int fid)
 {
+	struct aml_dvb *dvb = dmx->demux.priv;
 	u32 t1[FILTER_LEN], t2[FILTER_LEN];
 	u8 advance1[FILTER_LEN], advance2[FILTER_LEN];
 	u32 addr, data, max, adv;
@@ -3660,15 +3654,15 @@ static int dmx_set_filter_regs(struct aml_dmx *dmx, int fid)
 	}
 
 	for (i = 0; i < FILTER_LEN; i++) {
-		while (DMX_READ_REG(dmx->id, FM_WR_ADDR) & 0x8000)
+		while (aml_read_dmx(dvb, dmx->id, FM_WR_ADDR) & 0x8000)
 			udelay(1);
 
 		data = (t1[i] << 16) | t2[i];
 		addr = (fid >> 1) | ((i + 1) << 4);
 		adv = (advance1[i] << 8) | advance2[i];
 
-		DMX_WRITE_REG(dmx->id, FM_WR_DATA, data);
-		DMX_WRITE_REG(dmx->id, FM_WR_ADDR, (adv << 16) | 0x8000 | addr);
+		aml_write_dmx(dvb, dmx->id, FM_WR_DATA, data);
+		aml_write_dmx(dvb, dmx->id, FM_WR_ADDR, (adv << 16) | 0x8000 | addr);
 
 		pr_dbg("write fm %x:%x\n", (adv << 16) | 0x8000 | addr, data);
 	}
@@ -3678,14 +3672,14 @@ static int dmx_set_filter_regs(struct aml_dmx *dmx, int fid)
 			break;
 	}
 
-	data = DMX_READ_REG(dmx->id, MAX_FM_COMP_ADDR) & 0xF;
-	DMX_WRITE_REG(dmx->id, MAX_FM_COMP_ADDR, data | ((max >> 1) << 4));
+	data = aml_read_dmx(dvb, dmx->id, MAX_FM_COMP_ADDR) & 0xF;
+	aml_write_dmx(dvb, dmx->id, MAX_FM_COMP_ADDR, data | ((max >> 1) << 4));
 
 	pr_dbg("write fm comp %x\n", data | ((max >> 1) << 4));
 
-	if (DMX_READ_REG(dmx->id, OM_CMD_STATUS) & 0x8e00) {
+	if (aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS) & 0x8e00) {
 		pr_error("error send cmd %x\n",
-			 DMX_READ_REG(dmx->id, OM_CMD_STATUS));
+			 aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS));
 	}
 
 	return 0;
@@ -3694,7 +3688,8 @@ static int dmx_set_filter_regs(struct aml_dmx *dmx, int fid)
 /*Clear the filter's buffer*/
 static void dmx_clear_filter_buffer(struct aml_dmx *dmx, int fid)
 {
-	u32 section_busy32 = DMX_READ_REG(dmx->id, SEC_BUFF_READY);
+	struct aml_dvb *dvb = dmx->demux.priv;
+	u32 section_busy32 = aml_read_dmx(dvb, dmx->id, SEC_BUFF_READY);
 	u32 filter_number;
 	int i;
 
@@ -3703,25 +3698,27 @@ static void dmx_clear_filter_buffer(struct aml_dmx *dmx, int fid)
 
 	for (i = 0; i < SEC_BUF_COUNT; i++) {
 		if (section_busy32 & (1 << i)) {
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_NUMBER, i);
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_NUMBER, i);
 			filter_number =
-			    (DMX_READ_REG(dmx->id, SEC_BUFF_NUMBER) >> 8);
+			    (aml_read_dmx(dvb, dmx->id, SEC_BUFF_NUMBER) >> 8);
 			if (filter_number != fid)
 				section_busy32 &= ~(1 << i);
 		}
 	}
 
 	if (section_busy32)
-		DMX_WRITE_REG(dmx->id, SEC_BUFF_READY, section_busy32);
+		aml_write_dmx(dvb, dmx->id, SEC_BUFF_READY, section_busy32);
 }
 
 static void async_fifo_disable(struct aml_asyncfifo *afifo)
 {
+    struct aml_dvb *dvb = afifo->dvb;
+
 	pr_inf("AF(%d) disable asyncfifo\n", afifo->id);
-	CLEAR_ASYNC_FIFO_REG_MASK(afifo->id, REG1, 1 << ASYNC_FIFO_FLUSH_EN);
-	CLEAR_ASYNC_FIFO_REG_MASK(afifo->id, REG2, 1 << ASYNC_FIFO_FILL_EN);
-	if (READ_ASYNC_FIFO_REG(afifo->id, REG2) & (1 << ASYNC_FIFO_FILL_EN)
-		|| READ_ASYNC_FIFO_REG(afifo->id, REG1)
+	aml_clear_mask_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1, 1 << ASYNC_FIFO_FLUSH_EN);
+	aml_clear_mask_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2, 1 << ASYNC_FIFO_FILL_EN);
+	if (aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2) & (1 << ASYNC_FIFO_FILL_EN)
+		|| aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1)
 			& (1 << ASYNC_FIFO_FLUSH_EN)) {
 		pr_error("disable failed\n");
 	} else
@@ -3732,6 +3729,7 @@ static void async_fifo_disable(struct aml_asyncfifo *afifo)
 
 static void async_fifo_set_regs(struct aml_asyncfifo *afifo, int source_val)
 {
+    struct aml_dvb *dvb = afifo->dvb;
 	u32 start_addr = (afifo->secure_enable && afifo->blk.addr)?
 			afifo->blk.addr : virt_to_phys((void *)afifo->pages);
 	u32 size = afifo->buf_len;
@@ -3740,20 +3738,20 @@ static void async_fifo_set_regs(struct aml_asyncfifo *afifo, int source_val)
 	u32 old_size, new_size, old_factor, new_factor;
 	int old_src, old_en;
 
-	old_en  = READ_ASYNC_FIFO_REG(afifo->id, REG2)
+	old_en  = aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2)
 			& (1 << ASYNC_FIFO_FILL_EN);
 	old_src =
-		(READ_ASYNC_FIFO_REG(afifo->id, REG2) >> ASYNC_FIFO_SOURCE_LSB)
+		(aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2) >> ASYNC_FIFO_SOURCE_LSB)
 		& 3;
 
 	new_size = (size >> 7) & 0x7fff;
 	old_size =
-		(READ_ASYNC_FIFO_REG(afifo->id, REG1)
+		(aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1)
 			>> ASYNC_FIFO_FLUSH_CNT_LSB)
 		& 0x7fff;
 
 	old_factor =
-		(READ_ASYNC_FIFO_REG(afifo->id, REG3)
+		(aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG3)
 			>> ASYNC_FLUSH_SIZE_IRQ_LSB)
 		& 0x7fff;
 	new_factor = ((size >> (factor + 7)) - 1) & 0x7fff;
@@ -3776,8 +3774,8 @@ static void async_fifo_set_regs(struct aml_asyncfifo *afifo, int source_val)
 			&& (old_factor == new_factor)) {
 			/*only source changed, do not reset all*/
 			/* Connect the DEMUX to ASYNC_FIFO */
-			WRITE_ASYNC_FIFO_REG(afifo->id, REG2,
-				(READ_ASYNC_FIFO_REG(afifo->id, REG2)
+			aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2,
+				(aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2)
 				& ~(0x3 << ASYNC_FIFO_SOURCE_LSB))
 				| (source_val << ASYNC_FIFO_SOURCE_LSB));
 			return;
@@ -3795,10 +3793,10 @@ static void async_fifo_set_regs(struct aml_asyncfifo *afifo, int source_val)
 		afifo->id, afifo->source, start_addr, size, source_val, factor);
 
 	/* Destination address */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG0, start_addr);
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG0, start_addr);
 
 	/* Setup flush parameters */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG1,
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1,
 			(0 << ASYNC_FIFO_TO_HIU) |
 			(0 << ASYNC_FIFO_FLUSH) |
 			/* don't flush the path */
@@ -3811,32 +3809,32 @@ static void async_fifo_set_regs(struct aml_asyncfifo *afifo, int source_val)
 			/* number of 128-byte blocks to flush */
 
 	/* clear the reset signal */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG1,
-		     READ_ASYNC_FIFO_REG(afifo->id,
-					REG1) & ~(1 << ASYNC_FIFO_RESET));
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1,
+		     aml_read_asyncfifo(dvb, afifo->id,
+					ASYNC_FIFO_REG1) & ~(1 << ASYNC_FIFO_RESET));
 	/* Enable flush */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG1,
-		     READ_ASYNC_FIFO_REG(afifo->id,
-				REG1) | (1 << ASYNC_FIFO_FLUSH_EN));
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG1,
+		     aml_read_asyncfifo(dvb, afifo->id,
+				ASYNC_FIFO_REG1) | (1 << ASYNC_FIFO_FLUSH_EN));
 
 	/*Setup Fill parameters */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG2,
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2,
 			     (1 << ASYNC_FIFO_ENDIAN_LSB) |
 			     (0 << ASYNC_FIFO_FILL_EN) |
 			     (0 << ASYNC_FIFO_FILL_CNT_LSB));
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG2,
-			READ_ASYNC_FIFO_REG(afifo->id, REG2) |
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2,
+			aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2) |
 				(1 << ASYNC_FIFO_FILL_EN));/*Enable fill path*/
 
 	/* generate flush interrupt */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG3,
-			(READ_ASYNC_FIFO_REG(afifo->id, REG3) & 0xffff0000) |
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG3,
+			(aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG3) & 0xffff0000) |
 				((((size >> (factor + 7)) - 1) & 0x7fff) <<
 					ASYNC_FLUSH_SIZE_IRQ_LSB));
 
 	/* Connect the STB DEMUX to ASYNC_FIFO */
-	WRITE_ASYNC_FIFO_REG(afifo->id, REG2,
-			READ_ASYNC_FIFO_REG(afifo->id, REG2) |
+	aml_write_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2,
+			aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2) |
 			(source_val << ASYNC_FIFO_SOURCE_LSB));
 }
 
@@ -3903,23 +3901,23 @@ static void reset_async_fifos(struct aml_dvb *dvb)
 
 		if (record_enable) {
 			int old_en =
-				DMX_READ_REG(dvb->dmx[j].id, DEMUX_CONTROL)
+				aml_read_dmx(dvb, dvb->dmx[j].id, DEMUX_CONTROL)
 				& (1 << TS_RECORDER_ENABLE);
 
 			if (!old_en) {
-				DMX_WRITE_REG(dvb->dmx[j].id, DEMUX_CONTROL,
-					DMX_READ_REG(dvb->dmx[j].id,
+				aml_write_dmx(dvb, dvb->dmx[j].id, DEMUX_CONTROL,
+					aml_read_dmx(dvb, dvb->dmx[j].id,
 						DEMUX_CONTROL)
 					| (1 << TS_RECORDER_ENABLE));
 			}
 		} else {
 			int old_en =
-				DMX_READ_REG(dvb->dmx[j].id, DEMUX_CONTROL)
+				aml_read_dmx(dvb, dvb->dmx[j].id, DEMUX_CONTROL)
 				& (1 << TS_RECORDER_ENABLE);
 
 			if (old_en) {
-				DMX_WRITE_REG(dvb->dmx[j].id, DEMUX_CONTROL,
-					DMX_READ_REG(dvb->dmx[j].id,
+				aml_write_dmx(dvb, dvb->dmx[j].id, DEMUX_CONTROL,
+					aml_read_dmx(dvb, dvb->dmx[j].id,
 						DEMUX_CONTROL)
 					& (~(1 << TS_RECORDER_ENABLE)));
 			}
@@ -3934,7 +3932,7 @@ static void reset_async_fifos(struct aml_dvb *dvb)
 		if (!afifo->init)
 			continue;
 
-		old = READ_ASYNC_FIFO_REG(afifo->id, REG2)
+		old = aml_read_asyncfifo(dvb, afifo->id, ASYNC_FIFO_REG2)
 			& (1 << ASYNC_FIFO_FILL_EN);
 
 		if (old
@@ -3980,9 +3978,9 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 	for (id = 0; id < DMX_DEV_COUNT; id++) {
 		if (!dvb->dmx[id].init)
 			continue;
-		pcr_reg[id] = DMX_READ_REG(id, PCR90K_CTL);
-		pcr_num[id] = DMX_READ_REG(id, ASSIGN_PID_NUMBER);
-		pcr_dmx[id] = DMX_READ_REG(id, PCR_DEMUX);
+		pcr_reg[id] = aml_read_dmx(dvb, id, PCR90K_CTL);
+		pcr_num[id] = aml_read_dmx(dvb, id, ASSIGN_PID_NUMBER);
+		pcr_dmx[id] = aml_read_dmx(dvb, id, PCR_DEMUX);
 		pr_dbg("reset demux, pcr_regs[%d]:0x%x, pcr_num[%d]:0x%x pcr_dmx[%d]:0x%x\n", id, pcr_reg[id], id, pcr_num[id], id, pcr_dmx[id]);
 		if (reset_irq) {
 			if (dvb->dmx[id].dmx_irq != -1)
@@ -4014,13 +4012,13 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 	for (id = 0; id < DMX_DEV_COUNT; id++) {
 		times = 0;
 		while (times++ < 1000000) {
-			if (!(DMX_READ_REG(id, OM_CMD_STATUS) & 0x01))
+			if (!(aml_read_dmx(dvb, id, OM_CMD_STATUS) & 0x01))
 				break;
 		}
 	}
 
-	WRITE_MPEG_REG(STB_TOP_CONFIG, 0);
-	WRITE_MPEG_REG(STB_S2P2_CONFIG, 0);
+	aml_write_stb(dvb, STB_TOP_CONFIG, 0);
+	aml_write_stb(dvb, STB_S2P2_CONFIG, 0);
 
 	for (id = 0; id < DMX_DEV_COUNT; id++) {
 		u32 version, data;
@@ -4034,22 +4032,22 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 			if (dvb->dmx[id].dvr_irq != -1)
 				enable_irq(dvb->dmx[id].dvr_irq);
 		}
-		DMX_WRITE_REG(id, DEMUX_CONTROL, 0x0000);
-		version = DMX_READ_REG(id, STB_VERSION);
-		DMX_WRITE_REG(id, STB_TEST_REG, version);
+		aml_write_dmx(dvb, id, DEMUX_CONTROL, 0x0000);
+		version = aml_read_dmx(dvb, id, STB_VERSION);
+		aml_write_dmx(dvb, id, STB_TEST_REG, version);
 		pr_dbg("STB %d hardware version : %d\n", id, version);
-		DMX_WRITE_REG(id, STB_TEST_REG, 0x5550);
-		data = DMX_READ_REG(id, STB_TEST_REG);
+		aml_write_dmx(dvb, id, STB_TEST_REG, 0x5550);
+		data = aml_read_dmx(dvb, id, STB_TEST_REG);
 		if (data != 0x5550)
 			pr_error("STB %d register access failed\n", id);
-		DMX_WRITE_REG(id, STB_TEST_REG, 0xaaa0);
-		data = DMX_READ_REG(id, STB_TEST_REG);
+		aml_write_dmx(dvb, id, STB_TEST_REG, 0xaaa0);
+		data = aml_read_dmx(dvb, id, STB_TEST_REG);
 		if (data != 0xaaa0)
 			pr_error("STB %d register access failed\n", id);
-		DMX_WRITE_REG(id, MAX_FM_COMP_ADDR, 0x0000);
-		DMX_WRITE_REG(id, STB_INT_MASK, 0);
-		DMX_WRITE_REG(id, STB_INT_STATUS, 0xffff);
-		DMX_WRITE_REG(id, FEC_INPUT_CONTROL, 0);
+		aml_write_dmx(dvb, id, MAX_FM_COMP_ADDR, 0x0000);
+		aml_write_dmx(dvb, id, STB_INT_MASK, 0);
+		aml_write_dmx(dvb, id, STB_INT_STATUS, 0xffff);
+		aml_write_dmx(dvb, id, FEC_INPUT_CONTROL, 0);
 	}
 
 	stb_enable(dvb);
@@ -4077,14 +4075,14 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 			grp_addr[3] = grp_addr[2] + grp_len[2];
 
 			base = grp_addr[0] & 0xFFFF0000;
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_BASE, base >> 16);
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_01_START,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_BASE, base >> 16);
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_01_START,
 					(((grp_addr[0] - base) >> 8) << 16) |
 					 ((grp_addr[1] - base) >> 8));
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_23_START,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_23_START,
 					(((grp_addr[2] - base) >> 8) << 16) |
 					 ((grp_addr[3] - base) >> 8));
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_SIZE,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_SIZE,
 					SEC_GRP_LEN_0 |
 					(SEC_GRP_LEN_1 << 4) |
 					(SEC_GRP_LEN_2 << 8) |
@@ -4094,16 +4092,16 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 #ifndef SUB_PARSER
 		if (dmx->sub_pages) {
 			addr = virt_to_phys((void *)dmx->sub_pages);
-			DMX_WRITE_REG(dmx->id, SB_START, addr >> 12);
-			DMX_WRITE_REG(dmx->id, SB_LAST_ADDR,
+			aml_write_dmx(dvb, dmx->id, SB_START, addr >> 12);
+			aml_write_dmx(dvb, dmx->id, SB_LAST_ADDR,
 				      (dmx->sub_buf_len >> 3) - 1);
 		}
 #endif
 		}
 		if (dmx->pes_pages) {
 			addr = virt_to_phys((void *)dmx->pes_pages);
-			DMX_WRITE_REG(dmx->id, OB_START, addr >> 12);
-			DMX_WRITE_REG(dmx->id, OB_LAST_ADDR,
+			aml_write_dmx(dvb, dmx->id, OB_START, addr >> 12);
+			aml_write_dmx(dvb, dmx->id, OB_LAST_ADDR,
 				      (dmx->pes_buf_len >> 3) - 1);
 		}
 
@@ -4153,9 +4151,9 @@ void dmx_reset_hw_ex(struct aml_dvb *dvb, int reset_irq)
 				dmx->timeout.ch_disable,
 				dmx->timeout.match,
 				1);
-		DMX_WRITE_REG(id, ASSIGN_PID_NUMBER,  pcr_num[id]);
-		DMX_WRITE_REG(id, PCR90K_CTL,  pcr_reg[id]);
-		DMX_WRITE_REG(id, PCR_DEMUX, pcr_dmx[id]);
+		aml_write_dmx(dvb, id, ASSIGN_PID_NUMBER,  pcr_num[id]);
+		aml_write_dmx(dvb, id, PCR90K_CTL,  pcr_reg[id]);
+		aml_write_dmx(dvb, id, PCR_DEMUX, pcr_dmx[id]);
 	}
 
 	for (id = 0; id < DSC_DEV_COUNT; id++) {
@@ -4200,9 +4198,9 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 	{
 		if (!dmx->init)
 			return;
-		pcr_regs = DMX_READ_REG(dmx->id, PCR90K_CTL);
-		pcr_num = DMX_READ_REG(dmx->id, ASSIGN_PID_NUMBER);
-		pcr_dmx = DMX_READ_REG(dmx->id, PCR_DEMUX);
+		pcr_regs = aml_read_dmx(dvb, dmx->id, PCR90K_CTL);
+		pcr_num = aml_read_dmx(dvb, dmx->id, ASSIGN_PID_NUMBER);
+		pcr_dmx = aml_read_dmx(dvb, dmx->id, PCR_DEMUX);
 		pr_dbg("reset demux, pcr_regs:0x%x, pcr_num:0x%x pcr_dmx:0x%x\n", pcr_regs, pcr_num,pcr_dmx);
 	}
 	{
@@ -4246,7 +4244,7 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 
 		times = 0;
 		while (times++ < 1000000) {
-			if (!(DMX_READ_REG(dmx->id, OM_CMD_STATUS) & 0x01))
+			if (!(aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS) & 0x01))
 				break;
 		}
 	}
@@ -4262,22 +4260,22 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 			if (dmx->dvr_irq != -1)
 				enable_irq(dmx->dvr_irq);
 		}
-		DMX_WRITE_REG(dmx->id, DEMUX_CONTROL, 0x0000);
-		version = DMX_READ_REG(dmx->id, STB_VERSION);
-		DMX_WRITE_REG(dmx->id, STB_TEST_REG, version);
+		aml_write_dmx(dvb, dmx->id, DEMUX_CONTROL, 0x0000);
+		version = aml_read_dmx(dvb, dmx->id, STB_VERSION);
+		aml_write_dmx(dvb, dmx->id, STB_TEST_REG, version);
 		pr_dbg("STB %d hardware version : %d\n", dmx->id, version);
-		DMX_WRITE_REG(dmx->id, STB_TEST_REG, 0x5550);
-		data = DMX_READ_REG(dmx->id, STB_TEST_REG);
+		aml_write_dmx(dvb, dmx->id, STB_TEST_REG, 0x5550);
+		data = aml_read_dmx(dvb, dmx->id, STB_TEST_REG);
 		if (data != 0x5550)
 			pr_error("STB %d register access failed\n", dmx->id);
-		DMX_WRITE_REG(dmx->id, STB_TEST_REG, 0xaaa0);
-		data = DMX_READ_REG(dmx->id, STB_TEST_REG);
+		aml_write_dmx(dvb, dmx->id, STB_TEST_REG, 0xaaa0);
+		data = aml_read_dmx(dvb, dmx->id, STB_TEST_REG);
 		if (data != 0xaaa0)
 			pr_error("STB %d register access failed\n", dmx->id);
-		DMX_WRITE_REG(dmx->id, MAX_FM_COMP_ADDR, 0x0000);
-		DMX_WRITE_REG(dmx->id, STB_INT_MASK, 0);
-		DMX_WRITE_REG(dmx->id, STB_INT_STATUS, 0xffff);
-		DMX_WRITE_REG(dmx->id, FEC_INPUT_CONTROL, 0);
+		aml_write_dmx(dvb, dmx->id, MAX_FM_COMP_ADDR, 0x0000);
+		aml_write_dmx(dvb, dmx->id, STB_INT_MASK, 0);
+		aml_write_dmx(dvb, dmx->id, STB_INT_STATUS, 0xffff);
+		aml_write_dmx(dvb, dmx->id, FEC_INPUT_CONTROL, 0);
 	}
 
 	stb_enable(dvb);
@@ -4304,14 +4302,14 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 			grp_addr[3] = grp_addr[2] + grp_len[2];
 
 			base = grp_addr[0] & 0xFFFF0000;
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_BASE, base >> 16);
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_01_START,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_BASE, base >> 16);
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_01_START,
 					(((grp_addr[0] - base) >> 8) << 16) |
 					 ((grp_addr[1] - base) >> 8));
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_23_START,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_23_START,
 					(((grp_addr[2] - base) >> 8) << 16) |
 					 ((grp_addr[3] - base) >> 8));
-			DMX_WRITE_REG(dmx->id, SEC_BUFF_SIZE,
+			aml_write_dmx(dvb, dmx->id, SEC_BUFF_SIZE,
 					SEC_GRP_LEN_0 |
 					(SEC_GRP_LEN_1 << 4) |
 					(SEC_GRP_LEN_2 << 8) |
@@ -4321,16 +4319,16 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 #ifndef SUB_PARSER
 		if (dmx->sub_pages) {
 			addr = virt_to_phys((void *)dmx->sub_pages);
-			DMX_WRITE_REG(dmx->id, SB_START, addr >> 12);
-			DMX_WRITE_REG(dmx->id, SB_LAST_ADDR,
+			aml_write_dmx(dvb, dmx->id, SB_START, addr >> 12);
+			aml_write_dmx(dvb, dmx->id, SB_LAST_ADDR,
 				      (dmx->sub_buf_len >> 3) - 1);
 		}
 #endif
 		}
 		if (dmx->pes_pages) {
 			addr = virt_to_phys((void *)dmx->pes_pages);
-			DMX_WRITE_REG(dmx->id, OB_START, addr >> 12);
-			DMX_WRITE_REG(dmx->id, OB_LAST_ADDR,
+			aml_write_dmx(dvb, dmx->id, OB_START, addr >> 12);
+			aml_write_dmx(dvb, dmx->id, OB_LAST_ADDR,
 				      (dmx->pes_buf_len >> 3) - 1);
 		}
 
@@ -4419,9 +4417,9 @@ void dmx_reset_dmx_hw_ex_unlock(struct aml_dvb *dvb, struct aml_dmx *dmx,
 	}
 #endif
 	{
-		DMX_WRITE_REG(dmx->id, ASSIGN_PID_NUMBER,  pcr_num);
-		DMX_WRITE_REG(dmx->id, PCR90K_CTL,  pcr_regs);
-		DMX_WRITE_REG(dmx->id, PCR_DEMUX, pcr_dmx);
+		aml_write_dmx(dvb, dmx->id, ASSIGN_PID_NUMBER,  pcr_num);
+		aml_write_dmx(dvb, dmx->id, PCR90K_CTL,  pcr_regs);
+		aml_write_dmx(dvb, dmx->id, PCR_DEMUX, pcr_dmx);
 	}
 }
 
@@ -4456,11 +4454,12 @@ void dmx_reset_dmx_hw(struct aml_dvb *dvb, int id)
 static int set_subtitle_pes_buffer(struct aml_dmx *dmx)
 {
 #ifdef SUB_PARSER
+    struct aml_dvb *dvb = dmx->demux.priv;
 	if (dmx->sub_chan == -1) {
 	unsigned long addr = virt_to_phys((void *)dmx->sub_pages);
-	WRITE_MPEG_REG(PARSER_SUB_RP, addr);
-	WRITE_MPEG_REG(PARSER_SUB_START_PTR, addr);
-	WRITE_MPEG_REG(PARSER_SUB_END_PTR, addr + dmx->sub_buf_len - 8);
+	aml_write_sub(dvb, PARSER_SUB_RP, addr);
+	aml_write_sub(dvb, PARSER_SUB_START_PTR, addr);
+	aml_write_sub(dvb, PARSER_SUB_END_PTR, addr + dmx->sub_buf_len - 8);
 	pr_inf("set sub buff: (%d) %lx %x\n", dmx->id, addr, dmx->sub_buf_len);
 	}
 #endif
@@ -4470,7 +4469,7 @@ static int set_subtitle_pes_buffer(struct aml_dmx *dmx)
 int dmx_get_sub_buffer(unsigned long *base, unsigned long *virt)
 {
 #ifndef SUB_BUF_DMX
-	unsigned long s = READ_MPEG_REG(PARSER_SUB_START_PTR);
+	unsigned long s = aml_read_sub(dvb, PARSER_SUB_START_PTR);
 	if (base)
 		*base = s;
 	if (virt)
@@ -4609,6 +4608,8 @@ int dmx_alloc_chan(struct aml_dmx *dmx, int type, int pes_type, int pid)
 /*Free a channel*/
 void dmx_free_chan(struct aml_dmx *dmx, int cid)
 {
+    struct aml_dvb *dvb = dmx->demux.priv;
+
 	pr_dbg("free channel(id:%d-%d PID:0x%x)\n", dmx->id, cid, dmx->channel[cid].pid);
 
 	dmx->channel[cid].used = 0;
@@ -4618,9 +4619,9 @@ void dmx_free_chan(struct aml_dmx *dmx, int cid)
 	if (cid == 2) {
 		u32 parser_sub_start_ptr;
 
-		parser_sub_start_ptr = READ_MPEG_REG(PARSER_SUB_START_PTR);
-		WRITE_MPEG_REG(PARSER_SUB_RP, parser_sub_start_ptr);
-		WRITE_MPEG_REG(PARSER_SUB_WP, parser_sub_start_ptr);
+		parser_sub_start_ptr = aml_read_sub(dvb, PARSER_SUB_START_PTR);
+		aml_write_sub(dvb, PARSER_SUB_RP, parser_sub_start_ptr);
+		aml_write_sub(dvb, PARSER_SUB_WP, parser_sub_start_ptr);
 	}
 
 	set_debug_dmx_chanpids(dmx->id, cid, -1);
@@ -4910,7 +4911,7 @@ static int dmx_add_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 					feed->priv = (void *)(long)ret;
 					if (!dmx->record)
 						dmx_enable(dmx);
-					dmx_add_recchan(dmx->id, ret);
+					dmx_add_recchan(dmx, ret);
 					return 0;
 				}
 				{
@@ -4942,13 +4943,13 @@ static int dmx_add_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 			feed->priv = (void *)(long)ret;
 			if (!dmx->record)
 				dmx_enable(dmx);
-			dmx_add_recchan(dmx->id, ret);
+			dmx_add_recchan(dmx, ret);
 		} else if (dfeed && sf_ret) {
 			dmx->channel[ret].dvr_feed = dfeed;
 			dfeed->priv = (void *)(long)ret;
 			if (!dmx->record)
 				dmx_enable(dmx);
-			dmx_add_recchan(dmx->id, ret);
+			dmx_add_recchan(dmx, ret);
 		}
 
 		break;
@@ -4998,7 +4999,7 @@ static int dmx_add_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 				dfeed->priv = (void *)(long)id;
 				if (!dmx->record)
 					dmx_enable(dmx);
-				dmx_add_recchan(dmx->id, id);
+				dmx_add_recchan(dmx, id);
 			}
 		}
 		break;
@@ -5036,12 +5037,12 @@ static int dmx_remove_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 			dmx->id, feed->pid, feed);
 		if (dmx->channel[(long)feed->priv].feed ==
 		    dmx->channel[(long)feed->priv].dvr_feed) {
-			dmx_rm_recchan(dmx->id, (long)feed->priv);
+			dmx_rm_recchan(dmx, (long)feed->priv);
 			dmx_free_chan(dmx, (long)feed->priv);
 		} else {
 			if (feed == dmx->channel[(long)feed->priv].feed) {
 				dfeed = dmx->channel[(long)feed->priv].dvr_feed;
-				dmx_rm_recchan(dmx->id, (long)feed->priv);
+				dmx_rm_recchan(dmx, (long)feed->priv);
 				dmx_free_chan(dmx, (long)feed->priv);
 				if (dfeed) {
 					/*start the dvr feed */
@@ -5051,7 +5052,7 @@ static int dmx_remove_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 				   dmx->channel[(long)feed->priv].dvr_feed) {
 				/*just remove the dvr_feed */
 				dmx->channel[(long)feed->priv].dvr_feed = NULL;
-				dmx_rm_recchan(dmx->id,	(long)feed->priv);
+				dmx_rm_recchan(dmx,	(long)feed->priv);
 				if (dmx->record)
 					dmx_enable(dmx);
 			} else {
@@ -5072,7 +5073,7 @@ static int dmx_remove_feed(struct aml_dmx *dmx, struct dvb_demux_feed *feed)
 		}
 
 		dfeed = dmx->channel[(long)feed->priv].dvr_feed;
-		dmx_rm_recchan(dmx->id, (long)feed->priv);
+		dmx_rm_recchan(dmx, (long)feed->priv);
 		dmx_free_chan(dmx, (long)feed->priv);
 		if (dfeed) {
 			/*start the dvr feed */
@@ -5748,9 +5749,9 @@ static ssize_t dmx_timeout_show(const struct class *class,
 				dvb->dmx[dmx_id].timeout.timeout,
 				dvb->dmx[dmx_id].timeout.ch_disable,
 				dvb->dmx[dmx_id].timeout.match,
-		(DMX_READ_REG(dmx_id, STB_INT_STATUS)&(1<<INPUT_TIME_OUT)) ?
+		(aml_read_dmx(dvb, dmx_id, STB_INT_STATUS)&(1<<INPUT_TIME_OUT)) ?
 			1 : 0);
-	DMX_WRITE_REG(dmx_id, STB_INT_STATUS, (1<<INPUT_TIME_OUT));
+	aml_write_dmx(dvb, dmx_id, STB_INT_STATUS, (1<<INPUT_TIME_OUT));
 	return ret;
 }
 static ssize_t dmx_timeout_store(const struct class *class,
@@ -5773,11 +5774,12 @@ static ssize_t dmx_timeout_store(const struct class *class,
 static ssize_t demux##i##_scramble_show(const struct class *class,  \
 const struct class_attribute *attr, char *buf)\
 {\
+    struct aml_dvb *dvb = aml_get_dvb_device();\
 	int data = 0;\
 	int aflag = 0;\
 	int vflag = 0;\
 	ssize_t ret = 0;\
-	data = DMX_READ_REG(i, DEMUX_SCRAMBLING_STATE);\
+	data = aml_read_dmx(dvb, i, DEMUX_SCRAMBLING_STATE);\
 	if ((data & 0x01) == 0x01) \
 		vflag = 1;\
 	if ((data & 0x02) == 0x02) \
@@ -5847,8 +5849,8 @@ static ssize_t ciplus_output_ctrl_store(const struct class *class,
 		pr_error("Auto set output mode disable\n");
 	}
 
-	top_cfg = READ_MPEG_REG(STB_TOP_CONFIG);
-	ci_cfg  = READ_MPEG_REG(CIPLUS_CONFIG);
+	top_cfg = aml_read_stb(dvb, STB_TOP_CONFIG);
+	ci_cfg  = aml_read_stb(dvb, CIPLUS_CONFIG);
 
 	if (ci_cfg & (1 << CNTL_ENABLE)) {
 		int out = 0;
@@ -5862,7 +5864,7 @@ static ssize_t ciplus_output_ctrl_store(const struct class *class,
 
 		top_cfg &=  ~(7<<CIPLUS_OUT_SEL);
 		top_cfg |= (out<<CIPLUS_OUT_SEL);
-		WRITE_MPEG_REG(STB_TOP_CONFIG, top_cfg);
+		aml_write_stb(dvb, STB_TOP_CONFIG, top_cfg);
 
 		set_fec_core_sel(dvb);
 	}
@@ -5880,11 +5882,12 @@ static ssize_t reset_fec_input_ctrl_store(const struct class *class,
 					  const struct class_attribute *attr,
 					  const char *buf, size_t size)
 {
+    struct aml_dvb *dvb = aml_get_dvb_device();
 	u32 v;
 
-	v = READ_MPEG_REG(FEC_INPUT_CONTROL);
+	v = aml_read_stb(dvb, FEC_INPUT_CONTROL);
 	v &= ~(1<<11);
-	WRITE_MPEG_REG(FEC_INPUT_CONTROL, v);
+	aml_write_stb(dvb, FEC_INPUT_CONTROL, v);
 
 	pr_dbg("reset FEC_INPUT_CONTROL to %x\n", v);
 
@@ -6022,9 +6025,10 @@ static ssize_t register_value_show(const struct class *class,
 					 const struct class_attribute *attr,
 					 char *buf)
 {
+    struct aml_dvb *dvb = aml_get_dvb_device();
 	int ret, value;
 
-	value = READ_MPEG_REG(reg_addr);
+	value = aml_read_stb(dvb, reg_addr);
 	ret = sprintf(buf, "%x\n", value);
 	return ret;
 }
@@ -6033,12 +6037,13 @@ static ssize_t register_value_store(const struct class *class,
 					  const struct class_attribute *attr,
 					  const char *buf, size_t size)
 {
+    struct aml_dvb *dvb = aml_get_dvb_device();
 	int value = 0;
 	long val = 0;
 
 	if (kstrtol(buf, 0, &val) == 0)
 		value = (int)val;
-	WRITE_MPEG_REG(reg_addr, value);
+	aml_write_stb(dvb, reg_addr, value);
 	return size;
 }
 
