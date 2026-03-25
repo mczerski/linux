@@ -443,7 +443,7 @@ static void dmxn_op_chan(struct aml_dmx *dmx, int ch, int(*op)(int, int), int ch
 			(1<<(SECTION_BUFFER_READY))     |\
 			(0<<(OM_CMD_READ_PENDING))      |\
 			(1<<(TS_ERROR_PIN))             |\
-			(1<<(NEW_PDTS_READY))           |\
+			(0<<(NEW_PDTS_READY))           |\
 			(0<<(DUPLICATED_PACKET))        |\
 			(0<<(DIS_CONTINUITY_PACKET)))
 
@@ -467,13 +467,6 @@ static int dmx_timeout_set(struct aml_dmxtimeout *dto, int enable,
 				int timeout, int ch_dis, int nomatch,
 				int force);
 
-/*Audio & Video PTS value*/
-static u32 video_pts = 0;
-static u32 audio_pts = 0;
-static u32 video_pts_bit32 = 0;
-static u32 audio_pts_bit32 = 0;
-static u32 first_video_pts = 0;
-static u32 first_audio_pts = 0;
 static int demux_skipbyte;
 static int tsfile_clkdiv = 5;
 static int asyncfifo_buf_len = ASYNCFIFO_BUFFER_SIZE_DEFAULT;
@@ -1205,28 +1198,6 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 		process_om_read(dmx);
 	if (status & (1 << TS_ERROR_PIN))
 		pr_error("TS_ERROR_PIN\n");
-
-	if (status & (1 << NEW_PDTS_READY)) {
-		u32 pdts_status = aml_read_dmx(dvb, dmx->id, STB_PTS_DTS_STATUS);
-
-		if (pdts_status & (1 << VIDEO_PTS_READY)) {
-			video_pts = aml_read_dmx(dvb, dmx->id, VIDEO_PTS_DEMUX);
-			video_pts_bit32 =
-				(pdts_status & (1 << VIDEO_PTS_BIT32)) ? 1 : 0;
-			if (!first_video_pts
-			    || 0 > (int)(video_pts - first_video_pts))
-				first_video_pts = video_pts;
-		}
-
-		if (pdts_status & (1 << AUDIO_PTS_READY)) {
-			audio_pts = aml_read_dmx(dvb, dmx->id, AUDIO_PTS_DEMUX);
-			audio_pts_bit32 =
-				(pdts_status & (1 << AUDIO_PTS_BIT32)) ? 1 : 0;
-			if (!first_audio_pts
-			    || 0 > (int)(audio_pts - first_audio_pts))
-				first_audio_pts = audio_pts;
-		}
-	}
 
 	if (dmx->irq_handler)
 		dmx->irq_handler(dmx->dmx_irq, (void *)(long)dmx->id);
@@ -3415,15 +3386,6 @@ static int dmx_set_chan_regs(struct aml_dmx *dmx, int cid)
 			 aml_read_dmx(dvb, dmx->id, OM_CMD_STATUS));
 	}
 
-	if (cid == 0) {
-		video_pts = 0;
-		first_video_pts = 0;
-	}
-	else if (cid == 1) {
-		audio_pts = 0;
-		first_audio_pts = 0;
-	}
-
 	if (dmx->channel[cid].used)
 		set_debug_dmx_chanpids_types(dmx->id, cid,
 			dmx->channel[cid].pkt_type);
@@ -4456,8 +4418,6 @@ int dmx_alloc_chan(struct aml_dmx *dmx, int type, int pes_type, int pid)
 /*Free a channel*/
 void dmx_free_chan(struct aml_dmx *dmx, int cid)
 {
-    struct aml_dvb *dvb = dmx->demux.priv;
-
 	pr_dbg("free channel(id:%d-%d PID:0x%x)\n", dmx->id, cid, dmx->channel[cid].pid);
 
 	dmx->channel[cid].used = 0;
@@ -5422,77 +5382,6 @@ int aml_dmx_hw_set_dump_ts_select(struct dmx_demux *demux, int dump_ts_select)
 	spin_unlock_irqrestore(&dvb->slock, flags);
 
 	return ret;
-}
-
-u32 aml_dmx_get_video_pts(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 pts;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	pts = video_pts;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return pts;
-}
-
-u32 aml_dmx_get_audio_pts(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 pts;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	pts = audio_pts;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return pts;
-}
-
-u32 aml_dmx_get_video_pts_bit32(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 bit32;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	bit32 = video_pts_bit32;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return bit32;
-}
-
-u32 aml_dmx_get_audio_pts_bit32(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 bit32;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	bit32 = audio_pts_bit32;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return bit32;
-}
-u32 aml_dmx_get_first_video_pts(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 pts;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	pts = first_video_pts;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return pts;
-}
-
-u32 aml_dmx_get_first_audio_pts(struct aml_dvb *dvb)
-{
-	unsigned long flags;
-	u32 pts;
-
-	spin_lock_irqsave(&dvb->slock, flags);
-	pts = first_audio_pts;
-	spin_unlock_irqrestore(&dvb->slock, flags);
-
-	return pts;
 }
 
 int aml_dmx_set_skipbyte(struct aml_dvb *dvb, int skipbyte)
