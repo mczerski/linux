@@ -338,7 +338,6 @@ struct aml_dvb {
     struct reset_control *demux_rst[DMX_DEV_COUNT];
     struct reset_control *des_rst;
     struct reset_control *async_rst[ASYNCFIFO_COUNT];
-    struct i2c_client    *i2c_client_demod;
     struct aml_dvb_data  dvb_data;
 	struct dvb_device    dvb_dev;
 	struct aml_ts_input  ts[TS_IN_COUNT];
@@ -420,7 +419,7 @@ extern u32 aml_dmx_get_first_audio_pts(struct aml_dvb *dvb);
 /*Get the DVB device*/
 extern struct aml_dvb *aml_get_dvb_device(void);
 extern struct device *aml_get_device(void);
-extern struct dvb_adapter *aml_get_dvb_adapter(void);
+extern struct dvb_adapter *aml_get_dvb_adapter(struct device *dev);
 
 extern int aml_regist_dmx_class(void);
 extern int aml_unregist_dmx_class(void);

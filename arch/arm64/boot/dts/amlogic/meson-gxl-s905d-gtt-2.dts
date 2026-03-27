@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2016 Endless Computers, Inc.
- * Author: Carlo Caione <carlo@endlessm.com>
+ * Author: Marek Czerski <ma.czerski@gmail.com>
  */
 
 /dts-v1/;
@@ -81,8 +80,20 @@
                  <&reset RESET_PERIPHS_ASYNC_0>,
                  <&reset RESET_PERIPHS_ASYNC_1>;
         reset-names = "demux_rst", "des_rst", "demux0_rst", "demux1_rst", "demux2_rst", "async0_rst", "async1_rst";
+    };
 
-        fe_i2c_bus = <&i2c_B>;
+    dvb-fe {
+        compatible = "amlogic,dvb-bridge";
+
+        demux = <&dvb_demux>;
+
+        frontends {
+            fe0 {
+                demod-i2c-bus = <&i2c_B>;
+                demod-i2c-addr = <0x6c>;
+                demod-module = "aml-dvb-gtt2";
+            };
+        };
     };
 };
 
