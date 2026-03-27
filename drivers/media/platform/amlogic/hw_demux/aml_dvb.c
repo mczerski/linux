@@ -2003,8 +2003,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
     const struct aml_dvb_data *dvb_data;
 	int i, ts, ret = 0;
 	char buf[32];
-    struct device_node *fe_i2c_bus;
-    struct i2c_adapter *fe_i2c_adapter;
 
 	pr_inf("probe amlogic dvb driver [%s]\n", DVB_VERSION);
 
@@ -2213,9 +2211,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++)
 		advb->asyncfifo[i].id = -1;
 
-	advb->dvb_adapter.priv = advb;
-	dev_set_drvdata(advb->dev, advb);
-
 	for (i = 0; i < DSC_DEV_COUNT; i++) {
 		ret = aml_dvb_dsc_init(advb, &advb->dsc[i], i);
 		if (ret < 0)
@@ -2251,38 +2246,14 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	if (class_register(&aml_stb_class) < 0) {
 		pr_error("dvb register class error\n");
         ret = -1;
+    	aml_unregist_dmx_class();
 		goto error;
 	}
 
-
-    fe_i2c_bus = of_parse_phandle(pdev->dev.of_node, "fe_i2c_bus", 0);
-    if (fe_i2c_bus) {
-        pr_inf("Found fe i2c bus\n");
-        fe_i2c_adapter = of_find_i2c_adapter_by_node(fe_i2c_bus);
-        of_node_put(fe_i2c_bus);
-        if (!fe_i2c_adapter) {
-            pr_err("Failed to claim fe i2c adapter\n");
-            ret = -1;
-            goto error_i2c;
-        }
-	    pr_inf("Found i2c-%d adapter: %s\n", i2c_adapter_id(fe_i2c_adapter), fe_i2c_adapter->name);
-
-        advb->i2c_client_demod = dvb_module_probe("aml-fe", NULL, fe_i2c_adapter, 0x6c, &advb->dvb_adapter);
-        if (!advb->i2c_client_demod) {
-            pr_error("dvb demodulator attach error\n");
-            ret = -1;
-            goto error_demod;
-        }
-    }
+	advb->dvb_adapter.priv = advb;
+	dev_set_drvdata(advb->dev, advb);
 
 	return 0;
-
-error_demod:
-    i2c_put_adapter(fe_i2c_adapter);
-
-error_i2c:
-	aml_unregist_dmx_class();
-	class_unregister(&aml_stb_class);
 
 error:
 	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
@@ -2312,16 +2283,10 @@ error:
 
 static void aml_dvb_remove(struct platform_device *pdev)
 {
-	struct aml_dvb *advb = (struct aml_dvb *)dev_get_drvdata(&pdev->dev);
+	struct aml_dvb *advb = dev_get_drvdata(&pdev->dev);
 	int i;
 
 	pr_inf("[dmx_kpi] %s Enter.\n", __func__);
-
-    if (advb->i2c_client_demod) {
-        dvb_module_release(advb->i2c_client_demod);
-        i2c_put_adapter(advb->i2c_client_demod->adapter);
-        advb->i2c_client_demod = NULL;
-    }
 
 	aml_unregist_dmx_class();
 	class_unregister(&aml_stb_class);
@@ -2351,7 +2316,7 @@ static void aml_dvb_remove(struct platform_device *pdev)
 	pr_inf("[dmx_kpi] %s Exit.\n", __func__);
 }
 
-static int aml_dvb_suspend(struct platform_device *dev, pm_message_t state)
+static int aml_dvb_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	//close tsin_deglitch clk
 	if (has_tsin_deglitch) {
@@ -2361,13 +2326,13 @@ static int aml_dvb_suspend(struct platform_device *dev, pm_message_t state)
 	return 0;
 }
 
-static int aml_dvb_resume(struct platform_device *dev)
+static int aml_dvb_resume(struct platform_device *pdev)
 {
-	struct aml_dvb *dvb = &aml_dvb_device;
+	struct aml_dvb *advb = dev_get_drvdata(&pdev->dev);
 	int i;
 
 	for (i = 0; i < DMX_DEV_COUNT; i++)
-		dmx_reset_dmx_id_hw_ex(dvb, i, 0);
+		dmx_reset_dmx_id_hw_ex(advb, i, 0);
 
 	//open tsin_deglitch clk
 	if (has_tsin_deglitch) {
@@ -2431,6 +2396,18 @@ static struct platform_driver aml_dvb_driver = {
 #endif
 		}
 };
+
+struct dvb_adapter *aml_get_dvb_adapter(struct device *dev)
+{
+	struct aml_dvb *dvb;
+    if (!dev || !dev->driver ||
+        dev->driver != &aml_dvb_driver.driver)
+        return ERR_PTR(-EINVAL);
+
+    dvb = dev_get_drvdata(dev);
+    return &dvb->dvb_adapter;
+}
+EXPORT_SYMBOL(aml_get_dvb_adapter);
 
 static int __init aml_dvb_init(void)
 {

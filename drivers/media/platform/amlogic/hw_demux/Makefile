@@ -1,4 +1,4 @@
-obj-$(CONFIG_DVB_MESON)	+= aml_hardware_dmx.o aml_fe.o
+obj-$(CONFIG_DVB_MESON)	+= aml_hardware_dmx.o aml_fe.o aml_dvb_gtt2.o
 
 ccflags-y += -I$(srctree)/include/media -I$(srctree)/drivers/media/pci/ttpci -I$(srctree)/drivers/gpio -I$(srctree)/drivers/media -I$(srctree)/include -DENABLE_DEMUX_DRIVER
 

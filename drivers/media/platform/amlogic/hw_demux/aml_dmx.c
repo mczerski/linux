@@ -1178,7 +1178,7 @@ static irqreturn_t dmx_irq_thread_handler(int irq_number, void *para)
 static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 {
 	struct aml_dmx *dmx = (struct aml_dmx *)para;
-	struct aml_dvb *dvb = aml_get_dvb_device();
+	struct aml_dvb *dvb = dmx->demux.priv;
 	u32 status;
 	unsigned long flags;
 
@@ -1212,8 +1212,6 @@ static irqreturn_t dmx_irq_handler(int irq_number, void *para)
 		if (jiffies_to_msecs(jiffies - dmx->int_check_time) >= 100
 		    || dmx->int_check_count > 1000) {
 			if (dmx->int_check_count > 1000) {
-				struct aml_dvb *dvb =
-				    (struct aml_dvb *)dmx->demux.priv;
 				pr_error("Too many irq (%d irq in %d ms)!\n",
 					dmx->int_check_count,
 					jiffies_to_msecs(jiffies -
