@@ -26,10 +26,7 @@ struct cxd_base{
 	struct mutex i2c_lock; //for two adapter at the same i2c bus
 	u8 adr		;		// 
 	u32 count	;		//
-	struct cxd2878_config *config;	
-
-	/* Copy of the config provided to the cxd2878_attach */
-	struct cxd2878_config _cfg;
+	const struct cxd2878_config *config;	
 };
 
 struct cxd2878_dev{
@@ -52,6 +49,7 @@ struct cxd2878_dev{
 	u32 atscSignalThresh;
 	u32 tune_time;
  };
+
 /* For CXD2856 or newer generation ICs */
 static	struct sony_ascot3_adjust_param_t g_param_table_ascot3i[SONY_ASCOT3_TV_SYSTEM_NUM] = {
 	/*
@@ -3053,17 +3051,6 @@ static int cxd2878_read_ucblocks(struct dvb_frontend *fe,u32 *ucblocks)
 
 	return 0;
 }
-static void cxd2878_release (struct dvb_frontend*fe)
-{
-	struct cxd2878_dev *dev = fe->demodulator_priv;
-	dev->base->count--;
-	if(dev->base->count == 0){
-		list_del(&dev->base->cxdlist);
-		kfree(dev->base);
-		}
-	kfree(dev);
-	dev_info(&dev->base->i2c->dev,"%s: frontend successfully released.\n",KBUILD_MODNAME);
-}
 
 static const struct dvb_frontend_ops cxd2878_ops = {
 	.delsys = {SYS_DVBT,SYS_DVBT2,SYS_ISDBT,
@@ -3096,7 +3083,6 @@ static const struct dvb_frontend_ops cxd2878_ops = {
 	},
 
 			.init 					= cxd2878_init,
-			.release			= cxd2878_release,
 			.i2c_gate_ctrl			= cxd2878_i2c_gate_ctrl,
 			.set_frontend			= cxd2878_set_frontend,
 			.tune					= cxd2878_tune,
@@ -3118,9 +3104,11 @@ static struct cxd_base *match_base(struct i2c_adapter *i2c,u8 adr)
 		return p;
 	return NULL;
 }
-struct dvb_frontend*cxd2878_attach(const struct cxd2878_config*config,
-									struct i2c_adapter*i2c)
+
+static int cxd2878_probe(struct i2c_client *client)
 {
+	struct i2c_adapter *i2c = client->adapter;
+	const struct cxd2878_config *config = i2c_get_match_data(client);
 	struct cxd2878_dev *dev;
 	struct cxd_base *base;
 
@@ -3131,10 +3119,10 @@ struct dvb_frontend*cxd2878_attach(const struct cxd2878_config*config,
 	if(!dev)
 	    goto err;
 	    
-	dev->slvt   = config->addr_slvt;
-	dev->slvx	= config->addr_slvt+2;
-	dev->slvr	= config->addr_slvt-0x20;
-	dev->slvm	= config->addr_slvt-0x54;
+	dev->slvt   = client->addr;
+	dev->slvx	= client->addr+2;
+	dev->slvr	= client->addr-0x20;
+	dev->slvm	= client->addr-0x54;
 	dev->tuner_addr = config->tuner_addr;
 
 	dev->state	= SONY_DEMOD_STATE_UNKNOWN;
@@ -3172,7 +3160,7 @@ struct dvb_frontend*cxd2878_attach(const struct cxd2878_config*config,
 	memcpy(&dev->fe.ops,&cxd2878_ops,sizeof(struct dvb_frontend_ops));
 	dev->fe.demodulator_priv = dev;
 	
-	base = match_base(i2c,config->addr_slvt);
+	base = match_base(i2c,client->addr);
 	if(base){
 		base->count++;
 		dev->base = base;
@@ -3181,9 +3169,8 @@ struct dvb_frontend*cxd2878_attach(const struct cxd2878_config*config,
 		if(!base)
 			goto err1;
 		base->i2c =i2c;
-		memcpy(&base->_cfg, config, sizeof(base->_cfg));
-		base->config = &base->_cfg;
-		base->adr =config->addr_slvt;
+		base->config = config;
+		base->adr =client->addr;
 		base->count = 1;
 		mutex_init(&base->i2c_lock);
 		dev->base = base;
@@ -3220,24 +3207,92 @@ struct dvb_frontend*cxd2878_attach(const struct cxd2878_config*config,
 			break;
 	}
 	dev->chipid = id;
-	
+
+	i2c_set_clientdata(client, &dev->fe);
+
 	dev_dbg(&i2c->dev,"%s: attaching frontend successfully.\n",KBUILD_MODNAME);
 	
-	return &dev->fe;
+	return 0;
 
 err1:
 	kfree(dev);
 err:
 	dev_err(&i2c->dev,"%s:error attaching frontend.\n",KBUILD_MODNAME);
-	return NULL;
+	return -1;
 
 	
 }
 
-EXPORT_SYMBOL_GPL(cxd2878_attach);
+static void cxd2878_remove(struct i2c_client *client)
+{
+	struct dvb_frontend *fe = i2c_get_clientdata(client);
+	struct cxd2878_dev *dev = fe->demodulator_priv;
+	fe->demodulator_priv = NULL;
+	dev->base->count--;
+	if(dev->base->count == 0){
+		list_del(&dev->base->cxdlist);
+		kfree(dev->base);
+	}
+	kfree(dev);
+	dev_info(&dev->base->i2c->dev,"%s: frontend successfully removed.\n",KBUILD_MODNAME);
+}
+
+static const struct cxd2878_config cxd2878_configs[] = {
+	{
+		.addr_slvt = 0x6c,
+		.xtal = SONY_DEMOD_XTAL_24000KHz,
+		.tuner_addr = 0,
+		.tuner_xtal = 0,
+		.ts_mode = 1,
+		.ts_ser_data = 0,
+		.ts_clk = 1,
+		.ts_clk_mask = 1,
+		.ts_valid = 0,
+		.atscCoreDisable = 0,
+		.lock_flag = 1,
+	},
+	{
+		.addr_slvt = 0x6c,
+		.xtal = SONY_DEMOD_XTAL_24000KHz,
+		.tuner_addr = 0,
+		.tuner_xtal = 0,
+		.ts_mode = 0,
+		.ts_ser_data = 0,
+		.ts_clk = 1,
+		.ts_clk_mask = 1,
+		.ts_valid = 0,
+		.atscCoreDisable = 0,
+		.lock_flag = 1,
+	}
+};
+
+static const struct of_device_id cxd2878_of_match[] = {
+	{ .compatible = "sony,cxd2878-24-p", .data = &cxd2878_configs[0] },
+	{ .compatible = "sony,cxd2878-24-s", .data = &cxd2878_configs[1] },
+	{}
+};
+MODULE_DEVICE_TABLE(of, cxd2878_of_match);
+
+static const struct i2c_device_id cxd2878_id_table[] = {
+	{ "cxd2878-24-p", (kernel_ulong_t)&cxd2878_configs[0] },
+	{ "cxd2878-24-s", (kernel_ulong_t)&cxd2878_configs[1] },
+	{}
+};
+MODULE_DEVICE_TABLE(i2c, cxd2878_id_table);
+
+static struct i2c_driver cxd2878_driver = {
+	.driver = {
+		.name                = "cxd2878",
+		.of_match_table      = cxd2878_of_match,
+	},
+	.probe      = cxd2878_probe,
+	.remove     = cxd2878_remove,
+	.id_table   = cxd2878_id_table,
+};
+
+module_i2c_driver(cxd2878_driver);
 
 MODULE_AUTHOR("Davin zhang<Davin@tbsdtv.com>");
 MODULE_DESCRIPTION("sony cxd2878 family demodulator driver");
 MODULE_LICENSE("GPL");
-
 

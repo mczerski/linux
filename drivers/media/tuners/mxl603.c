@@ -146,14 +146,11 @@ static struct reg_pair_t MxL603_DigitalDvbt[] = {
 };
 
 struct mxl603_state {
-	struct mxl603_config *config;
+	const struct mxl603_config *config;
 	struct i2c_adapter   *i2c;
 	u8 addr;
 	u32 frequency;
 	u32 bandwidth;
-
-	/* Copy of the config provided to the mxl603_attach */
-	struct mxl603_config _cfg;
 };
 
 static int mxl603_write_reg(struct mxl603_state *state, u8 reg, u8 val)
@@ -999,16 +996,6 @@ err:
 	return ret;
 }
 
-void mxl603_release(struct dvb_frontend *fe)
-{
-	struct mxl603_state *state = fe->tuner_priv;
-
-	fe->tuner_priv = NULL;
-	kfree(state);
-	
-	dev_info(&state->i2c->dev, "MxL603 released\n");
-	return;
-}
 static struct dvb_tuner_ops mxl603_tuner_ops = {
 	.info = {
 		.name = "MaxLinear MxL603",
@@ -1022,7 +1009,6 @@ static struct dvb_tuner_ops mxl603_tuner_ops = {
 	.get_status        = mxl603_get_status,
 	.get_frequency     = mxl603_get_frequency,
 	.get_bandwidth     = mxl603_get_bandwidth,
-	.release           = mxl603_release,
 	.get_if_frequency  = mxl603_get_if_frequency,
 };
 static int mxl603_get_chip_id(struct mxl603_state *state)
@@ -1049,12 +1035,49 @@ err:
 			, id);
 	return ret;
 }
-struct dvb_frontend *mxl603_attach(struct dvb_frontend *fe,
-				     struct i2c_adapter *i2c, u8 addr,
-				     struct mxl603_config *config)
+
+static struct dvb_frontend *mxl603_get_frontend(struct i2c_client *client)
 {
+    struct device_node *demod_np;
+    struct i2c_client *demod;
+    struct dvb_frontend *fe = dev_get_platdata(&client->dev);
+
+    if (fe) {
+        return fe;
+    }
+
+    demod_np = of_parse_phandle(client->dev.of_node, "demod-dev", 0);
+    if (!demod_np) {
+        dev_err(&client->dev, "failed to read demod-dev\n");
+        return ERR_PTR(-EINVAL);
+    }
+
+    demod = of_find_i2c_device_by_node(demod_np);
+    of_node_put(demod_np);
+    if (!demod) {
+        dev_err(&client->dev, "demod-dev is not i2c device\n");
+        return ERR_PTR(-EINVAL);
+    }
+
+    fe = i2c_get_clientdata(demod);
+    if (!fe) {
+        return ERR_PTR(-EPROBE_DEFER);
+    }
+    return fe;
+}
+
+static int mxl603_probe(struct i2c_client *client)
+{
+	struct i2c_adapter *i2c = client->adapter;
+	const struct mxl603_config *config = i2c_get_match_data(client);
+	struct dvb_frontend *fe = mxl603_get_frontend(client);
+	u8 addr = client->addr;
 	struct mxl603_state *state = NULL;
 	int ret = 0;
+
+	if (IS_ERR(fe)) {
+		return PTR_ERR(fe);
+	}
 
 	state = kzalloc(sizeof(struct mxl603_state), GFP_KERNEL);
 	if (!state) {
@@ -1063,8 +1086,7 @@ struct dvb_frontend *mxl603_attach(struct dvb_frontend *fe,
 		goto err1;
 	}
 	
-	memcpy(&state->_cfg, config, sizeof(state->_cfg));
-	state->config = &state->_cfg;
+	state->config = config;
 	state->i2c = i2c;
 	state->addr = addr;
 	
@@ -1083,18 +1105,75 @@ struct dvb_frontend *mxl603_attach(struct dvb_frontend *fe,
 	dev_info(&i2c->dev, "Attaching MxL603\n");
 	
 	fe->tuner_priv = state;
+	i2c_set_clientdata(client, fe);
 
 	memcpy(&fe->ops.tuner_ops, &mxl603_tuner_ops,
 	       sizeof(struct dvb_tuner_ops));
-
-	return fe;
 	
+	return 0;
+
 err2:
 	kfree(state);
 err1:
-	return NULL;
+	return -1;
 }
-EXPORT_SYMBOL_GPL(mxl603_attach);
+
+static void mxl603_remove(struct i2c_client *client)
+{
+	struct dvb_frontend *fe = i2c_get_clientdata(client);
+	struct mxl603_state *state = fe->tuner_priv;
+
+	dev_info(&state->i2c->dev, "MxL603 removing\n");
+
+	fe->tuner_priv = NULL;
+	kfree(state);
+
+	return;
+}
+
+static const struct mxl603_config mxl603_configs[] = {
+	{
+		.xtal_freq_hz = MXL603_XTAL_16MHz,
+		.if_freq_hz = MXL603_IF_5MHz,
+		.agc_type = MXL603_AGC_SELF,
+		.xtal_cap = 16,
+		.gain_level = 11,
+		.if_out_gain_level = 11,
+		.agc_set_point = 66,
+		.agc_invert_pol = 0,
+		.invert_if = 1,
+		.loop_thru_enable = 0,
+		.clk_out_enable = 1,
+		.clk_out_div = 0,
+		.clk_out_ext = 0,
+		.xtal_sharing_mode = 0,
+		.single_supply_3_3V = 1,
+	},
+};
+
+static const struct of_device_id mxl603_of_match[] = {
+	{ .compatible = "maxlinear,mxl603-16", .data = &mxl603_configs[0] },
+	{}
+};
+MODULE_DEVICE_TABLE(of, mxl603_of_match);
+
+static const struct i2c_device_id mxl603_id_table[] = {
+	{ "mxl603-16", (kernel_ulong_t)&mxl603_configs[0] },
+	{}
+};
+MODULE_DEVICE_TABLE(i2c, mxl603_id_table);
+
+static struct i2c_driver mxl603_driver = {
+	.driver = {
+		.name                = "mxl603",
+		.of_match_table      = mxl603_of_match,
+	},
+	.probe      = mxl603_probe,
+	.remove     = mxl603_remove,
+	.id_table   = mxl603_id_table,
+};
+
+module_i2c_driver(mxl603_driver);
 
 MODULE_DESCRIPTION("MaxLinear MxL603 tuner driver");
 MODULE_AUTHOR("Sasa Savic <sasa.savic.sr@gmail.com>");

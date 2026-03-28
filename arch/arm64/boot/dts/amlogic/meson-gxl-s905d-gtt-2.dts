@@ -89,9 +89,16 @@
 
         frontends {
             fe0 {
-                demod-i2c-bus = <&i2c_B>;
-                demod-i2c-addr = <0x6c>;
-                demod-module = "aml-dvb-gtt2";
+                //demod-i2c-bus = <&i2c_B>;
+                //demod-i2c-addr = <0x6c>;
+                //demod-module = "cxd2878";
+                //demod-id = "cxd2878-24-p";
+                //tuner-i2c-bus = <&i2c_B>;
+                //tuner-i2c-addr = <0x63>;
+                //tuner-module = "mxl603";
+                //tuner-id = "mxl603-16";
+                demod-dev = <&dvb_demod0>;
+                tuner-dev = <&dvb_tuner0>;
             };
         };
     };
@@ -135,4 +142,15 @@
     status = "okay";
     pinctrl-0 = <&i2c_b_pins>;
     pinctrl-names = "default";
+
+    dvb_demod0: dvb-demod@6c {
+        compatible = "sony,cxd2878-24-p";
+        reg = <0x6c>;
+    };
+
+    dvb_tuner0: dvb-tuner@63 {
+        compatible = "maxlinear,mxl603-16";
+        reg = <0x63>;
+        demod-dev = <&dvb_demod0>;
+    };
 };
