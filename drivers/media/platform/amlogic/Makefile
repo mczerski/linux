@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
 
 obj-y += c3/
+obj-y += meson-demux/
 obj-y += meson-ge2d/
-obj-y += hw_demux/

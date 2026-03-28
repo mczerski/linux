@@ -2,5 +2,5 @@ config DVB_MESON
 	tristate "Amlogic DVB demux driver"
 	depends on ARCH_MESON || COMPILE_TEST
 	help
-	  This is a dvb demux driver for Amlogic.
+	  This is a DVB demux driver for Amlogic.
 
