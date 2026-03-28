@@ -52,9 +52,8 @@
         };
     };
 
-
-    dvb-demux {
-        compatible = "amlogic, dvb-demux";
+    dvb_demux: dvb-demux {
+        compatible = "amlogic,meson-gxbb-demux";
         reg = <0x0 0xc1105800 0x0 0x400>,
               <0x0 0xc1108c40 0x0 0x10>,
               <0x0 0xc1108c50 0x0 0x10>;
@@ -71,9 +70,8 @@
 
         clocks = <&clkc CLKID_DEMUX
                   &clkc CLKID_ASYNC_FIFO
-                  &clkc CLKID_AHB_ARB0
-                  &clkc CLKID_HIU_IFACE>;
-        clock-names = "demux", "asyncfifo", "ahbarb0", "uparsertop";
+                  &clkc CLKID_AHB_ARB0>;
+        clock-names = "demux", "asyncfifo", "ahbarb0";
 
         resets = <&reset RESET_DEMUX>,
                  <&reset RESET_DEMUX_DES>,

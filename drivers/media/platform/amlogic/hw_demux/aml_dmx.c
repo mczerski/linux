@@ -44,7 +44,6 @@
 
 #include "aml_dvb.h"
 #include "aml_dvb_reg.h"
-#include "cpu_version.h"
 
 #define ENABLE_SEC_BUFF_WATCHDOG
 #define USE_AHB_MODE
@@ -1549,7 +1548,7 @@ static void stb_enable(struct aml_dvb *dvb)
 	invert1 = 0;
 	invert2 = 0;
 
-	for (i = 0; i < dvb->ts_in_total_count; i++) {
+	for (i = 0; i < dvb->dvb_data.ts_in_total_count; i++) {
 		if (dvb->ts[i].s2p_id == 0)
 			fec_s0 = i;
 		else if (dvb->ts[i].s2p_id == 1)
@@ -1573,7 +1572,7 @@ static void stb_enable(struct aml_dvb *dvb)
 		       (ciplus));
 	ciplus = 0;
 
-	if (get_cpu_type() >= MESON_CPU_MAJOR_ID_TL1) {
+	if (dvb->dvb_data.s2p_total_count == 3) {
 		invert2 = dvb->s2p[2].invert;
 
 		aml_write_stb(dvb, STB_S2P2_CONFIG,
@@ -1778,20 +1777,20 @@ static int dsc_set_csa_key(struct aml_dsc_channel *ch, int flags,
 		aml_write_stb(dvb, COMM_DESC_KEY1, key1);
 
 	/*tdes? :*/
-		if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXBB) {
+		if (dvb->key_ladder_mode == MODE_64BIT) {
 			aml_write_stb(dvb, COMM_DESC_KEY_RW,
 				((1 << 5)) |
 				((ch->id + type * DSC_COUNT)+
 					(is_dsc2 ? 16 : 0)));
 		}
-		if (get_cpu_type() == MESON_CPU_MAJOR_ID_GXL ||
-			get_cpu_type() == MESON_CPU_MAJOR_ID_GXM) {
+		if (dvb->key_ladder_mode == MODE_128BIT_ENDIAN) {
 			pr_info("do kl..\n");
 			aml_write_stb(dvb, COMM_DESC_KEY_RW,
 				(type ? (1 << 6) : (1 << 5)) | (1<<7) |
 				((ch->id + type * DSC_COUNT)+
 				 (is_dsc2 ? 16 : 0)));
 		}
+        /*no write to COMM_DESC_KEY_RW, bug ? */
 		reg = (type ? (1 << 6) : (1 << 5)) |
 				((ch->id + type * DSC_COUNT)+
 				 (is_dsc2 ? 16 : 0));
@@ -1870,7 +1869,7 @@ static void aml_ci_plus_config(struct aml_dvb *dvb, int key_endian, int mode, in
 
 	pr_dbg("%s mode:%d,alog:%d\n",__FUNCTION__,mode,algo);
 
-	if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
+	if (!dvb->dvb_data.has_aes) {
 		aml_write_stb(dvb, CIPLUS_ENDIAN,
 				(15 << AES_MSG_OUT_ENDIAN)
 				| (15 << AES_MSG_IN_ENDIAN)
@@ -1899,7 +1898,7 @@ static void aml_ci_plus_config(struct aml_dvb *dvb, int key_endian, int mode, in
 	} else if (algo ==  ALGO_AES){
 		aes_enable = 1;
 	} else {
-		if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
+		if (!dvb->dvb_data.has_aes) {
 			des_enable = 1;
 		} else {
 			des2_key_endian = 8;
@@ -2065,7 +2064,7 @@ static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 	int algo = 0;
 
 	if (!from_kl) {
-		if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
+		if (!dvb->dvb_data.has_aes) {
 		k3 = (key[0] << 24) | (key[1] << 16) | (key[2] << 8) | key[3];
 		k2 = (key[4] << 24) | (key[5] << 16) | (key[6] << 8) | key[7];
 		k1 = (key[8] << 24) | (key[9] << 16) | (key[10] << 8) | key[11];
@@ -2126,7 +2125,7 @@ static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 			algo = ALGO_SM4;
 		break;
 	case CA_CW_DES_EVEN:
-		if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
+		if (!dvb->dvb_data.has_aes) {
 			ab_des = 0x1;
 		} else {
 			ab_aes = 0x1;
@@ -2136,7 +2135,7 @@ static int dsc_set_aes_des_sm4_key(struct aml_dsc_channel *ch, int flags,
 		algo = ALGO_DES;
 		break;
 	case CA_CW_DES_ODD:
-		if (get_cpu_type() < MESON_CPU_MAJOR_ID_SM1) {
+		if (!dvb->dvb_data.has_aes) {
 			ab_des = 0x2;
 		} else {
 			ab_aes = 0x2;
@@ -2875,7 +2874,7 @@ static int dmx_get_record_flag(struct aml_dmx *dmx)
 	struct aml_dvb *dvb = (struct aml_dvb *)dmx->demux.priv;
 
 	/*Check whether a async fifo connected to this dmx */
-	for (i = 0; i < dvb->async_fifo_total_count; i++) {
+	for (i = 0; i < dvb->dvb_data.async_fifo_total_count; i++) {
 		if (!dvb->asyncfifo[i].init)
 			continue;
 		if ((dvb->asyncfifo[i].source == dmx->id)) {
@@ -2992,7 +2991,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 		} else if (dmx->source == AM_TS_SRC_S_TS2) {
 			s2p_id = 2;
 		}
-		for (i = 0; i < dvb->s2p_total_count; i++) {
+		for (i = 0; i < dvb->dvb_data.s2p_total_count; i++) {
 			if (dvb->ts[i].s2p_id == s2p_id) {
 				fec_ctrl = dvb->ts[i].control;
 			}
@@ -3096,7 +3095,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 			u32 v = aml_read_stb(dvb, STB_TOP_CONFIG);
 			int i;
 
-			for (i = 0; i < dvb->ts_in_total_count; i++) {
+			for (i = 0; i < dvb->dvb_data.ts_in_total_count; i++) {
 				if (dvb->ts[i].s2p_id == 0)
 					fec_s0 = i;
 				else if (dvb->ts[i].s2p_id == 1)
@@ -3119,7 +3118,7 @@ static int dmx_enable(struct aml_dmx *dmx)
 			    (invert1 << INVERT_S2P1_FEC_CLK);
 			aml_write_stb(dvb, STB_TOP_CONFIG, v);
 
-			if (get_cpu_type() >= MESON_CPU_MAJOR_ID_TL1) {
+			if (dvb->dvb_data.s2p_total_count == 3) {
 			    invert2 = dvb->s2p[2].invert;
 
 			//add s2p2 config
@@ -3722,7 +3721,7 @@ static void reset_async_fifos(struct aml_dvb *dvb)
 			continue;
 
 		record_enable = 0;
-		for (i = 0; i < dvb->async_fifo_total_count; i++) {
+		for (i = 0; i < dvb->dvb_data.async_fifo_total_count; i++) {
 			afifo = &dvb->asyncfifo[i];
 
 			if (!afifo->init)
@@ -3792,7 +3791,7 @@ static void reset_async_fifos(struct aml_dvb *dvb)
 		}
 	}
 	pr_inf("reset ASYNC FIFOs\n");
-	for (i = 0; i < dvb->async_fifo_total_count; i++) {
+	for (i = 0; i < dvb->dvb_data.async_fifo_total_count; i++) {
 		int old;
 
 		afifo = &dvb->asyncfifo[i];

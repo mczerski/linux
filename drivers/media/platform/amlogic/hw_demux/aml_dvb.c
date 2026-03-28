@@ -49,7 +49,6 @@
 
 #include "aml_dvb.h"
 #include "aml_dvb_reg.h"
-#include "cpu_version.h"
 
 #define pr_dbg(args...)\
 	do {\
@@ -1422,7 +1421,7 @@ static ssize_t asyncfifo##i##_source_show(const struct class *class,  \
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	ssize_t ret = 0;\
 	char *src;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return ret;\
 	switch (afifo->source) {\
 	CASE_PREFIX case AM_DMX_0:\
@@ -1446,7 +1445,7 @@ static ssize_t asyncfifo##i##_source_store(const struct class *class,  \
 {\
 	enum aml_dmx_id_t src = -1;\
 	\
-	if (aml_dvb_device.async_fifo_total_count <= i)\
+	if (aml_dvb_device.dvb_data.async_fifo_total_count <= i)\
 		return 0;\
 	if (!strncmp("dmx0", buf, 4)) {\
 		src = AM_DMX_0;\
@@ -1480,7 +1479,7 @@ static ssize_t asyncfifo##i##_flush_size_show(const struct class *class,  \
 	struct aml_dvb *dvb = &aml_dvb_device;\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	ssize_t ret = 0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return ret;\
 	ret = sprintf(buf, "%d\n", afifo->flush_size);\
 	return ret;\
@@ -1494,7 +1493,7 @@ static ssize_t asyncfifo##i##_flush_size_store(const struct class *class,  \
 	int fsize = 0;\
 	long value;\
 	int ret =0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return (size_t)0;\
 	ret = kstrtol(buf, 0, &value);\
 	if (ret == 0)\
@@ -1526,7 +1525,7 @@ static ssize_t asyncfifo##i##_secure_addr_show(const struct class *class,  \
 	struct aml_dvb *dvb = &aml_dvb_device;\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	ssize_t ret = 0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return ret;\
 	ret = sprintf(buf, "0x%x\n", afifo->blk.addr);\
 	return ret;\
@@ -1539,7 +1538,7 @@ const char *buf, size_t size)\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	unsigned long value;\
 	int ret=0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return (size_t)0;\
 	ret = kstrtol(buf, 0, &value);\
 	if (ret == 0 && value != afifo->blk.addr) {\
@@ -1569,7 +1568,7 @@ static ssize_t asyncfifo##i##_secure_addr_size_show(const struct class *class,  
 	struct aml_dvb *dvb = &aml_dvb_device;\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	ssize_t ret = 0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return ret;\
 	ret = sprintf(buf, "0x%x\n", afifo->blk.len);\
 	return ret;\
@@ -1582,7 +1581,7 @@ const char *buf, size_t size)\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	unsigned long value;\
 	int ret=0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return (size_t)0;\
 	ret = kstrtol(buf, 0, &value);\
 	if (ret == 0 && value != afifo->blk.len) {\
@@ -1613,7 +1612,7 @@ static ssize_t asyncfifo##i##_secure_enable_show(const struct class *class,  \
 	struct aml_dvb *dvb = &aml_dvb_device;\
 	struct aml_asyncfifo *afifo = &dvb->asyncfifo[i];\
 	ssize_t ret = 0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return ret;\
 	ret = sprintf(buf, "%d\n", afifo->secure_enable);\
 	return ret;\
@@ -1627,7 +1626,7 @@ static ssize_t asyncfifo##i##_secure_enable_store(const struct class *class,  \
 	int enable = 0;\
 	long value;\
 	int ret=0;\
-	if (dvb->async_fifo_total_count <= i)\
+	if (dvb->dvb_data.async_fifo_total_count <= i)\
 		return (size_t)0;\
 	ret = kstrtol(buf, 0, &value);\
 	if (ret == 0)\
@@ -1677,7 +1676,7 @@ static ssize_t hw_setting_show(const struct class *class,
 	struct aml_dvb *dvb = &aml_dvb_device;
 	int invert, ctrl;
 
-	for (i = 0; i < dvb->ts_in_total_count; i++) {
+	for (i = 0; i < dvb->dvb_data.ts_in_total_count; i++) {
 		struct aml_ts_input *ts = &dvb->ts[i];
 
 		if (ts->s2p_id != -1)
@@ -1713,7 +1712,7 @@ static ssize_t hw_setting_store(const struct class *class,
 	if (r != 4)
 		return -EINVAL;
 
-	if (id < 0 || id >= dvb->ts_in_total_count)
+	if (id < 0 || id >= dvb->dvb_data.ts_in_total_count)
 		return -EINVAL;
 
 	if ((mname[0] == 's') || (mname[0] == 'S')) {
@@ -1733,12 +1732,12 @@ static ssize_t hw_setting_store(const struct class *class,
 		int i;
 		int scnt = 0;
 
-		for (i = 0; i < dvb->ts_in_total_count; i++) {
+		for (i = 0; i < dvb->dvb_data.ts_in_total_count; i++) {
 			if (dvb->ts[i].s2p_id != -1)
 				scnt++;
 		}
 
-		if (scnt >= dvb->s2p_total_count)
+		if (scnt >= dvb->dvb_data.s2p_total_count)
 			pr_error("no free s2p\n");
 		else
 			ts->s2p_id = scnt;
@@ -2015,7 +2014,9 @@ static struct class aml_stb_class = {
 
 static int aml_dvb_probe(struct platform_device *pdev)
 {
+    static struct clk_bulk_data *clks;
 	struct aml_dvb *advb;
+    const struct aml_dvb_data *dvb_data;
 	int i, ts, ret = 0;
 	char buf[32];
     struct device_node *fe_i2c_bus;
@@ -2038,59 +2039,23 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		advb->dmx[i].dvr_irq = -1;
 	}
 
-	if (get_cpu_type() < MESON_CPU_MAJOR_ID_TL1) {
-	  advb->ts_in_total_count = 3;
-	  advb->s2p_total_count = 2;
-	  advb->async_fifo_total_count = 2;
-	} else {
-		advb->ts_in_total_count = 4;
-		advb->s2p_total_count = 3;
-		advb->async_fifo_total_count = 3;
-	}
-
-    if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "demux"))) {
-        dev_err(&pdev->dev, "get demux clk fail\n");
-        return -1;
+    dvb_data = of_device_get_match_data(&pdev->dev);
+    if (dvb_data) {
+        memcpy(&advb->dvb_data, dvb_data, sizeof(advb->dvb_data));
     }
-    if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "ahbarb0"))) {
-        dev_err(&pdev->dev, "get ahbarb0 clk fail\n");
-        return -1;
-    }
-	if (get_cpu_type() < MESON_CPU_MAJOR_ID_G12A)
-	{
 
-		if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "asyncfifo"))) {
-			dev_err(&pdev->dev, "get asyncfifo clk fail\n");
-			return -1;
-		}
-        //TODO: this make system crash after module unload. wierd thing is that
-        //none of those clocks needs to be enabled here for dvb to work ...
-		//if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "uparsertop"))) {
-		//	dev_err(&pdev->dev, "get uparsertop clk fail\n");
-		//	return -1;
-		//}
-	}
-	else
-	{
-		if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "parser_top"))) {
-			dev_err(&pdev->dev, "get parser_top clk fail\n");
-			return -1;
-		}
-		if (get_cpu_type() == MESON_CPU_MAJOR_ID_TL1)
-		{
-			if (IS_ERR_OR_NULL(devm_clk_get_enabled(&pdev->dev, "asyncfifo"))) {
-				dev_err(&pdev->dev, "get asyncfifo clk fail\n");
-                return -1;
-            }
-		}
-	}
+    ret = devm_clk_bulk_get_all_enabled(&pdev->dev, &clks);
+    if (ret < 0) {
+        dev_err(&pdev->dev, "get all cloks failed: %d\n", ret);
+        return ret;
+    }
 
     advb->stb_base = devm_platform_ioremap_resource_byname(pdev, "stb");
     if (IS_ERR(advb->stb_base)) {
         return PTR_ERR(advb->stb_base);
     }
 
-    for (i = 0; i < advb->async_fifo_total_count; i++) {
+    for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
         memset(buf, 0, 32);
         snprintf(buf, sizeof(buf), "asyncfifo%d", i);
         advb->asyncfifo_base[i] = devm_platform_ioremap_resource_byname(pdev, buf);
@@ -2118,7 +2083,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
         return PTR_ERR(advb->des_rst);
     }
 
-    for (i = 0; i < advb->async_fifo_total_count; i++) {
+    for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
         memset(buf, 0, 32);
         snprintf(buf, sizeof(buf), "async%d_rst", i);
         advb->async_rst[i] = devm_reset_control_get(&pdev->dev, buf);
@@ -2137,7 +2102,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		if (!ret) {
 			pr_inf("%s: 0x%x\n", buf, value);
 			if (value < 128)
-				advb->async_fifo_total_count = 0;
+				advb->dvb_data.async_fifo_total_count = 0;
 		}
 	}
 
@@ -2147,7 +2112,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		const char *str;
 		u32 value;
 
-		for (i = 0; i < advb->ts_in_total_count; i++) {
+		for (i = 0; i < advb->dvb_data.ts_in_total_count; i++) {
 
 			advb->ts[i].mode = AM_TS_DISABLE;
 			advb->ts[i].s2p_id = -1;
@@ -2161,7 +2126,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 				if (!strcmp(str, "serial")) {
 					pr_inf("%s: serial\n", buf);
 
-					if (s2p_id >= advb->s2p_total_count)
+					if (s2p_id >= advb->dvb_data.s2p_total_count)
 						pr_error("no free s2p\n");
 					else {
 						snprintf(buf, sizeof(buf),
@@ -2236,6 +2201,16 @@ static int aml_dvb_probe(struct platform_device *pdev)
 			   has_tsin_deglitch = 1;
 			}
 		}
+		memset(buf, 0, 32);
+		snprintf(buf, sizeof(buf), "key_ladder_mode");
+		ret =
+			of_property_read_u32(pdev->dev.of_node, buf,
+				&value);
+		if (!ret) {
+			pr_inf("%s: 0x%x\n", buf, value);
+				advb->key_ladder_mode = value;
+		}
+		memset(buf, 0, 32);
 	}
 #endif
 
@@ -2251,7 +2226,7 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	for (i = 0; i<DSC_DEV_COUNT; i++)
 		advb->dsc[i].id = -1;
 
-	for (i = 0; i < advb->async_fifo_total_count; i++)
+	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++)
 		advb->asyncfifo[i].id = -1;
 
 	advb->dvb_adapter.priv = advb;
@@ -2270,16 +2245,16 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	}
 
 	/*Init the async fifos */
-	for (i = 0; i < advb->async_fifo_total_count; i++) {
+	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
 		ret = aml_dvb_asyncfifo_init(advb, &advb->asyncfifo[i], i);
 		if (ret < 0)
 			goto error;
 
-		aml_asyncfifo_hw_set_source(&advb->asyncfifo[i], AM_DMX_0 + min(i, advb->async_fifo_total_count));
+		aml_asyncfifo_hw_set_source(&advb->asyncfifo[i], AM_DMX_0 + min(i, advb->dvb_data.async_fifo_total_count));
 	}
 
 	/* assign TS inputs to DMX starting at DMX0 */
-	for (ts = 0, i = 0; i < advb->ts_in_total_count; i++) {
+	for (ts = 0, i = 0; i < min(advb->dvb_data.ts_in_total_count, DMX_DEV_COUNT); i++) {
 		if (advb->ts[i].mode == AM_TS_DISABLE)
 			continue;
 		aml_dmx_hw_set_source(advb->dmx[ts].dmxdev.demux, DMX_SOURCE_FRONT0 + i);
@@ -2326,7 +2301,7 @@ error_i2c:
 	class_unregister(&aml_stb_class);
 
 error:
-	for (i = 0; i < advb->async_fifo_total_count; i++) {
+	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
 		if (advb->asyncfifo[i].id != -1)
 			aml_dvb_asyncfifo_release(advb, &advb->asyncfifo[i]);
 	}
@@ -2343,7 +2318,7 @@ error:
 
     dvb_unregister_adapter(&advb->dvb_adapter);
 
-	for (i = 0; i < advb->ts_in_total_count; i++) {
+	for (i = 0; i < advb->dvb_data.ts_in_total_count; i++) {
 		if (advb->ts[i].pinctrl && !IS_ERR_VALUE(advb->ts[i].pinctrl))
 			devm_pinctrl_put(advb->ts[i].pinctrl);
 	}
@@ -2367,7 +2342,7 @@ static void aml_dvb_remove(struct platform_device *pdev)
 	aml_unregist_dmx_class();
 	class_unregister(&aml_stb_class);
 
-	for (i = 0; i < advb->async_fifo_total_count; i++) {
+	for (i = 0; i < advb->dvb_data.async_fifo_total_count; i++) {
 		if (advb->asyncfifo[i].id != -1)
 			aml_dvb_asyncfifo_release(advb, &advb->asyncfifo[i]);
 	}
@@ -2384,7 +2359,7 @@ static void aml_dvb_remove(struct platform_device *pdev)
 	}
     dvb_unregister_adapter(&advb->dvb_adapter);
 
-	for (i = 0; i < advb->ts_in_total_count; i++) {
+	for (i = 0; i < advb->dvb_data.ts_in_total_count; i++) {
 		if (advb->ts[i].pinctrl && !IS_ERR_VALUE(advb->ts[i].pinctrl))
 			devm_pinctrl_put(advb->ts[i].pinctrl);
 	}
@@ -2421,10 +2396,40 @@ static int aml_dvb_resume(struct platform_device *dev)
 }
 
 #ifdef CONFIG_OF
+static const struct aml_dvb_data meson_gxbb_dvb_data = {
+    .has_aes = false,
+    .ts_in_total_count = 3,
+    .s2p_total_count = 2,
+    .async_fifo_total_count = 2,
+};
+
+static const struct aml_dvb_data meson_g12a_dvb_data = {
+    .has_aes = true,
+    .ts_in_total_count = 3,
+    .s2p_total_count = 2,
+    .async_fifo_total_count = 2,
+};
+
+static const struct aml_dvb_data meson_tl1_dvb_data = {
+    .has_aes = true,
+    .ts_in_total_count = 4,
+    .s2p_total_count = 3,
+    .async_fifo_total_count = 3,
+};
+
 static const struct of_device_id aml_dvb_dt_match[] = {
 	{
-	 .compatible = "amlogic, dvb-demux",
-	 },
+	    .compatible = "amlogic,meson-gxbb-demux",
+        .data = &meson_gxbb_dvb_data,
+	},
+    {
+	    .compatible = "amlogic,meson-g12a-demux",
+        .data = &meson_g12a_dvb_data,
+	},
+    {
+	    .compatible = "amlogic,meson-tl1-demux",
+        .data = &meson_tl1_dvb_data,
+	},
 	{},
 };
 #endif /*CONFIG_OF */

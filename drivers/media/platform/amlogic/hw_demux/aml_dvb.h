@@ -318,6 +318,19 @@ struct aml_swfilter {
 	int    track_dmx;
 };
 
+enum aml_key_ladder_mode {
+    MODE_64BIT = 0,
+    MODE_128BIT_ENDIAN,
+    MODE_128BIT,
+};
+
+struct aml_dvb_data {
+    bool has_aes;
+	int async_fifo_total_count;
+	int ts_in_total_count;
+	int s2p_total_count;
+};
+
 struct aml_dvb {
     void __iomem *stb_base;
     void __iomem *asyncfifo_base[ASYNCFIFO_COUNT];
@@ -326,14 +339,12 @@ struct aml_dvb {
     struct reset_control *des_rst;
     struct reset_control *async_rst[ASYNCFIFO_COUNT];
     struct i2c_client    *i2c_client_demod;
+    struct aml_dvb_data  dvb_data;
 	struct dvb_device    dvb_dev;
-	int ts_in_total_count;
 	struct aml_ts_input  ts[TS_IN_COUNT];
-	int s2p_total_count;
 	struct aml_s2p       s2p[S2P_COUNT];
 	struct aml_dmx       dmx[DMX_DEV_COUNT];
 	struct aml_dsc       dsc[DSC_DEV_COUNT];
-	int async_fifo_total_count;
 	struct aml_asyncfifo asyncfifo[ASYNCFIFO_COUNT];
 	struct dvb_adapter   dvb_adapter;
 	struct device       *dev;
@@ -347,6 +358,7 @@ struct aml_dvb {
 	int                  dmx_watchdog_disable[DMX_DEV_COUNT];
 	struct aml_swfilter  swfilter;
 	int	ts_out_invert;
+    enum aml_key_ladder_mode key_ladder_mode;
 
 	/*bufs for dmx shared*/
 	unsigned long        pes_pages;
