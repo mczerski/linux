@@ -74,10 +74,4 @@ struct mxl603_config {
 	u8 single_supply_3_3V;
 };
 
-
-
-extern struct dvb_frontend *mxl603_attach(struct dvb_frontend *fe,
-					    struct i2c_adapter *i2c, u8 addr,
-					    struct mxl603_config *cfg);
-
 #endif /* __MXL603_H__ */
