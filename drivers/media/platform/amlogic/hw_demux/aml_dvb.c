@@ -110,17 +110,6 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 	struct device_node *node_dmx = NULL;
 	char buf[32];
 
-	switch (id) {
-	case 0:
-		dmx->dmx_irq = INT_DEMUX;
-		break;
-	case 1:
-		dmx->dmx_irq = INT_DEMUX_1;
-		break;
-	case 2:
-		dmx->dmx_irq = INT_DEMUX_2;
-		break;
-	}
 	memset(buf, 0, 32);
 	snprintf(buf, sizeof(buf), "dmx");
 	node_dmx = of_parse_phandle(advb->pdev->dev.of_node, buf, 0);
@@ -130,9 +119,10 @@ static int aml_dvb_dmx_init(struct aml_dvb *advb, struct aml_dmx *dmx, int id)
 		ret = of_irq_get_byname(node_dmx, buf);
 		if (ret > 0)
 			dmx->dmx_irq = ret;
-		printk("get irq num demux%d_irq:%d\n",id,dmx->dmx_irq);
+		pr_inf("get irq num demux%d_irq:%d\n",id,dmx->dmx_irq);
 	} else {
-		printk("get default demux%d_irq:%d\n",id,dmx->dmx_irq);
+		pr_err("missing demux%d_irq\n",id);
+        return -1;
 	}
 
 	dmx->source = -1;
@@ -616,13 +606,6 @@ static int aml_dvb_asyncfifo_init(struct aml_dvb *advb,
 	int ret = 0;
 	struct device_node *node_dmx = NULL;
 
-	if (id == 0)
-		asyncfifo->asyncfifo_irq = INT_ASYNC_FIFO_FLUSH;
-	else if(id == 2)
-		asyncfifo->asyncfifo_irq = INT_ASYNC_FIFO3_FLUSH;
-	else
-		asyncfifo->asyncfifo_irq = INT_ASYNC_FIFO2_FLUSH;
-
 	memset(buf, 0, 32);
 	snprintf(buf, sizeof(buf), "dmx");
 	node_dmx = of_parse_phandle(advb->pdev->dev.of_node, buf, 0);
@@ -632,9 +615,10 @@ static int aml_dvb_asyncfifo_init(struct aml_dvb *advb,
 		ret = of_irq_get_byname(node_dmx, buf);
 		if (ret > 0)
 			asyncfifo->asyncfifo_irq = ret;
-		printk("get async%d_irq:%d\n",id,asyncfifo->asyncfifo_irq);
+		pr_inf("get async%d_irq:%d\n",id,asyncfifo->asyncfifo_irq);
 	} else {
-		printk("get default async%d_irq:%d\n",id,asyncfifo->asyncfifo_irq);
+		pr_err("missing async%d_irq\n",id);
+        return -1;
 	}
 	asyncfifo->dvb = advb;
 	asyncfifo->id = id;

@@ -23,16 +23,5 @@
 #include "c_stb_define.h"
 #include "c_stb_regs_define.h"
 
-#define BASE_IRQ 32
-#define AM_IRQ(reg)             (reg + BASE_IRQ)
-#define INT_DEMUX               AM_IRQ(23)
-#define INT_DEMUX_1             AM_IRQ(5)
-#define INT_DEMUX_2             AM_IRQ(21) //AM_IRQ(53)
-#define INT_ASYNC_FIFO_FILL     AM_IRQ(18)
-#define INT_ASYNC_FIFO_FLUSH    AM_IRQ(19)
-#define INT_ASYNC_FIFO2_FILL    AM_IRQ(24)
-#define INT_ASYNC_FIFO2_FLUSH   AM_IRQ(25)
-
-#define INT_ASYNC_FIFO3_FLUSH   AM_IRQ(17)
 #endif
 
