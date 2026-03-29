@@ -119,24 +119,20 @@
 		reset-names = "demux_rst", "des_rst", "demux0_rst", "demux1_rst", "demux2_rst", "async0_rst", "async1_rst";
 	};
 
-	//dvb-fe {
-	//	compatible = "amlogic,dvb-bridge";
+    dvb-fe {
+        compatible = "amlogic,dvb-bridge";
 
-	//	demux = <&dvb_demux>;
+        demux = <&dvb_demux>;
 
-	//	frontends {
-	//		fe0 {
-	//			demod-dev = <&dvb_demod0>;
-	//			tuner-dev = <&dvb_tuner0>;
-	//		};
+        frontend@0 {
+            demod-dev = <&dvb_demod0>;
+            tuner-dev = <&dvb_tuner0>;
+        };
 
-	//		fe1 {
-	//			demod-i2c-bus = <&i2c2>;
-	//			demod-i2c-addr = <0x69>;
-	//			demod-module = "m88rs6060";
-	//		};
-	//	};
-	//};
+        frontend@1 {
+            demod-dev = <&dvb_demod1>;
+        };
+    };
 	//dvb-extern {
 	//	//dvb_power_value = <0x00>;
 	//	//dvb_power_gpio = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
@@ -182,12 +178,21 @@
 	dvb_demod0: dvb-demod@6c {
 		compatible = "sony,cxd2878-24-s";
 		reg = <0x6c>;
+
+        i2c-gate {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            dvb_tuner0: dvb-tuner@64 {
+                compatible = "montage,m88tc6800-27";
+                reg = <0x64>;
+            };
+        };
 	};
 
-	dvb_tuner0: dvb-tuner@64 {
-		compatible = "montage,m88tc6800-27";
-		reg = <0x64>;
-		demod-dev = <&dvb_demod0>;
+	dvb_demod1: dvb-demod@69 {
+		compatible = "montage,m88rs6060-27p";
+		reg = <0x69>;
 	};
 };
 
