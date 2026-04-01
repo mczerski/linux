@@ -8,12 +8,6 @@
     SONY_DEMOD_XTAL_24000KHz = 1,       /**< 24 MHz */
     SONY_DEMOD_XTAL_32000KHz = 2        /**< 32 MHz */
 } ;
- enum sony_ascot3_xtal_t{
-    SONY_ASCOT3_XTAL_16000KHz,    /**< 16 MHz */
-    SONY_ASCOT3_XTAL_20500KHz,    /**< 20.5 MHz */
-    SONY_ASCOT3_XTAL_24000KHz,    /**< 24 MHz */
-    SONY_ASCOT3_XTAL_41000KHz     /**< 41 MHz */
-} ;
  
 #define SONY_DEMOD_MAKE_IFFREQ_CONFIG(iffreq) ((u32)(((iffreq)/48.0)*16777216.0 + 0.5))
 #define SONY_DEMOD_ATSC_MAKE_IFFREQ_CONFIG(iffreq) ((u32)(((iffreq)/24.0)*4294967296.0 + 0.5))
@@ -21,8 +15,6 @@
 struct cxd2878_config{
 	u8 addr_slvt;
 	enum sony_demod_xtal_t xtal;
-	u8 tuner_addr;
-	enum sony_ascot3_xtal_t tuner_xtal;
 
 	//for ts
 	 //           - 0: Serial output.
