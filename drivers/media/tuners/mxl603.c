@@ -20,6 +20,7 @@
 
 #include <linux/i2c.h>
 #include <linux/types.h>
+#include <linux/component.h>
 #include "tuner-i2c.h"
 #include "mxl603.h"
 
@@ -1036,48 +1037,64 @@ err:
 	return ret;
 }
 
-static struct dvb_frontend *mxl603_get_frontend(struct i2c_client *client)
+static int mxl603_bind(struct device *dev,
+                        struct device *master,
+                        void *data)
 {
-    struct device_node *demod_np;
-    struct i2c_client *demod;
-    struct dvb_frontend *fe = dev_get_platdata(&client->dev);
+    struct i2c_client *client = to_i2c_client(dev);
+    struct mxl603_state *state = i2c_get_clientdata(client);
+    struct dvb_frontend *fe = data;
+    int ret = 0;
 
-    if (fe) {
-        return fe;
+	if (fe->ops.i2c_gate_ctrl)
+		fe->ops.i2c_gate_ctrl(fe, 1);
+
+	ret = mxl603_get_chip_id(state);
+
+	if (fe->ops.i2c_gate_ctrl)
+		fe->ops.i2c_gate_ctrl(fe, 0);
+
+	/* check return value of mxl603_get_chip_id */
+	if (ret) {
+        dev_err(&client->dev, "Failed to attach MxL603\n");
+		goto err;
     }
 
-    demod_np = of_parse_phandle(client->dev.of_node, "demod-dev", 0);
-    if (!demod_np) {
-        dev_err(&client->dev, "failed to read demod-dev\n");
-        return ERR_PTR(-EINVAL);
-    }
+	dev_info(&client->dev, "Attaching MxL603\n");
 
-    demod = of_find_i2c_device_by_node(demod_np);
-    of_node_put(demod_np);
-    if (!demod) {
-        dev_err(&client->dev, "demod-dev is not i2c device\n");
-        return ERR_PTR(-EINVAL);
-    }
+	fe->tuner_priv = state;
+	memcpy(&fe->ops.tuner_ops, &mxl603_tuner_ops,
+	       sizeof(struct dvb_tuner_ops));
 
-    fe = i2c_get_clientdata(demod);
-    if (!fe) {
-        return ERR_PTR(-EPROBE_DEFER);
-    }
-    return fe;
+    return 0;
+
+err:
+    return -1;
 }
+
+static void mxl603_unbind(struct device *dev,
+                           struct device *master,
+                           void *data)
+{
+    struct i2c_client *client = to_i2c_client(dev);
+    struct dvb_frontend *fe = data;
+	fe->tuner_priv = NULL;
+    memset(&fe->ops.tuner_ops, 0, sizeof(struct dvb_tuner_ops));
+    dev_info(&client->dev, "unbinding\n");
+}
+
+static const struct component_ops mxl603_component_ops = {
+    .bind = mxl603_bind,
+    .unbind = mxl603_unbind,
+};
 
 static int mxl603_probe(struct i2c_client *client)
 {
 	struct i2c_adapter *i2c = client->adapter;
 	const struct mxl603_config *config = i2c_get_match_data(client);
-	struct dvb_frontend *fe = mxl603_get_frontend(client);
 	u8 addr = client->addr;
 	struct mxl603_state *state = NULL;
 	int ret = 0;
-
-	if (IS_ERR(fe)) {
-		return PTR_ERR(fe);
-	}
 
 	state = kzalloc(sizeof(struct mxl603_state), GFP_KERNEL);
 	if (!state) {
@@ -1089,27 +1106,14 @@ static int mxl603_probe(struct i2c_client *client)
 	state->config = config;
 	state->i2c = i2c;
 	state->addr = addr;
-	
-	if (fe->ops.i2c_gate_ctrl)
-		fe->ops.i2c_gate_ctrl(fe, 1);
 
-	ret = mxl603_get_chip_id(state);
+	i2c_set_clientdata(client, state);
+    ret = component_add(&client->dev, &mxl603_component_ops);
+    if (ret) {
+        dev_err(&client->dev, "Failed to add as component\n");
+        goto err2;
+    }
 
-	if (fe->ops.i2c_gate_ctrl)
-		fe->ops.i2c_gate_ctrl(fe, 0);
-
-	/* check return value of mxl603_get_chip_id */
-	if (ret)
-		goto err2;
-	
-	dev_info(&i2c->dev, "Attaching MxL603\n");
-	
-	fe->tuner_priv = state;
-	i2c_set_clientdata(client, fe);
-
-	memcpy(&fe->ops.tuner_ops, &mxl603_tuner_ops,
-	       sizeof(struct dvb_tuner_ops));
-	
 	return 0;
 
 err2:
@@ -1120,12 +1124,12 @@ err1:
 
 static void mxl603_remove(struct i2c_client *client)
 {
-	struct dvb_frontend *fe = i2c_get_clientdata(client);
-	struct mxl603_state *state = fe->tuner_priv;
+	struct mxl603_state *state = i2c_get_clientdata(client);
+
+    component_del(&client->dev, &mxl603_component_ops);
 
 	dev_info(&state->i2c->dev, "MxL603 removing\n");
 
-	fe->tuner_priv = NULL;
 	kfree(state);
 
 	return;
