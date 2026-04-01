@@ -13,6 +13,7 @@ Copyright (c) 2021 Davin zhang <Davin@tbsdtv.com> www.Turbosight.com
 #include <linux/types.h>
 #include <media/dvb_frontend.h>
 #include <linux/mutex.h>
+#include <linux/component.h>
 
 #include "cxd2878.h"
 #include "cxd2878_priv.h"
@@ -32,7 +33,6 @@ struct cxd_base{
 struct cxd2878_dev{
 	struct cxd_base *base;
 	bool warm; //start
-	struct dvb_frontend fe;
 	enum sony_dtv_system_t system;
 	enum sony_dtv_bandwidth_t bandwidth;
 	enum sony_demod_state_t state;
@@ -3105,6 +3105,35 @@ static struct cxd_base *match_base(struct i2c_adapter *i2c,u8 adr)
 	return NULL;
 }
 
+static int cxd2878_bind(struct device *dev,
+                        struct device *master,
+                        void *data)
+{
+    struct i2c_client *client = to_i2c_client(dev);
+    struct cxd2878_dev *priv = i2c_get_clientdata(client);
+    struct dvb_frontend *fe = data;
+    fe->demodulator_priv = priv;
+	memcpy(&fe->ops, &cxd2878_ops, sizeof(struct dvb_frontend_ops));
+
+    return 0;
+}
+
+static void cxd2878_unbind(struct device *dev,
+                           struct device *master,
+                           void *data)
+{
+    struct i2c_client *client = to_i2c_client(dev);
+    struct dvb_frontend *fe = data;
+    fe->demodulator_priv = NULL;
+    memset(&fe->ops, 0, sizeof(struct dvb_frontend_ops));
+    dev_info(&client->dev, "CXD2878 driver unbind.\n");
+}
+
+static const struct component_ops cxd2878_component_ops = {
+    .bind = cxd2878_bind,
+    .unbind = cxd2878_unbind,
+};
+
 static int cxd2878_probe(struct i2c_client *client)
 {
 	struct i2c_adapter *i2c = client->adapter;
@@ -3155,11 +3184,7 @@ static int cxd2878_probe(struct i2c_client *client)
 	dev->atscNoSignalThresh = 0x7FFB61;
 	dev->atscSignalThresh = 0x7C4926;
 	dev->warm	 = 0;
-	
-	
-	memcpy(&dev->fe.ops,&cxd2878_ops,sizeof(struct dvb_frontend_ops));
-	dev->fe.demodulator_priv = dev;
-	
+
 	base = match_base(i2c,client->addr);
 	if(base){
 		base->count++;
@@ -3185,30 +3210,35 @@ static int cxd2878_probe(struct i2c_client *client)
 	switch(id){ 
 		
 		case SONY_DEMOD_CHIP_ID_CXD2856 :  /**< CXD2856 / CXD6800(SiP) */
-			dev_info(&i2c->dev,"Detect CXD2856/CXD6800(SiP) chip.");
+			dev_info(&client->dev,"Detect CXD2856/CXD6800(SiP) chip.");
 			break;
 		
 		case SONY_DEMOD_CHIP_ID_CXD2857 :  /**< CXD2857 */
-			dev_info(&i2c->dev,"Detect CXD2857 chip.");
+			dev_info(&client->dev,"Detect CXD2857 chip.");
 			break;
 		case SONY_DEMOD_CHIP_ID_CXD2878 :  /**< CXD2878 / CXD6801(SiP) */
-			dev_info(&i2c->dev,"Detect CXD2878/CXD6801(SiP) chip.");
+			dev_info(&client->dev,"Detect CXD2878/CXD6801(SiP) chip.");
 			break;
 		case SONY_DEMOD_CHIP_ID_CXD2879 :  /**< CXD2879 */
-			dev_info(&i2c->dev,"Detect CXD2879 chip.");
+			dev_info(&client->dev,"Detect CXD2879 chip.");
 			break;
 		case SONY_DEMOD_CHIP_ID_CXD6802	: /**< CXD6802(SiP) */
-			dev_info(&i2c->dev,"Detect CXD2878/CXD6802(SiP) chip.");
+			dev_info(&client->dev,"Detect CXD2878/CXD6802(SiP) chip.");
 			break;
 		default:
 		case SONY_DEMOD_CHIP_ID_UNKNOWN: /**< Unknown */		
-			dev_err(&i2c->dev,"%s:Can not decete the chip.\n",KBUILD_MODNAME);
+			dev_err(&client->dev,"%s:Can not decete the chip.\n",KBUILD_MODNAME);
 			goto err1;
 			break;
 	}
 	dev->chipid = id;
 
-	i2c_set_clientdata(client, &dev->fe);
+	i2c_set_clientdata(client, dev);
+    ret = component_add(&client->dev, &cxd2878_component_ops);
+    if (ret) {
+        dev_err(&i2c->dev,"%s:Failed to add as component\n",KBUILD_MODNAME);
+        goto err1;
+    }
 
 	dev_dbg(&i2c->dev,"%s: attaching frontend successfully.\n",KBUILD_MODNAME);
 	
@@ -3219,22 +3249,19 @@ err1:
 err:
 	dev_err(&i2c->dev,"%s:error attaching frontend.\n",KBUILD_MODNAME);
 	return -1;
-
-	
 }
 
 static void cxd2878_remove(struct i2c_client *client)
 {
-	struct dvb_frontend *fe = i2c_get_clientdata(client);
-	struct cxd2878_dev *dev = fe->demodulator_priv;
-	fe->demodulator_priv = NULL;
+	struct cxd2878_dev *dev = i2c_get_clientdata(client);
+    component_del(&client->dev, &cxd2878_component_ops);
 	dev->base->count--;
 	if(dev->base->count == 0){
 		list_del(&dev->base->cxdlist);
 		kfree(dev->base);
 	}
 	kfree(dev);
-	dev_info(&dev->base->i2c->dev,"%s: frontend successfully removed.\n",KBUILD_MODNAME);
+	dev_info(&client->dev,"%s: frontend successfully removed.\n",KBUILD_MODNAME);
 }
 
 static const struct cxd2878_config cxd2878_configs[] = {

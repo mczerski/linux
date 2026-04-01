@@ -30,6 +30,7 @@
 #include <linux/of_gpio.h>
 #include <linux/clk.h>
 #include <linux/of_irq.h>
+#include <linux/of_platform.h>
 #include <linux/compat.h>
 
 #include "aml_dvb.h"
@@ -2236,6 +2237,9 @@ static int aml_dvb_probe(struct platform_device *pdev)
 
 	advb->dvb_adapter.priv = advb;
 	dev_set_drvdata(advb->dev, advb);
+
+	// probe frontend drivers
+	devm_of_platform_populate(&pdev->dev);
 
 	return 0;
 
