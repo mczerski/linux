@@ -21,6 +21,7 @@
 #include <linux/i2c.h>
 #include <linux/types.h>
 #include <linux/component.h>
+#include <linux/regmap.h>
 #include "tuner-i2c.h"
 #include "mxl603.h"
 
@@ -147,30 +148,17 @@ static struct reg_pair_t MxL603_DigitalDvbt[] = {
 };
 
 struct mxl603_state {
-	const struct mxl603_config *config;
-	struct i2c_adapter   *i2c;
-	u8 addr;
+	struct mxl603_config config;
+	struct i2c_client *i2c;
+	struct regmap *wr_map;
+	struct regmap *rd_map;
 	u32 frequency;
 	u32 bandwidth;
 };
 
 static int mxl603_write_reg(struct mxl603_state *state, u8 reg, u8 val)
 {
-	
-	u8 buf[] = { reg, val };
-	struct i2c_msg msg = { .addr = state->addr, .flags = 0,
-			       .buf = buf, .len = 2 };
-	int ret;
-		
-	ret = i2c_transfer(state->i2c, &msg, 1);
-	if (ret == 1) {
-		ret = 0;
-	} else {
-		dev_warn(&state->i2c->dev, "i2c wr failed=%d reg=%02x "
-				, ret, reg);				
-		ret = -EREMOTEIO;
-	}
-	return ret;
+    return regmap_write(state->wr_map, reg, val);
 }
 
 static int mxl603_write_regs(struct mxl603_state *state,
@@ -186,35 +174,23 @@ static int mxl603_write_regs(struct mxl603_state *state,
 	}
 	return ret;
 }
+
 static int mxl603_read_reg(struct mxl603_state *state, u8 reg, u8 *val)
 {
-	
-	u8 buf[2] = { 0xfb, reg };
-	struct i2c_msg msg[] = {
-		{ .addr = state->addr, .flags = 0,
-		  .buf = buf, .len = 2 },
-		{ .addr = state->addr, .flags = I2C_M_RD,
-		  .buf = val, .len = 1 },
-	};
-	int ret;
-
-	ret = i2c_transfer(state->i2c, msg, 2);
-	if (ret == 2) {
-		ret = 0;
-	} else {
-		dev_warn(&state->i2c->dev, "i2c rd failed=%d reg=%02x "
-				, ret, reg);
-		ret = -EREMOTEIO;
-	}
-	return ret;
+    unsigned int tmp;
+    int ret;
+    ret = regmap_read(state->rd_map, reg, &tmp);
+    *val = tmp;
+    return ret;
 }
+
 static int mxl603_get_if_frequency(struct dvb_frontend *fe, u32 *frequency)
 {
 	struct mxl603_state *state = fe->tuner_priv;
 
 	*frequency = 0;
 
-	switch (state->config->if_freq_hz) {
+	switch (state->config.if_freq_hz) {
 	case MXL603_IF_3_65MHz:
 		*frequency = 3650000;
 		break;
@@ -513,7 +489,7 @@ static int mxl603_set_mode(struct dvb_frontend *fe,
 			cfg_1 = 0x16;
 			pwr = 0xB1;
 		}
-		switch(state->config->if_out_gain_level)
+		switch(state->config.if_out_gain_level)
 		{
 			case 0x09: dfe = 0x44; break;
 			case 0x08: dfe = 0x43; break;
@@ -536,7 +512,7 @@ static int mxl603_set_mode(struct dvb_frontend *fe,
 			cfg_1 = 0x16;
 			pwr = 0xB1;
 		}
-		switch(state->config->if_out_gain_level)
+		switch(state->config.if_out_gain_level)
 		{
 			case 0x09: dfe = 0x44; break;
 			case 0x08: dfe = 0x43; break;
@@ -569,7 +545,7 @@ static int mxl603_set_mode(struct dvb_frontend *fe,
 	}
 
 	ret = mxl603_write_reg(state, 0xEA,
-				state->config->xtal_freq_hz ? 0x0E : 0x0D);
+				state->config.xtal_freq_hz ? 0x0E : 0x0D);
 	if (ret)
 		goto err;
 
@@ -606,7 +582,7 @@ static int mxl603_set_agc(struct mxl603_state *state)
 		goto err;
 
 	d &= 0xF2;
-	d = (u8) (d | (state->config->agc_type << 2) | 0x01);
+	d = (u8) (d | (state->config.agc_type << 2) | 0x01);
 	ret = mxl603_write_reg(state, 0x08, d);
 	if (ret)
 		goto err;
@@ -616,7 +592,7 @@ static int mxl603_set_agc(struct mxl603_state *state)
 		goto err;
 
 	d &= 0x80;
-	d |= (u8)(state->config->agc_set_point & 0xff);	
+	d |= (u8)(state->config.agc_set_point & 0xff);	
 	ret = mxl603_write_reg(state, 0x09, d);
 	if (ret)
 		goto err;
@@ -626,7 +602,7 @@ static int mxl603_set_agc(struct mxl603_state *state)
 		goto err;
 
 	d &= 0xEF;
-	d |= (state->config->agc_invert_pol << 4);
+	d |= (state->config.agc_invert_pol << 4);
 	ret = mxl603_write_reg(state, 0x5E, d);
 	if (ret)
 		goto err;
@@ -646,17 +622,17 @@ static int mxl603_set_if_out(struct mxl603_state *state)
 	if (ret)
 		goto err;
 
-	d |= state->config->if_freq_hz;
+	d |= state->config.if_freq_hz;
 
 	ret = mxl603_write_reg(state, 0x04, d);
 	if (ret)
 		goto err;
 
 	d = 0;
-	if (state->config->invert_if)
+	if (state->config.invert_if)
 		d = 0x3 << 6;
 
-	d += (state->config->gain_level & 0x0F);	
+	d += (state->config.gain_level & 0x0F);	
 	d |= 0x20;
 	ret = mxl603_write_reg(state, 0x05, d);
 	if (ret)
@@ -673,17 +649,17 @@ static int mxl603_set_xtal(struct mxl603_state *state)
 	u8 d = 0;
 	int ret;
 
-	d = (u8)((state->config->xtal_freq_hz << 5)
-			| (state->config->xtal_cap & 0x1F));
-	d |= (state->config->clk_out_enable << 7);
+	d = (u8)((state->config.xtal_freq_hz << 5)
+			| (state->config.xtal_cap & 0x1F));
+	d |= (state->config.clk_out_enable << 7);
 
 	ret = mxl603_write_reg(state, 0x01, d);
 	if (ret)
 		goto err;
 
-	d = (0x01 & (u8)state->config->clk_out_div);
+	d = (0x01 & (u8)state->config.clk_out_div);
 
-	if (state->config->xtal_sharing_mode) {
+	if (state->config.xtal_sharing_mode) {
 		d |= 0x40;
 
 		ret = mxl603_write_reg(state, 0x02, d);
@@ -702,7 +678,7 @@ static int mxl603_set_xtal(struct mxl603_state *state)
 			goto err;
 	}
 
-	if (state->config->single_supply_3_3V) {
+	if (state->config.single_supply_3_3V) {
 		ret = mxl603_write_reg(state, 0x0E, 0x14);
 		if (ret)
 			goto err;
@@ -746,7 +722,7 @@ static int mxl603_tuner_init_default(struct mxl603_state *state)
 	if (ret)
 		goto err;
 
-	if (state->config->single_supply_3_3V) {
+	if (state->config.single_supply_3_3V) {
 		ret = mxl603_write_reg(state, 0x0E, 0x04);
 		if (ret)
 			goto err;
@@ -946,7 +922,7 @@ static int mxl603_init(struct dvb_frontend *fe)
 	if (ret)
 		goto err;
 
-	if (state->config->loop_thru_enable)
+	if (state->config.loop_thru_enable)
 		ret = mxl603_write_reg(state, 0x60, 0x0E);
 	else
 		ret = mxl603_write_reg(state, 0x60, 0x37);
@@ -1088,11 +1064,173 @@ static const struct component_ops mxl603_component_ops = {
     .unbind = mxl603_unbind,
 };
 
+static int mxl603_parse_dt(struct device *dev, struct mxl603_config *config)
+{
+	struct device_node *np = dev->of_node;
+	u32 val;
+	const char *str;
+
+	if (!np) {
+		return 0;
+	}
+
+	/* Parse crystal frequency */
+	if (!of_property_read_u32(np, "maxlinear,xtal-freq-khz", &val)) {
+		switch (val) {
+		case 16000:
+			config->xtal_freq_hz = MXL603_XTAL_16MHz;
+			break;
+		case 24000:
+			config->xtal_freq_hz = MXL603_XTAL_24MHz;
+			break;
+		default:
+			dev_warn(dev, "Invalid xtal frequency %u kHz, using default\n", val);
+		}
+	}
+
+	/* Parse IF frequency - support both string and numeric formats */
+	if (!of_property_read_string(np, "maxlinear,if-frequency", &str)) {
+		if (!strcmp(str, "3.65MHz"))
+			config->if_freq_hz = MXL603_IF_3_65MHz;
+		else if (!strcmp(str, "4MHz"))
+			config->if_freq_hz = MXL603_IF_4MHz;
+		else if (!strcmp(str, "4.1MHz"))
+			config->if_freq_hz = MXL603_IF_4_1MHz;
+		else if (!strcmp(str, "4.15MHz"))
+			config->if_freq_hz = MXL603_IF_4_15MHz;
+		else if (!strcmp(str, "4.5MHz"))
+			config->if_freq_hz = MXL603_IF_4_5MHz;
+		else if (!strcmp(str, "4.57MHz"))
+			config->if_freq_hz = MXL603_IF_4_57MHz;
+		else if (!strcmp(str, "5MHz"))
+			config->if_freq_hz = MXL603_IF_5MHz;
+		else if (!strcmp(str, "5.38MHz"))
+			config->if_freq_hz = MXL603_IF_5_38MHz;
+		else if (!strcmp(str, "6MHz"))
+			config->if_freq_hz = MXL603_IF_6MHz;
+		else if (!strcmp(str, "6.28MHz"))
+			config->if_freq_hz = MXL603_IF_6_28MHz;
+		else if (!strcmp(str, "7.2MHz"))
+			config->if_freq_hz = MXL603_IF_7_2MHz;
+		else if (!strcmp(str, "8.25MHz"))
+			config->if_freq_hz = MXL603_IF_8_25MHz;
+		else if (!strcmp(str, "35.25MHz"))
+			config->if_freq_hz = MXL603_IF_35_25MHz;
+		else if (!strcmp(str, "36MHz"))
+			config->if_freq_hz = MXL603_IF_36MHz;
+		else if (!strcmp(str, "36.15MHz"))
+			config->if_freq_hz = MXL603_IF_36_15MHz;
+		else if (!strcmp(str, "36.65MHz"))
+			config->if_freq_hz = MXL603_IF_36_65MHz;
+		else if (!strcmp(str, "44MHz"))
+			config->if_freq_hz = MXL603_IF_44MHz;
+		else
+			dev_warn(dev, "Invalid if-frequency '%s', using default\n", str);
+	}
+
+	/* Parse AGC type */
+	if (!of_property_read_string(np, "maxlinear,agc-type", &str)) {
+		if (!strcmp(str, "self"))
+			config->agc_type = MXL603_AGC_SELF;
+		else if (!strcmp(str, "external"))
+			config->agc_type = MXL603_AGC_EXTERNAL;
+		else
+			dev_warn(dev, "Invalid agc-type '%s', using default\n", str);
+	}
+
+	/* Parse u8 configuration values */
+	if (!of_property_read_u32(np, "maxlinear,xtal-cap", &val)) {
+		if (val <= 255)
+			config->xtal_cap = val;
+		else
+			dev_warn(dev, "Invalid xtal-cap %u, using default\n", val);
+	}
+
+	if (!of_property_read_u32(np, "maxlinear,gain-level", &val)) {
+		if (val <= 255)
+			config->gain_level = val;
+		else
+			dev_warn(dev, "Invalid gain-level %u, using default\n", val);
+	}
+
+	if (!of_property_read_u32(np, "maxlinear,if-out-gain-level", &val)) {
+		if (val <= 255)
+			config->if_out_gain_level = val;
+		else
+			dev_warn(dev, "Invalid if-out-gain-level %u, using default\n", val);
+	}
+
+	if (!of_property_read_u32(np, "maxlinear,agc-set-point", &val)) {
+		if (val <= 255)
+			config->agc_set_point = val;
+		else
+			dev_warn(dev, "Invalid agc-set-point %u, using default\n", val);
+	}
+
+	/* Parse boolean/flag properties */
+	if (!of_property_read_u32(np, "maxlinear,agc-invert-pol", &val))
+		config->agc_invert_pol = val ? 1 : 0;
+
+	if (!of_property_read_u32(np, "maxlinear,invert-if", &val))
+		config->invert_if = val ? 1 : 0;
+
+	if (!of_property_read_u32(np, "maxlinear,loop-thru-enable", &val))
+		config->loop_thru_enable = val ? 1 : 0;
+
+	if (!of_property_read_u32(np, "maxlinear,clk-out-enable", &val))
+		config->clk_out_enable = val ? 1 : 0;
+
+	if (!of_property_read_u32(np, "maxlinear,xtal-sharing-mode", &val))
+		config->xtal_sharing_mode = val ? 1 : 0;
+
+	if (!of_property_read_u32(np, "maxlinear,single-supply-3-3v", &val))
+		config->single_supply_3_3V = val ? 1 : 0;
+
+	/* Parse clock output divider */
+	if (!of_property_read_u32(np, "maxlinear,clk-out-div", &val)) {
+		if (val <= 255)
+			config->clk_out_div = val;
+		else
+			dev_warn(dev, "Invalid clk-out-div %u, using default\n", val);
+	}
+
+	/* Parse clock output external flag */
+	if (!of_property_read_u32(np, "maxlinear,clk-out-ext", &val)) {
+		if (val <= 255)
+			config->clk_out_ext = val;
+		else
+			dev_warn(dev, "Invalid clk-out-ext %u, using default\n", val);
+	}
+
+	dev_info(dev, "DT config: xtal=%d if=%d agc=%d cap=%u gain=%u if_gain=%u setpoint=%u\n",
+		config->xtal_freq_hz, config->if_freq_hz, config->agc_type,
+		config->xtal_cap, config->gain_level, config->if_out_gain_level,
+		config->agc_set_point);
+	dev_info(dev, "  flags: agc_inv=%u inv_if=%u loop=%u clk_en=%u clk_div=%u clk_ext=%u xtal_share=%u 3.3V=%u\n",
+		config->agc_invert_pol, config->invert_if, config->loop_thru_enable,
+		config->clk_out_enable, config->clk_out_div, config->clk_out_ext,
+		config->xtal_sharing_mode, config->single_supply_3_3V);
+
+	return 0;
+}
+
+static struct regmap_config rd_map_config = {
+    .name = "mxl603 rd map",
+    .reg_bits = 16,
+    .val_bits = 8,
+    .reg_base = (0xfb << 8),
+};
+
+static struct regmap_config wr_map_config = {
+    .name = "mxl603 wr map",
+    .reg_bits = 8,
+    .val_bits = 8,
+};
+
 static int mxl603_probe(struct i2c_client *client)
 {
 	struct i2c_adapter *i2c = client->adapter;
 	const struct mxl603_config *config = i2c_get_match_data(client);
-	u8 addr = client->addr;
 	struct mxl603_state *state = NULL;
 	int ret = 0;
 
@@ -1102,10 +1240,15 @@ static int mxl603_probe(struct i2c_client *client)
 		dev_err(&i2c->dev, "kzalloc() failed\n");
 		goto err1;
 	}
-	
-	state->config = config;
-	state->i2c = i2c;
-	state->addr = addr;
+
+	memcpy(&state->config, config, sizeof(state->config));
+    mxl603_parse_dt(&client->dev, &state->config);
+	state->i2c = client;
+    state->rd_map = devm_regmap_init_i2c(state->i2c, &rd_map_config);
+    state->wr_map = devm_regmap_init_i2c(state->i2c, &wr_map_config);
+    if (IS_ERR(state->rd_map) || IS_ERR(state->wr_map)) {
+        goto err2;
+    }
 
 	i2c_set_clientdata(client, state);
     ret = component_add(&client->dev, &mxl603_component_ops);
@@ -1156,12 +1299,14 @@ static const struct mxl603_config mxl603_configs[] = {
 };
 
 static const struct of_device_id mxl603_of_match[] = {
+	{ .compatible = "maxlinear,mxl603", .data = &mxl603_configs[0] },
 	{ .compatible = "maxlinear,mxl603-16", .data = &mxl603_configs[0] },
 	{}
 };
 MODULE_DEVICE_TABLE(of, mxl603_of_match);
 
 static const struct i2c_device_id mxl603_id_table[] = {
+	{ "mxl603", (kernel_ulong_t)&mxl603_configs[0] },
 	{ "mxl603-16", (kernel_ulong_t)&mxl603_configs[0] },
 	{}
 };
