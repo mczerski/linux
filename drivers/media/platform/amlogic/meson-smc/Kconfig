@@ -1,0 +1,6 @@
+config SMARTCARD_MESON
+	tristate "Amlogic Smartcard driver"
+	depends on ARCH_MESON || COMPILE_TEST
+	help
+	  This is a Smart card reader driver for Amlogic.
+

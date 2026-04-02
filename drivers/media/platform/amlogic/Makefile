@@ -3,3 +3,4 @@
 obj-y += c3/
 obj-y += meson-demux/
 obj-y += meson-ge2d/
+obj-y += meson-smc/
