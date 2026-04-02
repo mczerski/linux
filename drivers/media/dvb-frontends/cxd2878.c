@@ -14,6 +14,7 @@ Copyright (c) 2021 Davin zhang <Davin@tbsdtv.com> www.Turbosight.com
 #include <media/dvb_frontend.h>
 #include <linux/mutex.h>
 #include <linux/component.h>
+#include <linux/i2c-mux.h>
 
 #include "cxd2878.h"
 #include "cxd2878_priv.h"
@@ -23,6 +24,7 @@ struct cxd_base{
 
 struct cxd2878_dev{
 	struct i2c_adapter *i2c;
+	struct i2c_mux_core *muxc;
 	const struct cxd2878_config *config;
 	bool warm; //start
 	enum sony_dtv_system_t system;
@@ -337,22 +339,11 @@ static int cxd2878_i2c_repeater(struct cxd2878_dev *dev,bool enable)
 	if(ret)
 		goto err;
 
-	msleep(20);
-
 	return 0;
 
 err:
 	dev_err(&dev->i2c->dev,"%s : %sable thee repeater failed! \n",KBUILD_MODNAME,enable?"en":"dis");
 	return ret;
-}
-static int cxd2878_i2c_gate_ctrl(struct dvb_frontend *fe, int enable)
-{
-	struct cxd2878_dev *dev = fe->demodulator_priv;
-	if (!dev->warm) {
-		cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
-		msleep(2);
-	}
-	return cxd2878_i2c_repeater(dev, enable);
 }
 
 static int cxd2878_setstreamoutput(struct cxd2878_dev*dev,int enable)
@@ -2484,7 +2475,6 @@ static const struct dvb_frontend_ops cxd2878_ops = {
 	},
 
 			.init					= cxd2878_init,
-			.i2c_gate_ctrl			= cxd2878_i2c_gate_ctrl,
 			.set_frontend			= cxd2878_set_frontend,
 			.tune					= cxd2878_tune,
 			.get_frontend_algo		= cxd2878_get_algo,
@@ -2496,6 +2486,27 @@ static const struct dvb_frontend_ops cxd2878_ops = {
 			.read_ucblocks			= cxd2878_read_ucblocks,
 };
 
+static int cxd2878_select(struct i2c_mux_core *muxc, u32 chan)
+{
+	struct cxd2878_dev *dev = i2c_mux_priv(muxc);
+	if (!dev->warm) {
+		cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
+		msleep(2);
+	}
+	return cxd2878_i2c_repeater(dev, 1);
+    return 0;
+}
+
+static int cxd2878_deselect(struct i2c_mux_core *muxc, u32 chan)
+{
+	struct cxd2878_dev *dev = i2c_mux_priv(muxc);
+	if (!dev->warm) {
+		cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
+		msleep(2);
+	}
+	return cxd2878_i2c_repeater(dev, 0);
+    return 0;
+}
 
 static int cxd2878_bind(struct device *dev,
 						struct device *master,
@@ -2609,17 +2620,32 @@ static int cxd2878_probe(struct i2c_client *client)
 	}
 	dev->chipid = id;
 
+    /* create mux i2c adapter for tuner */
+    dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE,
+                  cxd2878_select, cxd2878_deselect);
+    if (!dev->muxc) {
+        ret = -ENOMEM;
+        goto err1;
+    }
+    dev->muxc->priv = dev;
+    ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
+    if (ret) {
+        goto err1;
+    }
+
 	i2c_set_clientdata(client, dev);
 	ret = component_add(&client->dev, &cxd2878_component_ops);
 	if (ret) {
 		dev_err(&i2c->dev,"%s:Failed to add as component\n",KBUILD_MODNAME);
-		goto err1;
+		goto err_del_adapters;
 	}
 
 	dev_dbg(&i2c->dev,"%s: attaching frontend successfully.\n",KBUILD_MODNAME);
 	
 	return 0;
 
+err_del_adapters:
+    i2c_mux_del_adapters(dev->muxc);
 err1:
 	kfree(dev);
 err:

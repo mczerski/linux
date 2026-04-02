@@ -144,10 +144,15 @@
     dvb_demod0: dvb-demod@6c {
         compatible = "sony,cxd2878-24-p";
         reg = <0x6c>;
-    };
 
-    dvb_tuner0: dvb-tuner@63 {
-        compatible = "maxlinear,mxl603-16";
-        reg = <0x63>;
+        i2c-gate {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            dvb_tuner0: dvb-tuner@63 {
+                compatible = "maxlinear,mxl603-16";
+                reg = <0x63>;
+            };
+        };
     };
 };
