@@ -19,52 +19,26 @@
 #include <asm/irq.h>
 #include <linux/uaccess.h>
 #include <linux/platform_device.h>
-#include <linux/pinctrl/pinmux.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/gpio/consumer.h>
-#include <linux/amlogic/cpu_version.h>
 #include <linux/sched/clock.h>
 #include <linux/compat.h>
-#include <linux/amlogic/gpiolib.h>
 #include <linux/of.h>
-#ifndef MESON_CPU_TYPE
-#define MESON_CPU_TYPE 0x50
-#endif
-#ifndef MESON_CPU_TYPE_MESON6
-#define MESON_CPU_TYPE_MESON6		0x60
-#endif
-#ifdef CONFIG_ARCH_ARC700
-#include <asm/arch/am_regs.h>
-#else
-#endif
 #include <linux/poll.h>
 #include <linux/delay.h>
-/*#include < mach/gpio.h > */
 #include <linux/platform_device.h>
 #include <linux/slab.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
 #define OWNER_NAME "smc"
-#if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6
-#include <mach/mod_gate.h>
-#include <mach/power_gate.h>
-#endif
 
 #include <linux/version.h>
-//#include <linux/amlogic/aml_gpio_consumer.h>
-#include <linux/amlogic/amsmc.h>
+#include <linux/amsmc.h>
 #include <linux/clk.h>
 #include <linux/reset.h>
-#include <linux/amlogic/media/utils/vdec_reg.h>
 #include <linux/mod_devicetable.h>
 
 #include "smartcard.h"
 #include "c_stb_regs_define.h"
 #include "smc_reg.h"
-
-#define DRIVER_NAME "amsmc"
-#define MODULE_NAME "amsmc"
-#define DEVICE_NAME "amsmc"
-#define CLASS_NAME "amsmc-class"
 
 #define INPUT 0
 #define OUTPUT 1
@@ -157,22 +131,6 @@ static int dcnt;
 /*no used reset ctl,need use clk in 4.9 kernel*/
 static struct clk *aml_smartcard_clk;
 
-#define REG_READ 0
-#define REG_WRITE 1
-void operate_reg(unsigned int reg, int read_write, unsigned int *value)
-{
-	void __iomem *vaddr;
-
-	reg = round_down(reg, 0x3);
-	vaddr = ioremap(reg, 0x4);
-	pr_dbg("smc ioremap %x %p\n", reg, vaddr);
-	if (read_write == REG_READ)
-		*value = readl(vaddr);
-	else if (read_write == REG_WRITE)
-		writel(*value, vaddr);
-	iounmap(vaddr);
-}
-
 #if defined(MEM_DEBUG) || defined(FILE_DEBUG)
 void debug_write(const char __user *buf, size_t count)
 {
@@ -228,7 +186,7 @@ static size_t print_time(u64 ts, char *buf)
 
 static const struct of_device_id smc_dt_match[] = {
 	{
-	 .compatible = "amlogic,smartcard",
+	 .compatible = "amlogic,meson-smc",
 	},
 	{},
 };
@@ -665,17 +623,6 @@ static struct attribute_group smc_attribute_group = {
 static struct class smc_class = {
 	.name = SMC_CLASS_NAME,
 };
-
-long smc_get_reg_base(void)
-{
-	int newbase = 0;
-
-	if (get_cpu_type() > MESON_CPU_MAJOR_ID_TXL &&
-	    get_cpu_type() != MESON_CPU_MAJOR_ID_GXLX) {
-		newbase = 1;
-	}
-	return (newbase) ? 0x9400 : 0x2110;
-}
 
 #ifndef CONFIG_OF
 static int _gpio_request(unsigned int gpio, const char *owner)
@@ -1298,7 +1245,7 @@ end:
 #endif
 }
 
-void smc_reset_prepare(struct smc_dev *smc)
+static void smc_reset_prepare(struct smc_dev *smc)
 {
 	/*reset recv&send buf */
 	smc->send_start = 0;
@@ -1798,10 +1745,6 @@ static void smc_dev_deinit(struct smc_dev *smc)
 	mutex_destroy(&smc->lock);
 
 	smc->init = 0;
-
-#if defined(MESON_CPU_TYPE_MESON8) && (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
-	CLK_GATE_OFF(SMART_CARD_MPEG_DOMAIN);
-#endif
 }
 
 static int _set_gpio(struct smc_dev *smc,
@@ -1815,18 +1758,18 @@ static int _set_gpio(struct smc_dev *smc,
 				   output_level ? GPIOD_OUT_HIGH :
 				   GPIOD_OUT_LOW);
 		if (IS_ERR(*gpiod)) {
-			pr_error("smc %s request failed with %d\n", str, PTR_ERR(*gpiod));
+			pr_error("smc %s request failed with %ld\n", str, PTR_ERR(*gpiod));
 			return -1;
 		}
 		ret = gpiod_direction_output(*gpiod, output_level);
 	} else if (input_output == INPUT) {
 		*gpiod = gpiod_get(&smc->pdev->dev, str, GPIOD_IN);
 		if (IS_ERR(*gpiod)) {
-			pr_error("smc %s request failed with %d\n", str, PTR_ERR(*gpiod));
+			pr_error("smc %s request failed with %ld\n", str, PTR_ERR(*gpiod));
 			return -1;
 		}
 		ret = gpiod_direction_input(*gpiod);
-		ret |= gpiod_set_pull(*gpiod, GPIOD_PULL_UP);
+		//ret |= gpiod_set_pull(*gpiod, GPIOD_PULL_UP);
 	} else {
 		pr_dbg("SMC Request gpio direction invalid\n");
 	}
@@ -1840,11 +1783,13 @@ static int smc_dev_init(struct smc_dev *smc, int id)
 	char buf[32];
 	const char *dts_str;
 	struct resource *res;
+    struct clk *clkc;
 
-#if defined(MESON_CPU_TYPE_MESON8) && (MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON8)
-	CLK_GATE_ON(SMART_CARD_MPEG_DOMAIN);
-#error
-#endif
+    clkc = devm_clk_get_enabled(&smc->pdev->dev, "smartcard");
+    if (IS_ERR(clkc)) {
+		pr_error("failed to get smartcard clock.\n");
+        return PTR_ERR(clkc);
+    }
 	/*of_match_node(smc_dt_match, smc->pdev->dev.of_node); */
 	smc->id = id;
 	smc->pinctrl = devm_pinctrl_get_select_default(&smc->pdev->dev);
@@ -2106,10 +2051,6 @@ static int smc_open(struct inode *inode, struct file *filp)
 
 	smc->used = 1;
 
-#if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6
-	switch_mod_gate_by_name("smart_card", 1);
-#endif
-
 	mutex_unlock(&smc->lock);
 
 	filp->private_data = smc;
@@ -2130,10 +2071,6 @@ static int smc_close(struct inode *inode, struct file *filp)
 #endif
 
 	smc->used = 0;
-
-#if MESON_CPU_TYPE >= MESON_CPU_TYPE_MESON6
-	switch_mod_gate_by_name("smart_card", 0);
-#endif
 
 #ifdef FILE_DEBUG
 	close_debug();
@@ -2456,7 +2393,7 @@ static int smc_probe(struct platform_device *pdev)
 	return smc ? 0 : -1;
 }
 
-static int smc_remove(struct platform_device *pdev)
+static void smc_remove(struct platform_device *pdev)
 {
 	struct smc_dev *smc = (struct smc_dev *)dev_get_drvdata(&pdev->dev);
 
@@ -2467,24 +2404,19 @@ static int smc_remove(struct platform_device *pdev)
 	sysfs_remove_group(&pdev->dev.kobj, &smc_attribute_group);
 
 	mutex_unlock(&smc_lock);
-
-	return 0;
 }
 
 static struct platform_driver smc_driver = {
 	.probe = smc_probe,
 	.remove = smc_remove,
 	.driver = {
-		   .name = "amlogic-smc",
+		   .name = "meson-smc",
 		   .owner = THIS_MODULE,
 		   .of_match_table = smc_dt_match,
 		   },
 };
 
-#if IS_MODULE(CONFIG_AMLOGIC_SMARTCARD)
-static
-#endif
-int __init smc_mod_init(void)
+static int __init smc_mod_init(void)
 {
 	int ret = -1;
 
@@ -2515,10 +2447,7 @@ error_register_chrdev:
 	return ret;
 }
 
-#if IS_MODULE(CONFIG_AMLOGIC_SMARTCARD)
-static
-#endif
-void __exit smc_mod_exit(void)
+static void __exit smc_mod_exit(void)
 {
 	platform_driver_unregister(&smc_driver);
 	class_unregister(&smc_class);
@@ -2526,11 +2455,9 @@ void __exit smc_mod_exit(void)
 	mutex_destroy(&smc_lock);
 }
 
-#if IS_MODULE(CONFIG_AMLOGIC_SMARTCARD)
 module_init(smc_mod_init);
 module_exit(smc_mod_exit);
 
 MODULE_AUTHOR("AMLOGIC");
 MODULE_DESCRIPTION("AMLOGIC smart card driver");
 MODULE_LICENSE("GPL");
-#endif
