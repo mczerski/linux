@@ -80,22 +80,10 @@
                  <&reset RESET_PERIPHS_ASYNC_0>,
                  <&reset RESET_PERIPHS_ASYNC_1>;
         reset-names = "demux_rst", "des_rst", "demux0_rst", "demux1_rst", "demux2_rst", "async0_rst", "async1_rst";
-    };
-
-    dvb-fe {
-        compatible = "amlogic,dvb-bridge";
-
-        demux = <&dvb_demux>;
 
         frontend@0 {
-            //demod-i2c-bus = <&i2c_B>;
-            //demod-i2c-addr = <0x6c>;
-            //demod-module = "cxd2878";
-            //demod-id = "cxd2878-24-p";
-            //tuner-i2c-bus = <&i2c_B>;
-            //tuner-i2c-addr = <0x63>;
-            //tuner-module = "mxl603";
-            //tuner-id = "mxl603-16";
+            compatible = "amlogic,dvb-fe";
+
             demod-dev = <&dvb_demod0>;
             tuner-dev = <&dvb_tuner0>;
         };
@@ -142,16 +130,42 @@
     pinctrl-names = "default";
 
     dvb_demod0: dvb-demod@6c {
-        compatible = "sony,cxd2878-24-p";
+        compatible = "sony,cxd2878";
         reg = <0x6c>;
+
+        reset-gpios = <&gpio GPIODV_24 GPIO_ACTIVE_LOW>;
+
+        sony,xtal-freq-khz = <24000>;
+        sony,ts-mode = <1>;
+        sony,ts-serial-data-pin = <0>;
+        sony,ts-clock-mode = <1>;
+        sony,ts-clock-mask = <1>;
+        sony,ts-valid-mask = <0>;
+        sony,atsc-core-disable = <0>;
 
         i2c-gate {
             #address-cells = <1>;
             #size-cells = <0>;
 
             dvb_tuner0: dvb-tuner@63 {
-                compatible = "maxlinear,mxl603-16";
+                compatible = "maxlinear,mxl603";
                 reg = <0x63>;
+
+                maxlinear,xtal-freq-khz = <16000>;
+                maxlinear,if-frequency = "5MHz";
+                maxlinear,agc-type = "self";
+                maxlinear,xtal-cap = <16>;
+                maxlinear,gain-level = <11>;
+                maxlinear,if-out-gain-level = <11>;
+                maxlinear,agc-set-point = <66>;
+                maxlinear,clk-out-div = <0>;
+                maxlinear,clk-out-ext = <0>;
+                maxlinear,agc-invert-pol = <1>;
+                maxlinear,invert-if = <1>;
+                maxlinear,loop-thru-enable = <0>;
+                maxlinear,clk-out-enable = <1>;
+                maxlinear,xtal-sharing-mode = <0>;
+                maxlinear,single-supply-3-3v = <1>;
             };
         };
     };

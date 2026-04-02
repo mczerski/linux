@@ -72,6 +72,7 @@ struct mxl603_config {
 	u8 clk_out_ext;
 	u8 xtal_sharing_mode;
 	u8 single_supply_3_3V;
+	struct dvb_frontend *fe;
 };
 
 #endif /* __MXL603_H__ */
