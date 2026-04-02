@@ -24,6 +24,7 @@
 #include <linux/sched/clock.h>
 #include <linux/compat.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
@@ -1852,13 +1853,12 @@ static int smc_dev_init(struct smc_dev *smc, int id)
 	if (smc->irq_num == -1) {
 		snprintf(buf, sizeof(buf), "smc%d_irq", id);
 
-		res = platform_get_resource_byname(smc->pdev,
-						   IORESOURCE_IRQ, buf);
-		if (!res) {
+		ret = of_irq_get_byname(smc->pdev->dev.of_node, buf);
+		if (ret <= 0) {
 			pr_error("cannot get resource \"%s\"\n", buf);
 			return -1;
 		}
-		smc->irq_num = res->start;
+		smc->irq_num = ret;
 	}
 
 	smc->pin_clk_pinmux_reg = -1;
