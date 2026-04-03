@@ -12,9 +12,11 @@
 #define HWTUNE
 
 struct m88rs6060_dev {
+	struct i2c_client *client;
 	struct regmap *regmap;
 	struct i2c_mux_core *muxc;
-	struct i2c_client *client;
+	struct i2c_client *tuner_client;
+	struct regmap *tuner_regmap;
 	struct m88rs6060_cfg config;
 
 	enum fe_status fe_status;
@@ -567,77 +569,24 @@ static struct MT_FE_PLS_INFO mPLSInfoTable[] = {
 	{ 0xFF, FALSE, MtFeType_DvbS2X, MtFeModMode_Undef, MtFeCodeRate_Undef,
 	  TRUE, FALSE, 0 }
 };
+
 static int rs6060_set_reg(struct m88rs6060_dev *dev, u8 reg, u8 data)
 {
-	u8 select[] = { 0x03, 0x11 };
-	u8 buf[] = { reg, data };
-	int ret;
-	struct i2c_msg msg[] = { { .addr = dev->config.demod_adr,
-				   .flags = 0,
-				   .buf = select,
-				   .len = ARRAY_SIZE(select) },
-				 { .addr = dev->config.tuner_adr,
-				   .flags = 0,
-				   .buf = buf,
-				   .len = ARRAY_SIZE(buf) } };
-
-	i2c_lock_bus(dev->client->adapter, I2C_LOCK_ROOT_ADAPTER);
-	ret = __i2c_transfer(dev->client->adapter, &msg[0], 1);
-	if (ret != 1)
-		dev_dbg(&dev->client->dev, "fail=%d\n", ret);
-
-	ret = __i2c_transfer(dev->client->adapter, &msg[1], 1);
-	i2c_unlock_bus(dev->client->adapter, I2C_LOCK_ROOT_ADAPTER);
-	if (ret != 1) {
-		dev_err(&dev->client->dev,
-			"0x%02x (ret=%i, reg=0x%02x, value=0x%02x)\n",
-			dev->config.tuner_adr, ret, reg, data);
-		return -EREMOTEIO;
-	}
-
-	dev_dbg(&dev->client->dev, "0x%02x reg 0x%02x, value 0x%02x\n",
-		dev->config.tuner_adr, reg, data);
-
-	return 0;
+	return regmap_write(dev->tuner_regmap, reg, data);
 }
 
 static int rs6060_get_reg(struct m88rs6060_dev *dev, u8 reg)
 {
-	struct i2c_adapter *i2c = dev->client->adapter;
+	unsigned int val;
 	int ret;
-	u8 select[] = { 0x03, dev->config.repeater_value };
-	u8 b0[] = { reg };
-	u8 b1[] = { 0 };
-	struct i2c_msg msg[] = { { .addr = dev->config.demod_adr,
-				   .flags = 0,
-				   .buf = select,
-				   .len = ARRAY_SIZE(select) },
-				 { .addr = dev->config.tuner_adr,
-				   .flags = 0,
-				   .buf = b0,
-				   .len = ARRAY_SIZE(b0) },
-				 { .addr = dev->config.tuner_adr,
-				   .flags = I2C_M_RD,
-				   .buf = b1,
-				   .len = ARRAY_SIZE(b1) } };
 
-	i2c_lock_bus(i2c, I2C_LOCK_ROOT_ADAPTER);
-	ret = __i2c_transfer(i2c, &msg[0], 1);
-	if (ret != 1)
-		dev_dbg(&dev->client->dev, "fail=%d\n", ret);
-
-	ret = __i2c_transfer(i2c, &msg[1], 2);
-	i2c_unlock_bus(i2c, I2C_LOCK_ROOT_ADAPTER);
-	if (ret != 2) {
-		dev_err(&dev->client->dev, "0x%02x (ret=%d, reg=0x%02x)\n",
-			dev->config.tuner_adr, ret, reg);
-		return -EREMOTEIO;
+	ret = regmap_read(dev->tuner_regmap, reg, &val);
+	if (ret) {
+		dev_dbg(&dev->tuner_client->dev, "get reg %d fail=%d\n", reg,
+			ret);
 	}
 
-	dev_dbg(&dev->client->dev, "0x%02x reg 0x%02x, value 0x%02x\n",
-		dev->config.tuner_adr, reg, b1[0]);
-
-	return b1[0];
+	return val;
 }
 
 static int m88rs6060_fireware_download(struct m88rs6060_dev *dev, u8 reg,
@@ -2656,7 +2605,7 @@ m88rs6060_diseqc_send_master_cmd(struct dvb_frontend *fe,
 	if (ret)
 		goto err;
 
-	/* wait DiSEqC TX ready */
+		/* wait DiSEqC TX ready */
 #define SEND_MASTER_CMD_TIMEOUT 120
 	timeout = jiffies + msecs_to_jiffies(SEND_MASTER_CMD_TIMEOUT);
 
@@ -2737,7 +2686,7 @@ static int m88rs6060_diseqc_send_burst(struct dvb_frontend *fe,
 	if (ret)
 		goto err;
 
-	/* wait DiSEqC TX ready */
+		/* wait DiSEqC TX ready */
 #define SEND_BURST_TIMEOUT 40
 	timeout = jiffies + msecs_to_jiffies(SEND_BURST_TIMEOUT);
 
@@ -2987,6 +2936,7 @@ static const struct dvb_frontend_ops m88rs6060_ops = {
 	.diseqc_send_burst = m88rs6060_diseqc_send_burst,
 	.diseqc_send_master_cmd = m88rs6060_diseqc_send_master_cmd,
 };
+
 static int m88rs6060_ready(struct m88rs6060_dev *dev)
 {
 	int ret, len, rem;
@@ -3069,13 +3019,22 @@ err:
 static int m88rs6060_select(struct i2c_mux_core *muxc, u32 chan)
 {
 	struct m88rs6060_dev *dev = i2c_mux_priv(muxc);
+	struct i2c_adapter *i2c = muxc->parent;
+	u8 select[] = { 0x03, dev->config.repeater_value };
+	struct i2c_msg msg[] = {
+		{ .addr = dev->config.demod_adr,
+		  .flags = 0,
+		  .buf = select,
+		  .len = ARRAY_SIZE(select) },
+	};
 	int ret;
 
-	ret = regmap_write(dev->regmap, 0x03, dev->config.repeater_value);
-	if (ret) {
-		dev_warn(muxc->dev, "i2c wr failed=%d\n", ret);
+	ret = __i2c_transfer(i2c, msg, ARRAY_SIZE(msg));
+	if (ret < 0) {
+		dev_err(muxc->dev, "select fail=%d\n", ret);
 		return ret;
 	}
+
 	return 0;
 }
 
@@ -3110,6 +3069,7 @@ static int m88rs6060_probe(struct i2c_client *client)
 	struct m88rs6060_dev *dev;
 	int ret;
 	unsigned tmp;
+	struct i2c_board_info tuner_info;
 	static const struct regmap_config regmap_config = {
 		.reg_bits = 8,
 		.val_bits = 8,
@@ -3140,7 +3100,7 @@ static int m88rs6060_probe(struct i2c_client *client)
 	dev->regmap = devm_regmap_init_i2c(client, &regmap_config);
 	if (IS_ERR(dev->regmap)) {
 		ret = PTR_ERR(dev->regmap);
-		goto err_base_kfree;
+		goto err;
 	}
 	/*check demod i2c */
 	ret = regmap_read(dev->regmap, 0x00, &tmp);
@@ -3149,20 +3109,37 @@ static int m88rs6060_probe(struct i2c_client *client)
 	}
 	if (tmp != 0xe2) {
 		ret = -ENODEV;
-		goto err_base_kfree;
+		goto err;
 	}
 
 	/* create mux i2c adapter for internal tuner */
-	dev->muxc = i2c_mux_alloc(client->adapter, &dev->client->dev, 1, 0, 0,
-				  m88rs6060_select, NULL);
+	dev->muxc = i2c_mux_alloc(client->adapter, &dev->client->dev, 1, 0,
+				  I2C_MUX_GATE, m88rs6060_select, NULL);
 	if (!dev->muxc) {
 		ret = -ENOMEM;
-		goto err_base_kfree;
+		goto err;
 	}
 	dev->muxc->priv = dev;
 	ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
 	if (ret)
-		goto err_base_kfree;
+		goto err;
+
+	memset(&tuner_info, 0, sizeof(tuner_info));
+	tuner_info.addr = cfg->tuner_adr;
+	dev->tuner_client =
+		i2c_new_client_device(dev->muxc->adapter[0], &tuner_info);
+	if (IS_ERR(dev->tuner_client)) {
+		dev_err(&client->dev, "Failed to create i2c tuner client\n");
+		ret = PTR_ERR(client);
+		goto err_i2c_adapter;
+	}
+
+	dev->tuner_regmap =
+		devm_regmap_init_i2c(dev->tuner_client, &regmap_config);
+	if (IS_ERR(dev->tuner_regmap)) {
+		ret = PTR_ERR(dev->tuner_regmap);
+		goto err_i2c_adapter;
+	}
 
 	dev->mclk = 96000;
 	dev->fe_status = 0;
@@ -3181,17 +3158,18 @@ static int m88rs6060_probe(struct i2c_client *client)
 	if (ret) {
 		dev_err(&dev->client->dev, "%s:Failed to add as component\n",
 			KBUILD_MODNAME);
-		goto err_i2c_adapter;
+		goto err_tuner_client;
 	}
 
 	return 0;
 
+err_tuner_client:
+	i2c_unregister_device(dev->tuner_client);
+
 err_i2c_adapter:
 	i2c_mux_del_adapters(dev->muxc);
 
-err_base_kfree:
 err:
-
 	dev_warn(&dev->client->dev, "probe failed = %d\n", ret);
 	return ret;
 }
@@ -3203,6 +3181,7 @@ static void m88rs6060_remove(struct i2c_client *client)
 
 	dev_dbg(&dev->client->dev, "\n");
 
+	i2c_unregister_device(dev->tuner_client);
 	i2c_mux_del_adapters(dev->muxc);
 }
 
