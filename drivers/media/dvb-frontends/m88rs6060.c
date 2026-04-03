@@ -11,7 +11,6 @@
 #include <linux/i2c-mux.h>
 #define HWTUNE
 
-static LIST_HEAD(m88rs6060list);
 static LIST_HEAD(si5351list);
 struct si5351_base{
 	struct list_head si5351list;
@@ -29,16 +28,6 @@ struct si5351_priv{
 	u32 plla_freq;
 	u32 pllb_freq;
 };
-struct m88rs6060_base{
-	struct list_head m88rs6060list;
-	struct mutex i2c_mutex;
-	struct i2c_adapter *i2c;	// i2c
-	u8 adr;
-	u32	count;
-//	struct i2c_client *tuner_client;	//tuner i2c
-
-};
-
 struct m88rs6060_dev {
 	struct regmap *regmap;	//demod
 	enum fe_status fe_status;
@@ -52,9 +41,9 @@ struct m88rs6060_dev {
 	u32 frequecy;    //khz
 	u64 post_bit_error;
 	u64 post_bit_count;
-	struct m88rs6060_base *base;
 	struct si5351_priv *priv;
 	struct i2c_mux_core *muxc;
+	struct i2c_adapter *i2c;	// i2c
 	bool newTP;
 
 };
@@ -903,21 +892,21 @@ static int rs6060_set_reg(struct m88rs6060_dev *dev, u8 reg, u8 data)
 		{.addr = dev->config.demod_adr,.flags = 0,.buf = select,.len = ARRAY_SIZE(select)},
 		{.addr = dev->config.tuner_adr,.flags = 0,.buf = buf,.len = ARRAY_SIZE(buf)}};
 
-	i2c_lock_bus(dev->base->i2c, I2C_LOCK_ROOT_ADAPTER);
-	ret = __i2c_transfer(dev->base->i2c, &msg[0], 1);
+	i2c_lock_bus(dev->i2c, I2C_LOCK_ROOT_ADAPTER);
+	ret = __i2c_transfer(dev->i2c, &msg[0], 1);
 	if (ret != 1)
-		dev_dbg(&dev->base->i2c->dev, "fail=%d\n", ret);
+		dev_dbg(&dev->i2c->dev, "fail=%d\n", ret);
 
-	ret = __i2c_transfer(dev->base->i2c, &msg[1], 1);
-	i2c_unlock_bus(dev->base->i2c, I2C_LOCK_ROOT_ADAPTER);
+	ret = __i2c_transfer(dev->i2c, &msg[1], 1);
+	i2c_unlock_bus(dev->i2c, I2C_LOCK_ROOT_ADAPTER);
 	if (ret != 1) {
-		dev_err(&dev->base->i2c->dev,
+		dev_err(&dev->i2c->dev,
 			"0x%02x (ret=%i, reg=0x%02x, value=0x%02x)\n",
 			dev->config.tuner_adr, ret, reg, data);
 		return -EREMOTEIO;
 	}
 
-	dev_dbg(&dev->base->i2c->dev, "0x%02x reg 0x%02x, value 0x%02x\n",
+	dev_dbg(&dev->i2c->dev, "0x%02x reg 0x%02x, value 0x%02x\n",
 		dev->config.tuner_adr, reg, data);
 
 	return 0;
@@ -926,7 +915,7 @@ static int rs6060_set_reg(struct m88rs6060_dev *dev, u8 reg, u8 data)
 static int rs6060_get_reg(struct m88rs6060_dev *dev, u8 reg)
 {
 
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
 	u8 select[] = { 0x03, dev->config.repeater_value };
 	u8 b0[] = { reg };
@@ -949,13 +938,13 @@ static int rs6060_get_reg(struct m88rs6060_dev *dev, u8 reg)
 		 .len = ARRAY_SIZE(b1)}
 	};
 
-	i2c_lock_bus(dev->base->i2c, I2C_LOCK_ROOT_ADAPTER);
+	i2c_lock_bus(dev->i2c, I2C_LOCK_ROOT_ADAPTER);
 	ret = __i2c_transfer(i2c, &msg[0], 1);
 	if (ret != 1)
 		dev_dbg(&i2c->dev, "fail=%d\n", ret);
 
 	ret = __i2c_transfer(i2c, &msg[1], 2);
-	i2c_unlock_bus(dev->base->i2c, I2C_LOCK_ROOT_ADAPTER);
+	i2c_unlock_bus(dev->i2c, I2C_LOCK_ROOT_ADAPTER);
 	if (ret != 2) {
 		dev_err(&i2c->dev, "0x%02x (ret=%d, reg=0x%02x)\n",
 			dev->config.tuner_adr, ret, reg);
@@ -972,7 +961,7 @@ static int rs6060_get_reg(struct m88rs6060_dev *dev, u8 reg)
 static int m88rs6060_fireware_download(struct m88rs6060_dev *dev, u8 reg,
 				       const u8 * data, int len)
 {
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
     	u8 buf[70];
     	struct i2c_msg msg = {
@@ -1776,7 +1765,7 @@ static void m88res6060_set_ts_mode(struct m88rs6060_dev *dev)
 static int m88rs6060_set_frontend(struct dvb_frontend *fe)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
 	int ret;
 	u32 symbol_rate_KSs;
@@ -1815,8 +1804,6 @@ static int m88rs6060_set_frontend(struct dvb_frontend *fe)
 	if(dev->config.LED_switch)
 		dev->config.LED_switch(i2c,2);  //
 				
-	mutex_lock(&dev->base->i2c_mutex);
-	
 	symbol_rate_KSs = c->symbol_rate / 1000;
 	realFreq = c->frequency;
 	/*reset */
@@ -2046,11 +2033,9 @@ static int m88rs6060_set_frontend(struct dvb_frontend *fe)
 	if(dev->config.HAS_CI)
 		dev->newTP = true;
 		
-	mutex_unlock(&dev->base->i2c_mutex);
 	return 0;
 
  err:
- 	mutex_unlock(&dev->base->i2c_mutex);
 	dev_dbg(&i2c->dev, "failed = %d", ret);
 	return ret;
 }
@@ -2063,7 +2048,7 @@ static enum dvbfe_algo m88rs6060_get_algo(struct dvb_frontend *fe)
 static int m88rs6060_init(struct dvb_frontend *fe)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
 
 	/*warm state */
@@ -2266,7 +2251,7 @@ static int rs6060_select_xm(struct m88rs6060_dev*dev,u32 *xm_KHz)
 
 static int m88rs6060_set_clock_ratio(struct m88rs6060_dev *dev )
 {
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	unsigned mod_fac,tmp1,tmp2,val;
 	u32 input_datarate,locked_sym_rate_KSs;
 	u32 Mclk_KHz = 96000,iSerialMclkHz;
@@ -2472,7 +2457,7 @@ static int m88rs6060_read_status(struct dvb_frontend *fe,
 				 enum fe_status *status)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
 	int ret, i, itmp;
 	unsigned int utmp;
@@ -2487,7 +2472,6 @@ static int m88rs6060_read_status(struct dvb_frontend *fe,
 		ret = -EAGAIN;
 		goto err;
 	}
-	mutex_lock(&dev->base->i2c_mutex);
 	switch (c->delivery_system) {
 	case SYS_DVBS:
 		ret = regmap_read(dev->regmap, 0x0d, &utmp);
@@ -2713,11 +2697,8 @@ static int m88rs6060_read_status(struct dvb_frontend *fe,
 	c->post_bit_error.len = 1;
 	c->post_bit_count.len = 1;
 	
-	mutex_unlock(&dev->base->i2c_mutex);
-	
 	return 0;
  err:
- 	mutex_unlock(&dev->base->i2c_mutex);
 	dev_dbg(&i2c->dev, "failed=%d\n", ret);
 	return ret;
 }
@@ -2765,7 +2746,7 @@ static int m88rs6060_set_voltage(struct dvb_frontend*fe,
 								enum fe_sec_voltage voltage)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
 	u8 utmp;
 	bool voltage_sel, lnb_power;
@@ -2801,7 +2782,7 @@ static int m88rs6060_set_tone(struct dvb_frontend *fe,
 			      enum fe_sec_tone_mode fe_sec_tone_mode)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
 	u8 utmp, tone, reg_a1_mask;
 
@@ -2848,7 +2829,7 @@ static int m88rs6060_diseqc_send_master_cmd(struct dvb_frontend *fe, struct dvb_
 					    *diseqc_cmd)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
 	u8 utmp;
 	unsigned long timeout;
@@ -2929,7 +2910,7 @@ static int m88rs6060_diseqc_send_burst(struct dvb_frontend *fe,
 				       enum fe_sec_mini_cmd fe_sec_mini_cmd)
 {
 	struct m88rs6060_dev *dev = fe->demodulator_priv;
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret;
 	u8 utmp, burst;
 	unsigned long timeout;
@@ -3144,13 +3125,13 @@ static const struct dvb_frontend_ops m88rs6060_ops = {
 static int m88rs6060_ready(struct m88rs6060_dev *dev)
 {
 	//struct m88rs6060_dev *dev= i2c_get_clientdata(client);
-	struct i2c_adapter *i2c = dev->base->i2c;
+	struct i2c_adapter *i2c = dev->i2c;
 	int ret, len, rem;
 	const struct firmware *firmware;
 	const char *name = M88RS6060_FIRMWARE;
 	unsigned val;
 		
-	dev_dbg(&dev->base->i2c->dev, "%s", __func__);
+	dev_dbg(&dev->i2c->dev, "%s", __func__);
 
 	//reset the harware;
 	m88rs6060_hard_rest(dev);
@@ -3220,15 +3201,7 @@ static int m88rs6060_ready(struct m88rs6060_dev *dev)
 	return ret;
 	
 }
-static struct m88rs6060_base*match_base(struct i2c_adapter*i2c,u8 adr)
-{
-	struct m88rs6060_base*p;
-	
-	list_for_each_entry(p,&m88rs6060list,m88rs6060list)
-		if(p->i2c == i2c)  // for two adapter in same i2c.
-			return p;
-	return NULL;
-}
+
 static struct si5351_base*match_si5351_base(struct i2c_adapter*i2c,int clk_port)
 {
 	struct si5351_base*p;
@@ -3286,7 +3259,6 @@ static int m88rs6060_probe(struct i2c_client *client)
 {
 	const struct m88rs6060_cfg *cfg = i2c_get_match_data(client);
 	struct m88rs6060_dev *dev;
-	struct m88rs6060_base *base;
 	int ret;
 	unsigned tmp;
 	static const struct regmap_config regmap_config = {
@@ -3326,24 +3298,7 @@ static int m88rs6060_probe(struct i2c_client *client)
 	dev->config.num = cfg->num;
 	dev->newTP = 0;
 	
-
-	//for i2c
-	base = match_base(client->adapter,client->addr);
-	if(base){
-		base->count++;
-		dev->base = base;
-	}else{
-		base = kzalloc(sizeof(struct m88rs6060_base),GFP_KERNEL);
-		if(!base)
-			goto err;
-		base->i2c = client->adapter;
-		base->count = 1;
-		base->adr = client->addr;		
-		mutex_init(&base->i2c_mutex);
-		list_add(&base->m88rs6060list,&m88rs6060list);
-		dev->base= base;
-	}
-	
+    dev->i2c = client->adapter;
 	dev->regmap = devm_regmap_init_i2c(client, &regmap_config);
 	if (IS_ERR(dev->regmap)) {
 		ret = PTR_ERR(dev->regmap);
@@ -3437,11 +3392,6 @@ err_i2c_adapter:
     i2c_mux_del_adapters(dev->muxc);
 
 err_base_kfree:
-	base->count--;
-	if (base->count==0) {
-		list_del(&base->m88rs6060list);
-		kfree(base);
-	}
 err:
 
 	dev_warn(&client->dev, "probe failed = %d\n", ret);
@@ -3457,12 +3407,6 @@ static void m88rs6060_remove(struct i2c_client *client)
 
 	i2c_mux_del_adapters(dev->muxc);
 
-	dev->base->count --;
-	if(dev->base->count==0)
-	{	
-		list_del(&dev->base->m88rs6060list);
-		kfree(dev->base);	 
-	}
 	if(dev->priv){
 		dev->priv->base1->count --;
 		if(dev->priv->base1->count==0){
