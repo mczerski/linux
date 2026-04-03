@@ -276,20 +276,6 @@ err:
 	dev_err(&dev->i2c_slvt->dev,"%s :cxd2878_atsc_softreset error! \n",KBUILD_MODNAME);
 	return ret;	
 }
-static int cxd2878_i2c_repeater(struct cxd2878_dev *dev,bool enable)
-{
-	int ret;
-
-	ret = cxd2878_wr(dev,dev->slvx,0x08,enable?1:0);
-	if(ret)
-		goto err;
-
-	return 0;
-
-err:
-	dev_err(&dev->i2c_slvt->dev,"%s : %sable thee repeater failed! \n",KBUILD_MODNAME,enable?"en":"dis");
-	return ret;
-}
 
 static int cxd2878_setstreamoutput(struct cxd2878_dev*dev,int enable)
 {
@@ -2431,24 +2417,38 @@ static const struct dvb_frontend_ops cxd2878_ops = {
 			.read_ucblocks			= cxd2878_read_ucblocks,
 };
 
-static int cxd2878_select(struct i2c_mux_core *muxc, u32 chan)
+static int cxd2878_i2c_repeater(struct i2c_mux_core *muxc, u8 enable)
 {
 	struct cxd2878_dev *dev = i2c_mux_priv(muxc);
-	if (!dev->warm) {
-		cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
-		msleep(2);
-	}
-	return cxd2878_i2c_repeater(dev, 1);
+	struct i2c_adapter *i2c = muxc->parent;
+	u8 select[] = { 0x08, enable };
+	struct i2c_msg msg[] = {
+        {
+            .addr = dev->i2c_slvx->addr,
+			.flags = 0,
+			.buf = select,
+			.len = ARRAY_SIZE(select)
+        },
+    };
+	int ret;
+
+	ret = __i2c_transfer(i2c, msg, ARRAY_SIZE(msg));
+	if (ret < 0) {
+		dev_err(muxc->dev, "select fail=%d\n", ret);
+        return ret;
+    }
+
+	return 0;
+}
+
+static int cxd2878_select(struct i2c_mux_core *muxc, u32 chan)
+{
+    return cxd2878_i2c_repeater(muxc, 1);
 }
 
 static int cxd2878_deselect(struct i2c_mux_core *muxc, u32 chan)
 {
-	struct cxd2878_dev *dev = i2c_mux_priv(muxc);
-	if (!dev->warm) {
-		cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
-		msleep(2);
-	}
-	return cxd2878_i2c_repeater(dev, 0);
+    return cxd2878_i2c_repeater(muxc, 0);
 }
 
 static int cxd2878_bind(struct device *dev,
@@ -2461,7 +2461,7 @@ static int cxd2878_bind(struct device *dev,
 	fe->demodulator_priv = priv;
 	memcpy(&fe->ops, &cxd2878_ops, sizeof(struct dvb_frontend_ops));
 
-	return 0;
+	return cxd2878_init(fe);
 }
 
 static void cxd2878_unbind(struct device *dev,
@@ -2671,7 +2671,7 @@ static int cxd2878_probe(struct i2c_client *client)
 	dev->chipid = id;
 
     /* create mux i2c adapter for tuner */
-    dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE | I2C_MUX_LOCKED,
+    dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE,
                   cxd2878_select, cxd2878_deselect);
     if (!dev->muxc) {
         ret = -ENOMEM;
