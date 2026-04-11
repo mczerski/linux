@@ -483,6 +483,7 @@ extern const struct regmap_config aml_demux_regmap_config;
 extern const struct regmap_config aml_async_regmap_config;
 
 /* Core functions */
+struct dvb_adapter *aml_dvb_adapter(struct device *dev);
 int aml_dvb_clk_enable(struct aml_dvb *dvb);
 void aml_dvb_clk_disable(struct aml_dvb *dvb);
 void aml_dvb_hw_reset(struct aml_dvb *dvb);

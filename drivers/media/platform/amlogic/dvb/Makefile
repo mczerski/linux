@@ -1,4 +1,4 @@
-obj-$(CONFIG_DVB_AMLOGIC) += amlogic-dvb.o
+obj-$(CONFIG_DVB_AMLOGIC) += amlogic-dvb.o amlogic-fe.o
 
 amlogic-dvb-y := \
 	amlogic-dvb-asyncfifo.o \
@@ -10,5 +10,7 @@ amlogic-dvb-y := \
 	amlogic-dvb-regmap.o    \
 	amlogic-dvb-stats.o     \
 	amlogic-dvb-ts.o
+
+amlogic-fe-y := amlogic-dvb-frontend.o
 
 ccflags-y += -I$(src)

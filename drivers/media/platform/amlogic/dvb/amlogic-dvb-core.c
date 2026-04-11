@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/regmap.h>
@@ -723,6 +724,8 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		dvb->caps.num_demux);
 	for (i = 0; i < dvb->caps.num_demux; i++) {
 		struct aml_dmx *dmx = &dvb->demux[i];
+		u32 dmx_ts;
+		char buf[32];
 
 		dev_dbg(dev, "aml_dvb_probe: demux %d - setting up structure\n",
 			i);
@@ -800,6 +803,14 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		dev_dbg(dev,
 			"aml_dvb_probe: demux %d - IRQ handler registered OK\n",
 			i);
+
+		snprintf(buf, sizeof(buf), "dmx%d_ts", i);
+		if (!of_property_read_u32(dev->of_node, buf, &dmx_ts)) {
+			dev_info(dev, "setting demux%d source to ts%d\n", i,
+				 dmx_ts);
+			aml_dmx_set_source(&dvb->demux[i],
+					   AML_TS_SRC_FRONTEND_TS0 + dmx_ts);
+		}
 	}
 	dev_dbg(dev,
 		"aml_dvb_probe: all demux cores initialized successfully\n");
@@ -876,6 +887,9 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	pm_runtime_use_autosuspend(dev);
 
 	dev_info(dev, AML_DVB_CARD_NAME " " AML_DVB_VERSION " loaded\n");
+
+    // probe frontend drivers
+    devm_of_platform_populate(dev);
 
 	return 0;
 
@@ -997,6 +1011,17 @@ static struct platform_driver aml_dvb_driver = {
         .pm    = &aml_dvb_pm_ops,
     },
 };
+
+struct dvb_adapter *aml_dvb_adapter(struct device *dev)
+{
+	struct aml_dvb *dvb;
+	if (!dev || !dev->driver || dev->driver != &aml_dvb_driver.driver)
+		return ERR_PTR(-EINVAL);
+
+	dvb = dev_get_drvdata(dev);
+	return &dvb->adapter;
+}
+EXPORT_SYMBOL_GPL(aml_dvb_adapter);
 
 /* ---------------------------------------------------------------------- */
 /* Module Init/Exit — Register I2C and Platform Drivers Together */
