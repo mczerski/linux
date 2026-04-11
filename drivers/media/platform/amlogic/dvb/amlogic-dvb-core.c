@@ -366,69 +366,21 @@ static int aml_dvb_init_regmaps(struct aml_dvb *dvb)
 }
 
 /* ---------------------------------------------------------------------- */
-/* GPIO initialization — NOTLAR */
-/* ---------------------------------------------------------------------- */
-static int aml_dvb_init_gpio(struct aml_dvb *dvb)
-{
-	/* GPIOs (power-gpios, reset-gpios) are defined in the I2C client node
-	 * (frontend0) in mainline DTS, not in the platform device node.
-	 *
-	 * Demod-specific power/reset sequence is managed by avl6862_probe()
-	 * via the aml_demod_power_reset(&client->dev) call.
-	 * This function is intentionally left empty. */
-	return 0;
-}
-
-/* ---------------------------------------------------------------------- */
 /* Pinctrl initialization */
 /* ---------------------------------------------------------------------- */
-int aml_pinctrl_init(struct aml_dvb *dvb)
+static int aml_pinctrl_init(struct aml_dvb *dvb)
 {
 	struct device *dev = dvb->dev;
-	int ret;
+	struct pinctrl *pctrl;
 
-	dvb->pinctrl = devm_pinctrl_get(dev);
-	if (IS_ERR(dvb->pinctrl)) {
-		if (PTR_ERR(dvb->pinctrl) == -EPROBE_DEFER)
-			return -EPROBE_DEFER;
-		dev_info(dev, "Pinctrl not available\n");
-		dvb->pinctrl = NULL;
-		return 0;
-	}
-
-	/* Try "parallel" or legacy "default" state.
-     * If ts-serial = <0>, aml_ts_input_init() selects the "parallel" state;
-     * if ts-serial = <1>, it selects "serial".
-     * During probe, "parallel" is used as the initial state. */
-	dvb->pins_default = pinctrl_lookup_state(dvb->pinctrl, "parallel");
-	if (IS_ERR(dvb->pins_default)) {
-		/* Backwards compatibility: try legacy "default" name */
-		dvb->pins_default =
-			pinctrl_lookup_state(dvb->pinctrl, "default");
-		if (IS_ERR(dvb->pins_default)) {
-			dev_info(
-				dev,
-				"No 'parallel' or 'default' pinctrl state found\n");
-			dvb->pins_default = NULL;
-		}
-	}
-
-	if (dvb->pins_default) {
-		ret = pinctrl_select_state(dvb->pinctrl, dvb->pins_default);
-		if (ret)
-			dev_warn(dev, "Pinctrl apply failed: %d\n", ret);
-		else
-			dev_info(dev, "Pinctrl: initial state applied\n");
+	pctrl = devm_pinctrl_get_select_default(dev);
+	if (IS_ERR(pctrl)) {
+		dev_err(dev, "Failed to setup pinctrl\n");
+		return PTR_ERR(pctrl);
 	}
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(aml_pinctrl_init);
-
-void aml_pinctrl_release(struct aml_dvb *dvb)
-{
-}
-EXPORT_SYMBOL_GPL(aml_pinctrl_release);
 
 /* ---------------------------------------------------------------------- */
 /* Clock and reset */
@@ -605,203 +557,6 @@ static irqreturn_t aml_dvb_irq_thread(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-/* ---------------------------------------------------------------------- */
-/* Platform driver */
-/* ---------------------------------------------------------------------- */
-
-/* ======================================================================
- * /proc/bus/nim_sockets — Enigma2 compatibility
- *
- * Format (Enigma2 beklentisi):
- *   NIM Socket <N>:
- *   	Type: DVB-S2
- *   	Name: Availink avl6862
- *   	Frontend_Device: 0
- *   	I2C_Device: 3
- *   	Has_Outputs: no
- * ====================================================================== */
-
-/*
- * aml_nim_type_str — Scans delsys[] for Enigma2's Type: field,
- * returns the most capable mode (T2 > T, S2 > S, C).
- */
-static const char *aml_nim_type_str(struct dvb_frontend *fe)
-{
-	bool has_t2 = false, has_t = false;
-	bool has_s2 = false, has_s = false;
-	bool has_c = false;
-	int j;
-
-	if (!fe)
-		return "UNKNOWN";
-
-	for (j = 0; j < MAX_DELSYS; j++) {
-		switch (fe->ops.delsys[j]) {
-		case SYS_DVBT2:
-			has_t2 = true;
-			break;
-		case SYS_DVBT:
-			has_t = true;
-			break;
-		case SYS_DVBS2:
-			has_s2 = true;
-			break;
-		case SYS_DVBS:
-			has_s = true;
-			break;
-		case SYS_DVBC_ANNEX_A:
-		case SYS_DVBC_ANNEX_B:
-			has_c = true;
-			break;
-		default:
-			break;
-		}
-	}
-
-	/* Multi-mode: primary type based on first delsys */
-	switch (fe->ops.delsys[0]) {
-	case SYS_DVBT:
-	case SYS_DVBT2:
-		return has_t2 ? "DVB-T2" : "DVB-T";
-	case SYS_DVBS:
-	case SYS_DVBS2:
-		return has_s2 ? "DVB-S2" : "DVB-S";
-	case SYS_DVBC_ANNEX_A:
-	case SYS_DVBC_ANNEX_B:
-		return "DVB-C";
-	default:
-		return "UNKNOWN";
-	}
-}
-
-/*
- * aml_nim_scan_modes - Scans fe->ops.delsys[] and extracts unique modes
- *
- * Enigma2 mode groups:
- *   DVB-S  ← SYS_DVBS, SYS_DVBS2
- *   DVB-T  ← SYS_DVBT, SYS_DVBT2
- *   DVB-C  ← SYS_DVBC_ANNEX_A, SYS_DVBC_ANNEX_B
- *
- * modes[] array: marks presence of 0=DVB-S, 1=DVB-T, 2=DVB-C
- * Return value: number of modes found
- */
-static int aml_nim_scan_modes(struct dvb_frontend *fe, bool modes[3])
-{
-	int j, count = 0;
-
-	modes[0] = modes[1] = modes[2] = false;
-
-	for (j = 0; j < MAX_DELSYS; j++) {
-		switch (fe->ops.delsys[j]) {
-		case SYS_DVBS:
-		case SYS_DVBS2:
-			if (!modes[0]) {
-				modes[0] = true;
-				count++;
-			}
-			break;
-		case SYS_DVBT:
-		case SYS_DVBT2:
-			if (!modes[1]) {
-				modes[1] = true;
-				count++;
-			}
-			break;
-		case SYS_DVBC_ANNEX_A:
-		case SYS_DVBC_ANNEX_B:
-			if (!modes[2]) {
-				modes[2] = true;
-				count++;
-			}
-			break;
-		default:
-			break;
-		}
-	}
-	return count;
-}
-
-static int aml_nim_sockets_show(struct seq_file *m, void *v)
-{
-	struct aml_dvb *dvb = m->private;
-	int i;
-
-	for (i = 0; i < dvb->num_frontend; i++) {
-		struct dvb_frontend *fe = dvb->frontend[i];
-		int i2c_num = -1;
-		bool modes[3];
-		int num_modes, mode_idx, j;
-
-		if (!fe)
-			continue;
-
-		if (dvb->demod_client[i])
-			i2c_num = dvb->demod_client[i]->adapter->nr;
-
-		num_modes = aml_nim_scan_modes(fe, modes);
-
-		seq_printf(m, "NIM Socket %d:\n", i);
-		seq_printf(m, "\tType: %s\n", aml_nim_type_str(fe));
-		seq_printf(m, "\tName: %s\n", fe->ops.info.name);
-		seq_printf(m, "\tFrontend_Device: %d\n", i);
-		seq_printf(m, "\tI2C_Device: %d\n", i2c_num);
-		seq_printf(m, "\tHas_Outputs: %s\n",
-			   num_modes > 1 ? "yes" : "no");
-
-		/* Multi-mode: Mode 0/1/2 lines */
-		if (num_modes > 1) {
-			const char *const mode_names[3] = { "DVB-S", "DVB-T",
-							    "DVB-C" };
-			mode_idx = 0;
-			for (j = 0; j < 3; j++) {
-				if (modes[j])
-					seq_printf(m, "\tMode %d: %s\n",
-						   mode_idx++, mode_names[j]);
-			}
-			seq_printf(m, "\tInternally_Connectable: 0\n");
-		}
-	}
-	return 0;
-}
-
-static int aml_nim_sockets_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, aml_nim_sockets_show, pde_data(inode));
-}
-
-static const struct proc_ops aml_nim_sockets_ops = {
-	.proc_open = aml_nim_sockets_open,
-	.proc_read = seq_read,
-	.proc_lseek = seq_lseek,
-	.proc_release = single_release,
-};
-
-static void aml_nim_sockets_create(struct aml_dvb *dvb)
-{
-	struct proc_dir_entry *entry;
-
-	/*
-	 * /proc/bus is always created by the kernel — calling proc_mkdir
-	 * triggers WARN_ON. Use the "bus/nim_sockets" path directly.
-	 */
-	entry = proc_create_data("bus/nim_sockets", 0444, NULL,
-				 &aml_nim_sockets_ops, dvb);
-	if (!entry)
-		dev_warn(dvb->dev, "Failed to create /proc/bus/nim_sockets\n");
-	else
-		dev_info(dvb->dev, "Created /proc/bus/nim_sockets\n");
-
-	dvb->nim_proc_entry = entry;
-}
-
-static void aml_nim_sockets_remove(struct aml_dvb *dvb)
-{
-	if (dvb->nim_proc_entry) {
-		proc_remove(dvb->nim_proc_entry);
-		dvb->nim_proc_entry = NULL;
-	}
-}
-
 static int aml_dvb_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -856,13 +611,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	ret = aml_dvb_init_reset(dvb);
 	if (ret) {
 		dev_err(dev, "aml_dvb_init_reset failed: %d\n", ret);
-		return ret;
-	}
-
-	dev_dbg(dev, "aml_dvb_probe: initializing GPIO\n");
-	ret = aml_dvb_init_gpio(dvb);
-	if (ret) {
-		dev_err(dev, "aml_dvb_init_gpio failed: %d\n", ret);
 		return ret;
 	}
 
@@ -1073,6 +821,16 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		if (!afifo->enabled)
 			continue;
 
+		if (i < dvb->caps.num_demux) {
+			ret = aml_asyncfifo_set_source(&dvb->asyncfifo[i], i);
+			if (ret) {
+				dev_err(dev,
+					"failed to set source for asyncfifo%d: %d\n",
+					i, ret);
+				goto err_demux_release;
+			}
+		}
+
 		snprintf(afifo->irq_name, sizeof(afifo->irq_name),
 			 "asyncfifo%d", i);
 		ret = platform_get_irq(pdev, dvb->caps.num_demux + i);
@@ -1105,12 +863,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 		}
 	}
 
-	dev_dbg(dev, "aml_dvb_probe: probing frontends\n");
-	ret = aml_dvb_probe_frontends(dvb);
-	if (ret) {
-		dev_warn(dev, "Frontend probe failed: %d (continuing)\n", ret);
-	}
-
 	dev_dbg(dev, "aml_dvb_probe: initializing watchdog\n");
 	aml_watchdog_init(dvb);
 
@@ -1124,9 +876,6 @@ static int aml_dvb_probe(struct platform_device *pdev)
 	pm_runtime_use_autosuspend(dev);
 
 	dev_info(dev, AML_DVB_CARD_NAME " " AML_DVB_VERSION " loaded\n");
-
-	/* /proc/bus/nim_sockets — Enigma2 compatibility */
-	aml_nim_sockets_create(dvb);
 
 	return 0;
 
@@ -1155,13 +904,11 @@ err_free_wq:
 static void aml_dvb_remove(struct platform_device *pdev)
 {
 	struct aml_dvb *dvb = platform_get_drvdata(pdev);
-	aml_nim_sockets_remove(dvb);
 	int i;
 
 	dev_dbg(dvb->dev, "aml_dvb_remove: starting\n");
 
 	aml_watchdog_release(dvb);
-	aml_dvb_release_frontends(dvb);
 
 	pm_runtime_disable(dvb->dev);
 	pm_runtime_set_suspended(dvb->dev);

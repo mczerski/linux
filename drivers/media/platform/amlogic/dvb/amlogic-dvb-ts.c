@@ -11,116 +11,22 @@
 
 static int aml_ts_input_init(struct aml_dvb *dvb, int idx)
 {
-	struct device_node *np = dvb->dev->of_node;
-	struct device_node *fe_np = NULL;
-	struct pinctrl_state *pctrl;
+	struct device_node *tsin_np;
+	char tsin_name[32];
 	u32 ts_serial = 0;
 	u32 ts_control = 0; /* DTS ts<n>_control → FEC_INPUT_CONTROL[11:0] */
 	u32 ctrl;
 	int ret;
 
-	/*
-     * Search DTS tsin sub-nodes including disabled ones.
-     * for_each_available_child_of_node() SKIPS disabled nodes,
-     * so for_each_child_of_node() must be used.
-     *
-     * tsin@N { status = "disabled"; } — this TS port is not physically
-     * connected, do not touch. Return 0 and skip.
-     *
-     * tsin@N { status = "okay"; } — enabled, initialise.
-     *
-     * If no tsin@N node exists in DTS, continue for legacy DTS compatibility.
-     */
-	if (np) {
-		struct device_node *child;
-		bool found = false;
-		for_each_child_of_node(np, child) {
-			u32 reg = 0xff;
-			of_property_read_u32(child, "reg", &reg);
-			if (reg != (u32)idx)
-				continue;
-			found = true;
-			if (!of_device_is_available(child)) {
-				dev_info(
-					dvb->dev,
-					"ts_input_init: TS input %d disabled in DTS, skipping\n",
-					idx);
-				of_node_put(child);
-				return 0;
-			}
-			of_node_put(child);
-			break;
-		}
-		(void)found; /* continue if tsin node is absent in legacy DTS */
+	snprintf(tsin_name, sizeof(tsin_name), "tsin@%d", idx);
+	tsin_np = of_get_child_by_name(dvb->dev->of_node, tsin_name);
+	if (tsin_np && of_device_is_available(tsin_np)) {
+		of_property_read_u32(tsin_np, "ts-control", &ts_control);
+		of_property_read_u32(tsin_np, "ts-serial", &ts_serial);
 	}
+	of_node_put(tsin_np);
 
-	/*
-     * Read ts-serial mode from frontend DTS node.
-     * Search for frontend with ts-port=<idx> (new DTS).
-     * If not found, try dvb-frontends[idx] (legacy DTS compatibility).
-     */
-	if (np) {
-		int fe_count =
-			of_count_phandle_with_args(np, "dvb-frontends", NULL);
-		int fi;
-		bool found_serial = false;
-		for (fi = 0; fi < fe_count && fi < AML_MAX_FRONTEND; fi++) {
-			u32 port_val = 0xff;
-			struct device_node *cand =
-				of_parse_phandle(np, "dvb-frontends", fi);
-			if (!cand)
-				continue;
-			/* ts-port (new DTS) or ts-source (legacy DTS) */
-			if (of_property_read_u32(cand, "ts-port", &port_val))
-				of_property_read_u32(cand, "ts-source",
-						     &port_val);
-			if (port_val == (u32)idx) {
-				of_property_read_u32(cand, "ts-serial",
-						     &ts_serial);
-				found_serial = true;
-				of_node_put(cand);
-				break;
-			}
-			of_node_put(cand);
-		}
-		/* If no match, try by idx */
-		if (!found_serial) {
-			fe_np = of_parse_phandle(np, "dvb-frontends", idx);
-			if (fe_np) {
-				of_property_read_u32(fe_np, "ts-serial",
-						     &ts_serial);
-				of_node_put(fe_np);
-			}
-		}
-
-		/* ts<idx>-control → FEC_INPUT_CONTROL[11:0] (vendor DTS: ts1_control=<0x00>) */
-		{
-			char prop[32];
-			snprintf(prop, sizeof(prop), "ts%d-control", idx);
-			of_property_read_u32(np, prop, &ts_control);
-			dev_info(dvb->dev,
-				 "ts_input_init: TS%d ts_control=0x%03x\n", idx,
-				 ts_control);
-		}
-	}
-
-	if (ts_serial) {
-		ctrl = TS_IN_ENABLE | TS_IN_SERIAL;
-		dvb->ts[idx].is_serial = true;
-		dev_info(dvb->dev, "ts_input_init: TS input %d → SERIAL mode\n",
-			 idx);
-		pctrl = pinctrl_lookup_state(dvb->pinctrl, "serial");
-		if (!IS_ERR(pctrl))
-			pinctrl_select_state(dvb->pinctrl, pctrl);
-	} else {
-		ctrl = TS_IN_CTRL_PARALLEL; /* vendor verified: 0x00030003 */
-		dvb->ts[idx].is_serial = false;
-		dev_info(dvb->dev,
-			 "ts_input_init: TS input %d → PARALLEL mode\n", idx);
-		pctrl = pinctrl_lookup_state(dvb->pinctrl, "parallel");
-		if (!IS_ERR(pctrl))
-			pinctrl_select_state(dvb->pinctrl, pctrl);
-	}
+	ctrl = ts_serial ? (TS_IN_ENABLE | TS_IN_SERIAL) : TS_IN_CTRL_PARALLEL;
 
 	dev_info(dvb->dev, "ts_input_init: initializing TS input %d\n", idx);
 
@@ -146,9 +52,10 @@ static int aml_ts_input_init(struct aml_dvb *dvb, int idx)
 		return ret;
 	}
 
+	dvb->ts[idx].is_serial = (bool)ts_serial;
 	dvb->ts[idx].mode = ts_serial ? TS_IN_SERIAL : TS_IN_PARALLEL;
-	dvb->ts[idx].fec_ctrl = ts_control &
-				0xFFF; /* DTS ts<n>_control, max 12-bit */
+	/* DTS ts<n>_control, max 12-bit */
+	dvb->ts[idx].fec_ctrl = ts_control & 0xFFF;
 	dvb->ts[idx].enabled = true;
 	dev_info(
 		dvb->dev,

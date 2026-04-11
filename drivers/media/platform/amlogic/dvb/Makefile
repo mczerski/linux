@@ -6,8 +6,6 @@ amlogic-dvb-y := \
 	amlogic-dvb-debugfs.o   \
 	amlogic-dvb-demux.o     \
 	amlogic-dvb-dsc.o       \
-	amlogic-dvb-frontend.o  \
-	amlogic-dvb-gpio.o      \
 	amlogic-dvb-pts.o       \
 	amlogic-dvb-regmap.o    \
 	amlogic-dvb-stats.o     \

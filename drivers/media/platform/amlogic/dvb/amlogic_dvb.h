@@ -388,12 +388,6 @@ struct aml_dvb {
 	struct aml_dsc dsc[AML_MAX_DSC];
 	struct aml_asyncfifo asyncfifo[AML_MAX_ASYNCFIFO];
 
-	struct dvb_frontend *frontend[AML_MAX_FRONTEND];
-	struct i2c_client *
-		demod_client[AML_MAX_FRONTEND]; /* ADDED: I2C client references */
-	int num_frontend;
-	struct proc_dir_entry *nim_proc_entry; /* /proc/bus/nim_sockets */
-
 	u32 ts_sync_byte;
 	u32 ts_packet_len;
 
@@ -428,9 +422,6 @@ struct aml_dvb {
 
 	struct gpio_desc *tuner_reset_gpio;
 	struct gpio_desc *tuner_power_gpio;
-
-	struct pinctrl *pinctrl;
-	struct pinctrl_state *pins_default;
 
 	struct timer_list watchdog_timer;
 };
@@ -548,38 +539,6 @@ static inline void aml_dvb_debugfs_exit(struct aml_dvb *dvb)
 {
 }
 #endif
-
-/* GPIO control */
-/* Generic demod power+reset sequence — used by avl6862_probe() and similar.
- * @dev: I2C client device, GPIOs and timing are read from this node.
- * DTS properties (optional):
- *   power-off-delay-ms, power-on-delay-ms,
- *   reset-assert-ms, reset-release-ms */
-int aml_demod_power_reset(struct device *dev);
-
-/* Legacy aml_dvb-based API — kept for backwards compatibility, stub */
-int aml_gpio_init(struct aml_dvb *dvb);
-void aml_gpio_release(struct aml_dvb *dvb);
-
-/* Pinctrl */
-int aml_pinctrl_init(struct aml_dvb *dvb);
-void aml_pinctrl_release(struct aml_dvb *dvb);
-
-/* Frontend */
-int aml_dvb_probe_frontends(struct aml_dvb *dvb);
-void aml_dvb_release_frontends(struct aml_dvb *dvb);
-
-/* Global adapter list — used by avl6862_probe() */
-void aml_dvb_list_add(struct aml_dvb *dvb);
-void aml_dvb_list_del(struct aml_dvb *dvb);
-
-/* Called by avl6862_probe() to register the frontend.
- * -EPROBE_DEFER: platform not yet ready, kernel retries automatically */
-int aml_dvb_register_frontend(struct device_node *fe_node,
-			      struct dvb_frontend *fe,
-			      struct i2c_client *client);
-void aml_dvb_unregister_frontend(struct device_node *fe_node);
-
 /* Advanced features */
 int aml_smallsec_init(struct aml_dmx *dmx);
 void aml_smallsec_release(struct aml_dmx *dmx);
