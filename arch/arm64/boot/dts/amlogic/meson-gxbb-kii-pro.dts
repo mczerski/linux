@@ -90,6 +90,13 @@
 			};
 		};
 	};
+
+	dvb_power: dvb-power {
+		compatible = "regulator-fixed";
+		regulator-name = "dvb-power";
+		gpios = <&gpio GPIOY_11 GPIO_ACTIVE_LOW>
+		regulator-always-on;
+	};
 };
 
 &aiu {
@@ -108,31 +115,32 @@
 		reg-names = "ts", "async-fifo";
 
 		interrupts = <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 24 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 26 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 27 IRQ_TYPE_EDGE_RISING>;
+			    <GIC_SPI 5 IRQ_TYPE_EDGE_RISING>,
+			    <GIC_SPI 53 IRQ_TYPE_EDGE_RISING>,
+			    <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
+			    <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "demux0", "demux1", "demux2", "dvr0", "dvr1";
 
 		clocks = <&clkc CLKID_DEMUX>;
 		clock-names = "demux";
 
 		status = "disabled";
 
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		pinctrl-names = "default";
 		pinctrl-0 = <&dvb_p_ts0_pins>;
 
-		amlogic,num-filters = <32>;
-		ts0-control = <0>;
-
-		dvb-frontends = <&frontend0>;
+		dmx0_ts = <0>;
 
 		tsin@0 {
-			reg = <0>;
-			amlogic,ts-bus-width = <8>;
-			status = "okay";
+			ts-control = <0>;
+			ts-serial = <0>;
+		};
+
+		frontend@0 {
+			compatible = "amlogic,dvb-fe";
+
+			demod-dev = <&dvb_demod0>;
+			tuner-dev = <&dvb_tuner0>;
 		};
 	};
 };
@@ -171,25 +179,23 @@
 	clock-frequency = <100000>;
 	clocks = <&clkc CLKID_I2C>;
 
-	frontend0: dvb-frontend@14 {
+	dvb_demod0: dvb-demod0@14 {
 		compatible = "availink,avl6862";
 		reg = <0x14>;
 		status = "okay";
 
 		reset-gpios = <&gpio GPIOY_13 GPIO_ACTIVE_LOW>;
-		power-gpios = <&gpio GPIOY_11 GPIO_ACTIVE_LOW>;
+		vcc-supply = <&dvb_power>;
 
-		ts-source = <0>;
-		ts-port = <0>;
-		ts-serial = <0>;
+		i2c-gate {
+			#address-cells = <1>;
+			#size-cells = <0>;
 
-		tuner-compatible = "rafael,r912";
-		tuner-i2c-addr = <0x7a>;
-
-		power-off-delay-ms = <100>;
-		power-on-delay-ms = <300>;
-		reset-assert-ms = <600>;
-		reset-release-ms = <500>;
+			dvb_tuner0: dvb-tuner@7a {
+				compatible = "rafael,r912";
+				reg = <0x63>;
+			};
+		};
 	};
 };
 

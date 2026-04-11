@@ -79,7 +79,6 @@
 			};
 		};
 	};
-
 };
 
 &ethmac {
@@ -97,6 +96,47 @@
 	status = "okay";
 	pinctrl-0 = <&i2c_b_pins>;
 	pinctrl-names = "default";
+
+	dvb_demod0: dvb-demod@6c {
+		compatible = "sony,cxd2878";
+		reg = <0x6c>;
+
+		reset-gpios = <&gpio GPIODV_24 GPIO_ACTIVE_LOW>;
+
+		sony,xtal-freq-khz = <24000>;
+		sony,ts-mode = <1>;
+		sony,ts-serial-data-pin = <0>;
+		sony,ts-clock-mode = <1>;
+		sony,ts-clock-mask = <1>;
+		sony,ts-valid-mask = <0>;
+		sony,atsc-core-disable = <0>;
+
+		i2c-gate {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dvb_tuner0: dvb-tuner@63 {
+				compatible = "maxlinear,mxl603";
+				reg = <0x63>;
+
+				maxlinear,xtal-freq-khz = <16000>;
+				maxlinear,if-frequency = "5MHz";
+				maxlinear,agc-type = "self";
+				maxlinear,xtal-cap = <16>;
+				maxlinear,gain-level = <11>;
+				maxlinear,if-out-gain-level = <11>;
+				maxlinear,agc-set-point = <66>;
+				maxlinear,clk-out-div = <0>;
+				maxlinear,clk-out-ext = <0>;
+				maxlinear,agc-invert-pol = <1>;
+				maxlinear,invert-if = <1>;
+				maxlinear,loop-thru-enable = <0>;
+				maxlinear,clk-out-enable = <1>;
+				maxlinear,xtal-sharing-mode = <0>;
+				maxlinear,single-supply-3-3v = <1>;
+			};
+		};
+	};
 };
 
 &cbus {
@@ -104,32 +144,34 @@
 		compatible = "amlogic,gxl-dvb";
 
 		reg = <0x0 0x5800 0x0 0x400>,
-		      <0x0 0x8c40 0x0 0x20>;
+			  <0x0 0x8c40 0x0 0x20>;
 		reg-names = "ts", "async-fifo";
 
 		interrupts = <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 5 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 53 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
-			     <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
-        interrupt-names = "demux0", "demux1", "demux2", "dvr0", "dvr1";
+				 <GIC_SPI 5 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 53 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "demux0", "demux1", "demux2", "dvr0", "dvr1";
 
 		clocks = <&clkc CLKID_DEMUX>;
 		clock-names = "demux";
 
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		pinctrl-names = "default";
 		pinctrl-0 = <&dvb_p_ts0_pins>;
 
-		amlogic,num-filters = <32>;
-		ts0-control = <0>;
+		dmx0_ts = <0>;
 
 		tsin@0 {
-			reg = <0>;
-			amlogic,ts-bus-width = <8>;
-			status = "okay";
+			ts-control = <0>;
+			ts-serial = <0>;
+		};
+
+		frontend@0 {
+			compatible = "amlogic,dvb-fe";
+
+			demod-dev = <&dvb_demod0>;
+			tuner-dev = <&dvb_tuner0>;
 		};
 	};
 };
