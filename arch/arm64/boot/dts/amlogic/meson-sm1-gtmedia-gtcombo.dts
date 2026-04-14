@@ -1,0 +1,208 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2026 Marek Czerski <ma.czerski@gmail.com>
+ */
+
+/dts-v1/;
+
+#include "meson-sm1-ac2xx.dtsi"
+#include <dt-bindings/sound/meson-g12a-tohdmitx.h>
+
+/ {
+	compatible = "amlogic,gtmedia-gtcombo", "amlogic,s905x3", "amlogic,meson-sm1";
+	model = "GTMedia GT Combo";
+
+	sound {
+		compatible = "amlogic,axg-sound-card";
+		model = "GTCombo";
+		audio-aux-devs = <&tdmout_b>;
+		audio-routing = "TDMOUT_B IN 0", "FRDDR_A OUT 1",
+				"TDMOUT_B IN 1", "FRDDR_B OUT 1",
+				"TDMOUT_B IN 2", "FRDDR_C OUT 1",
+				"TDM_B Playback", "TDMOUT_B OUT";
+
+		clocks = <&clkc CLKID_MPLL2>,
+			 <&clkc CLKID_MPLL0>,
+			 <&clkc CLKID_MPLL1>;
+
+		assigned-clocks = <&clkc CLKID_MPLL2>,
+				  <&clkc CLKID_MPLL0>,
+				  <&clkc CLKID_MPLL1>;
+		assigned-clock-rates = <294912000>,
+				       <270950400>,
+				       <393216000>;
+
+		dai-link-0 {
+			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-1 {
+			sound-dai = <&frddr_b>;
+		};
+
+		dai-link-2 {
+			sound-dai = <&frddr_c>;
+		};
+
+		/* 8ch hdmi interface */
+		dai-link-3 {
+			sound-dai = <&tdmif_b>;
+			dai-format = "i2s";
+			dai-tdm-slot-tx-mask-0 = <1 1>;
+			dai-tdm-slot-tx-mask-1 = <1 1>;
+			dai-tdm-slot-tx-mask-2 = <1 1>;
+			dai-tdm-slot-tx-mask-3 = <1 1>;
+			mclk-fs = <256>;
+
+			codec {
+				sound-dai = <&tohdmitx TOHDMITX_I2S_IN_B>;
+			};
+		};
+
+		/* hdmi glue */
+		dai-link-4 {
+			sound-dai = <&tohdmitx TOHDMITX_I2S_OUT>;
+
+			codec {
+				sound-dai = <&hdmi_tx>;
+			};
+		};
+	};
+
+	dvb_power: dvb_power {
+		compatible = "regulator-fixed";
+		regulator-name = "dvb-power";
+		gpios = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
+		regulator-always-on;
+	};
+};
+
+&arb {
+	status = "okay";
+};
+
+&clkc_audio {
+	status = "okay";
+};
+
+&ethmac {
+	status = "okay";
+	phy-handle = <&internal_ephy>;
+	phy-mode = "rmii";
+};
+
+&frddr_a {
+	status = "okay";
+};
+
+&frddr_b {
+	status = "okay";
+};
+
+&frddr_c {
+	status = "okay";
+};
+
+&tdmif_b {
+	status = "okay";
+};
+
+&tdmout_b {
+	status = "okay";
+};
+
+&tohdmitx {
+	status = "okay";
+};
+
+&cec_AO {
+	status = "okay";
+};
+
+&cecb_AO {
+	status = "disabled";
+};
+
+&cbus {
+	dvb_demux: dvb@6000 {
+		compatible = "amlogic,sm1-dvb";
+
+		reg = <0x0 0x6000 0x0 0x400>,
+			  <0x0 0x9000 0x0 0x2000>;
+		reg-names = "ts", "async-fifo";
+
+		interrupts = <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 5 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 21 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
+				 <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "demux0", "demux1", "demux2", "dvr0", "dvr1";
+
+		clocks = <&clkc CLKID_DEMUX>,
+				<&clkc CLKID_AHB_ARB0>,
+				<&clkc CLKID_PARSER>;
+		clock-names = "demux", "ahbarb0", "parser_top";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&dvb_s_ts0_ao_pins>,
+				<&dvb_p_ts1_z_pins>;
+
+		dmx0_ts = <0>;
+		dmx1_ts = <1>;
+
+		tsin@0 {
+			ts-control = <0x800>;
+			ts-serial = <1>;
+		};
+
+		tsin@1 {
+			ts-control = <0>;
+			ts-serial = <0>;
+		};
+
+		frontend@0 {
+			compatible = "amlogic,dvb-fe";
+
+			demod-dev = <&dvb_demod0>;
+			tuner-dev = <&dvb_tuner0>;
+		};
+
+		frontend@1 {
+			compatible = "amlogic,dvb-fe";
+
+			demod-dev = <&dvb_demod1>;
+		};
+	};
+};
+
+&i2c2 {
+	status = "okay";
+	pinctrl-0 = <&i2c2_sda_z_pins>, <&i2c2_sck_z_pins>;
+	pinctrl-names = "default";
+
+	dvb_demod0: dvb-demod@6c {
+		compatible = "sony,cxd2878-24-s";
+		reg = <0x6c>;
+
+		reset-gpios = <&gpio GPIOZ_6 GPIO_ACTIVE_LOW>;
+		vcc-supply = <&dvb_power>;
+
+		i2c-gate {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			dvb_tuner0: dvb-tuner@64 {
+				compatible = "montage,m88tc6800-27";
+				reg = <0x64>;
+			};
+		};
+	};
+
+	dvb_demod1: dvb-demod@69 {
+		compatible = "montage,m88rs6060-27p";
+		reg = <0x69>;
+
+		reset-gpios = <&gpio GPIOZ_1 GPIO_ACTIVE_LOW>;
+		vcc-supply = <&dvb_power>;
+	};
+};
