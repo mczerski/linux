@@ -66,11 +66,8 @@ struct cxd2878_config{
 
 	u8 atscCoreDisable;
 	
-	bool lock_flag;  //for usb device 
-	//for ecp3 update
-	void (*write_properties) (struct i2c_adapter *i2c,u8 reg, u32 buf);
-	void (*read_properties) (struct i2c_adapter *i2c,u8 reg, u32 *buf);
-	
+	bool lock_flag;  //for usb device
+	struct dvb_frontend **fe;
 };
 
 #endif

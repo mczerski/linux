@@ -26,6 +26,7 @@ struct cxd2878_dev {
 	struct i2c_mux_core *muxc;
 	struct cxd2878_config config;
 	bool warm; //start
+	struct dvb_frontend fe;
 	enum sony_dtv_system_t system;
 	enum sony_dtv_bandwidth_t bandwidth;
 	enum sony_demod_state_t state;
@@ -2457,11 +2458,11 @@ static int cxd2878_bind(struct device *dev,
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct cxd2878_dev *priv = i2c_get_clientdata(client);
-	struct dvb_frontend *fe = data;
-	fe->demodulator_priv = priv;
-	memcpy(&fe->ops, &cxd2878_ops, sizeof(struct dvb_frontend_ops));
+	struct dvb_frontend **fe = data;
 
-	return cxd2878_init(fe);
+	*fe = &priv->fe;
+
+	return 0;
 }
 
 static void cxd2878_unbind(struct device *dev,
@@ -2469,7 +2470,7 @@ static void cxd2878_unbind(struct device *dev,
 						   void *data)
 {
 	struct i2c_client *client = to_i2c_client(dev);
-	struct dvb_frontend *fe = data;
+	struct dvb_frontend *fe = *(struct dvb_frontend **)data;
 	fe->demodulator_priv = NULL;
 	memset(&fe->ops, 0, sizeof(struct dvb_frontend_ops));
 	dev_info(&client->dev, "CXD2878 driver unbind.\n");
@@ -2566,46 +2567,49 @@ static struct regmap_config map_config = {
 static int cxd2878_probe(struct i2c_client *client)
 {
 	struct i2c_adapter *i2c = client->adapter;
-	const struct cxd2878_config *config = i2c_get_match_data(client);
+	const struct cxd2878_config *config = client->dev.platform_data ? client->dev.platform_data : i2c_get_match_data(client);
 	struct cxd2878_dev *dev;
 	struct reset_control *rstc;
 
 	int ret;
 	u16 id;
 	u8 data[2];
-	dev = kzalloc(sizeof(struct cxd2878_dev),GFP_KERNEL);
-	if(!dev)
+
+	dev = devm_kzalloc(&client->dev, sizeof(struct cxd2878_dev),GFP_KERNEL);
+	if(!dev) {
 		goto err;
+	}
 
 	memcpy(&dev->config, config, sizeof(dev->config));
-    cxd2878_parse_dt(&client->dev, &dev->config);
+	// override with config passed by dts
+	cxd2878_parse_dt(&client->dev, &dev->config);
 	dev->i2c_slvt = client;
-    dev->i2c_slvx = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr + 2);
-    dev->i2c_slvr = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x20);
-    dev->i2c_slvm = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x54);
-    if (IS_ERR(dev->i2c_slvx) ||
-        IS_ERR(dev->i2c_slvr) ||
-        IS_ERR(dev->i2c_slvm)) {
-        goto err1;
-    }
+	dev->i2c_slvx = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr + 2);
+	dev->i2c_slvr = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x20);
+	dev->i2c_slvm = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x54);
+	if (IS_ERR(dev->i2c_slvx) ||
+		  IS_ERR(dev->i2c_slvr) ||
+		  IS_ERR(dev->i2c_slvm)) {
+		goto err;
+	}
 	dev->slvt = devm_regmap_init_i2c(dev->i2c_slvt, &map_config);
 	dev->slvx = devm_regmap_init_i2c(dev->i2c_slvx, &map_config);
 	dev->slvr = devm_regmap_init_i2c(dev->i2c_slvr, &map_config);
 	dev->slvm = devm_regmap_init_i2c(dev->i2c_slvm, &map_config);
-    if (IS_ERR(dev->slvt) ||
-        IS_ERR(dev->slvx) ||
-        IS_ERR(dev->slvr) ||
-        IS_ERR(dev->slvm)) {
-        goto err1;
-    }
+	if (IS_ERR(dev->slvt) ||
+		  IS_ERR(dev->slvx) ||
+		  IS_ERR(dev->slvr) ||
+		  IS_ERR(dev->slvm)) {
+		goto err;
+	}
 
-    rstc = devm_reset_control_get(&client->dev, NULL);
-    if (!IS_ERR(rstc)) {
-        reset_control_assert(rstc);
-        msleep(10);
-        reset_control_deassert(rstc);
-        msleep(10);
-    }
+	rstc = devm_reset_control_get(&client->dev, NULL);
+	if (!IS_ERR(rstc)) {
+		reset_control_assert(rstc);
+		msleep(10);
+		reset_control_deassert(rstc);
+		msleep(10);
+	}
 
 	dev->state	= SONY_DEMOD_STATE_UNKNOWN;
 	dev->system	= SONY_DTV_SYSTEM_UNKNOWN;
@@ -2636,7 +2640,10 @@ static int cxd2878_probe(struct i2c_client *client)
 
 	dev->atscNoSignalThresh = 0x7FFB61;
 	dev->atscSignalThresh = 0x7C4926;
-	dev->warm	 = 0;
+	dev->warm  = 0;
+
+	memcpy(&dev->fe.ops, &cxd2878_ops, sizeof(struct dvb_frontend_ops));
+	dev->fe.demodulator_priv = dev;
 
 	cxd2878_wr(dev,dev->slvx,0x00,0x00);
 	cxd2878_rdm(dev,dev->slvx, 0xFB, &data[0], 1);
@@ -2665,29 +2672,39 @@ static int cxd2878_probe(struct i2c_client *client)
 		default:
 		case SONY_DEMOD_CHIP_ID_UNKNOWN: /**< Unknown */		
 			dev_err(&client->dev,"%s:Can not decete the chip.\n",KBUILD_MODNAME);
-			goto err1;
+			goto err;
 			break;
 	}
 	dev->chipid = id;
 
-    /* create mux i2c adapter for tuner */
-    dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE,
-                  cxd2878_select, cxd2878_deselect);
-    if (!dev->muxc) {
-        ret = -ENOMEM;
-        goto err1;
-    }
-    dev->muxc->priv = dev;
-    ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
-    if (ret) {
-        goto err1;
-    }
+	/*setup tuner i2c bus*/
+	cxd2878_SetBankAndRegisterBits(dev,dev->slvx,0x00,0x1A,0x01,0xFF);
+	msleep(2);
 
-	i2c_set_clientdata(client, dev);
-	ret = component_add(&client->dev, &cxd2878_component_ops);
+	/* create mux i2c adapter for tuner */
+	dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE,
+	    cxd2878_select, cxd2878_deselect);
+	if (!dev->muxc) {
+		ret = -ENOMEM;
+		goto err;
+	}
+	dev->muxc->priv = dev;
+	ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
 	if (ret) {
-		dev_err(&client->dev,"%s:Failed to add as component\n",KBUILD_MODNAME);
-		goto err_del_adapters;
+		goto err;
+	}
+	
+	i2c_set_clientdata(client, dev);
+
+	if (config->fe) {
+		*config->fe = &dev->fe;
+	}
+	else {
+		ret = component_add(&client->dev, &cxd2878_component_ops);
+		if (ret) {
+			dev_err(&client->dev,"%s:Failed to add as component\n",KBUILD_MODNAME);
+			goto err_del_adapters;
+		}
 	}
 
 	dev_dbg(&client->dev,"%s: attaching frontend successfully.\n",KBUILD_MODNAME);
@@ -2695,9 +2712,7 @@ static int cxd2878_probe(struct i2c_client *client)
 	return 0;
 
 err_del_adapters:
-    i2c_mux_del_adapters(dev->muxc);
-err1:
-	kfree(dev);
+	i2c_mux_del_adapters(dev->muxc);
 err:
 	dev_err(&client->dev,"%s:error attaching frontend.\n",KBUILD_MODNAME);
 	return -1;
@@ -2706,9 +2721,14 @@ err:
 static void cxd2878_remove(struct i2c_client *client)
 {
 	struct cxd2878_dev *dev = i2c_get_clientdata(client);
-	component_del(&client->dev, &cxd2878_component_ops);
+	if (dev->config.fe) {
+		dev->fe.demodulator_priv = NULL;
+		memset(&dev->fe.ops, 0, sizeof(struct dvb_frontend_ops));
+	}
+	else {
+		component_del(&client->dev, &cxd2878_component_ops);
+	}
 	i2c_mux_del_adapters(dev->muxc);
-	kfree(dev);
 	dev_info(&client->dev,"%s: frontend successfully removed.\n",KBUILD_MODNAME);
 }
 
