@@ -19,6 +19,7 @@ struct m88rs6060_dev {
 	struct regmap *tuner_regmap;
 	struct m88rs6060_cfg config;
 
+    struct dvb_frontend fe;
 	enum fe_status fe_status;
 	bool TsClockChecked; //clock retio
 	bool warm; // for the init and download fw
@@ -3042,25 +3043,15 @@ static int m88rs6060_bind(struct device *dev, struct device *master, void *data)
 {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct m88rs6060_dev *priv = i2c_get_clientdata(client);
-	struct dvb_frontend *fe = data;
-	fe->demodulator_priv = priv;
-	memcpy(&fe->ops, &m88rs6060_ops, sizeof(struct dvb_frontend_ops));
+	struct dvb_frontend **fe = data;
+
+	*fe = &priv->fe;
 
 	return 0;
 }
 
-static void m88rs6060_unbind(struct device *dev, struct device *master,
-			     void *data)
-{
-	struct dvb_frontend *fe = data;
-	fe->demodulator_priv = NULL;
-	memset(&fe->ops, 0, sizeof(struct dvb_frontend_ops));
-	dev_info(dev, "M88RS6060 driver unbind.\n");
-}
-
 static const struct component_ops m88rs6060_component_ops = {
 	.bind = m88rs6060_bind,
-	.unbind = m88rs6060_unbind,
 };
 
 static int m88rs6060_probe(struct i2c_client *client)
@@ -3111,6 +3102,9 @@ static int m88rs6060_probe(struct i2c_client *client)
 		ret = -ENODEV;
 		goto err;
 	}
+
+	dev->fe.demodulator_priv = dev;
+	memcpy(&dev->fe.ops, &m88rs6060_ops, sizeof(struct dvb_frontend_ops));
 
 	/* create mux i2c adapter for internal tuner */
 	dev->muxc = i2c_mux_alloc(client->adapter, &dev->client->dev, 1, 0,
