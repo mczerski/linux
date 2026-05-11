@@ -9,6 +9,8 @@
 #include <linux/mutex.h>
 #include <linux/component.h>
 #include <linux/i2c-mux.h>
+#include <linux/reset.h>
+
 #define HWTUNE
 
 struct m88rs6060_dev {
@@ -3057,6 +3059,7 @@ static const struct component_ops m88rs6060_component_ops = {
 static int m88rs6060_probe(struct i2c_client *client)
 {
 	const struct m88rs6060_cfg *cfg = i2c_get_match_data(client);
+	struct reset_control *rstc;
 	struct m88rs6060_dev *dev;
 	int ret;
 	unsigned tmp;
@@ -3093,6 +3096,15 @@ static int m88rs6060_probe(struct i2c_client *client)
 		ret = PTR_ERR(dev->regmap);
 		goto err;
 	}
+
+	rstc = devm_reset_control_get(&client->dev, NULL);
+	if (!IS_ERR(rstc)) {
+		reset_control_assert(rstc);
+		msleep(10);
+		reset_control_deassert(rstc);
+		msleep(10);
+	}
+
 	/*check demod i2c */
 	ret = regmap_read(dev->regmap, 0x00, &tmp);
 	if (ret) {
