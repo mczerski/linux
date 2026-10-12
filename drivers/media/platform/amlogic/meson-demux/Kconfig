@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config DVB_MESON_DEMUX
+	tristate "Amlogic transport stream demux"
+	depends on DVB_CORE
+	depends on ARCH_MESON || COMPILE_TEST
+	help
+	  Support for the transport stream demultiplexer of the Amlogic
+	  GXBB, GXL, GXM, G12A, G12B and SM1 SoCs.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called meson-demux.
