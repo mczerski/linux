@@ -443,3 +443,8 @@ Digital TV Frontend functions and types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. kernel-doc:: include/media/dvb_frontend.h
+
+Frontends described by firmware nodes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. kernel-doc:: include/media/dvb_fwnode.h

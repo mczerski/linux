@@ -136,6 +136,12 @@ static void __dvb_frontend_free(struct dvb_frontend *fe)
 {
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
 
+	/*
+	 * Mark the frontend as not registered, so that it can be registered
+	 * or detached again. Do it before the release callback frees @fe.
+	 */
+	fe->frontend_priv = NULL;
+
 	if (fepriv)
 		dvb_device_put(fepriv->dvbdev);
 
@@ -3065,6 +3071,8 @@ int dvb_register_frontend(struct dvb_adapter *dvb,
 	init_waitqueue_head(&fepriv->events.wait_queue);
 	mutex_init(&fepriv->events.mtx);
 	fe->dvb = dvb;
+	/* the thread of an earlier registration may have left it set */
+	fe->exit = DVB_FE_NO_EXIT;
 	fepriv->inversion = INVERSION_OFF;
 
 	dev_info(fe->dvb->device,
