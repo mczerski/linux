@@ -7,10 +7,12 @@ Copyright (c) 2021 Davin zhang <Davin@tbsdtv.com> www.Turbosight.com
 #include <linux/module.h>
 #include <linux/string.h>
 #include <media/dvb_frontend.h>
-#include <linux/component.h>
+#include <media/dvb_fwnode.h>
+#include <linux/clk.h>
+#include <linux/gpio/consumer.h>
 #include <linux/i2c-mux.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
-#include <linux/reset.h>
 
 #include "cxd2878.h"
 #include "cxd2878_priv.h"
@@ -27,6 +29,7 @@ struct cxd2878_dev {
 	struct cxd2878_config config;
 	bool warm; //start
 	struct dvb_frontend fe;
+	struct dvb_fe_part part;
 	enum sony_dtv_system_t system;
 	enum sony_dtv_bandwidth_t bandwidth;
 	enum sony_demod_state_t state;
@@ -2452,109 +2455,96 @@ static int cxd2878_deselect(struct i2c_mux_core *muxc, u32 chan)
     return cxd2878_i2c_repeater(muxc, 0);
 }
 
-static int cxd2878_bind(struct device *dev,
-						struct device *master,
-						void *data)
+static struct dvb_frontend *cxd2878_part_get_frontend(struct dvb_fe_part *part)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct cxd2878_dev *priv = i2c_get_clientdata(client);
-	struct dvb_frontend **fe = data;
+	struct cxd2878_dev *dev = container_of(part, struct cxd2878_dev, part);
 
-	*fe = &priv->fe;
-
-	return 0;
+	return &dev->fe;
 }
 
-static void cxd2878_unbind(struct device *dev,
-						   struct device *master,
-						   void *data)
-{
-	struct i2c_client *client = to_i2c_client(dev);
-	struct dvb_frontend *fe = *(struct dvb_frontend **)data;
-	fe->demodulator_priv = NULL;
-	memset(&fe->ops, 0, sizeof(struct dvb_frontend_ops));
-	dev_info(&client->dev, "CXD2878 driver unbind.\n");
-}
-
-static const struct component_ops cxd2878_component_ops = {
-	.bind = cxd2878_bind,
-	.unbind = cxd2878_unbind,
+static const struct dvb_fe_part_ops cxd2878_part_ops = {
+	.get_frontend = cxd2878_part_get_frontend,
 };
 
-static int cxd2878_parse_dt(struct device *dev, struct cxd2878_config *config)
+/*
+ * Configuration from the firmware node, used when no bridge driver passed
+ * platform data: crystal clock, TS output endpoint (port 1) and vendor
+ * properties.
+ */
+static int cxd2878_parse_fwnode(struct device *dev,
+				struct cxd2878_config *config)
 {
-	struct device_node *np = dev->of_node;
+	struct fwnode_handle *ep __free(fwnode_handle) = NULL;
+	struct dvb_ts_endpoint ts = { };
+	unsigned long rate;
+	struct clk *xtal;
 	u32 val;
+	int ret;
 
-	if (!np) {
-		return 0;
+	xtal = devm_clk_get_enabled(dev, NULL);
+	if (IS_ERR(xtal))
+		return dev_err_probe(dev, PTR_ERR(xtal),
+				     "failed to get crystal clock\n");
+
+	rate = clk_get_rate(xtal);
+	switch (rate) {
+	case 16000000:
+		config->xtal = SONY_DEMOD_XTAL_16000KHz;
+		break;
+	case 24000000:
+		config->xtal = SONY_DEMOD_XTAL_24000KHz;
+		break;
+	case 32000000:
+		config->xtal = SONY_DEMOD_XTAL_32000KHz;
+		break;
+	default:
+		return dev_err_probe(dev, -EINVAL,
+				     "unsupported crystal frequency %lu Hz\n",
+				     rate);
 	}
 
-	if (!of_property_read_u32(np, "sony,xtal-freq-khz", &val)) {
-		switch (val) {
-		case 16000:
-			config->xtal = SONY_DEMOD_XTAL_16000KHz;
-			break;
-		case 24000:
-			config->xtal = SONY_DEMOD_XTAL_24000KHz;
-			break;
-		case 32000:
-			config->xtal = SONY_DEMOD_XTAL_32000KHz;
-			break;
-		default:
-			dev_warn(dev, "Invalid xtal frequency %u kHz, using default\n", val);
-		}
+	/* also when the TS receiver is disabled */
+	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), DVB_FE_PORT_OUT,
+					     0, FWNODE_GRAPH_ENDPOINT_NEXT |
+					     FWNODE_GRAPH_DEVICE_DISABLED);
+	if (!ep)
+		return dev_err_probe(dev, -EINVAL, "no TS output endpoint\n");
+
+	ret = dvb_fwnode_ts_endpoint_parse(ep, &ts);
+	if (ret)
+		return dev_err_probe(dev, ret, "invalid TS output endpoint\n");
+
+	switch (ts.bus_width) {
+	case 1:
+		/* serial output on TSDATA0 or TSDATA7 */
+		if (ts.data_shift != 0 && ts.data_shift != 7)
+			return dev_err_probe(dev, -EINVAL,
+					     "serial TS only on data line 0 or 7\n");
+		config->ts_mode = 0;
+		config->ts_ser_data = ts.data_shift == 7;
+		break;
+	case 8:
+		config->ts_mode = 1;
+		break;
+	default:
+		return dev_err_probe(dev, -EINVAL,
+				     "unsupported TS bus width %u\n",
+				     ts.bus_width);
 	}
 
-	/* TS mode (0=serial, 1=parallel) */
-	if (!of_property_read_u32(np, "sony,ts-mode", &val)) {
-		if (val <= 1)
-			config->ts_mode = val;
-		else
-			dev_warn(dev, "Invalid ts-mode %u, using default\n", val);
+	/* TS regions without clock, see struct cxd2878_config */
+	config->ts_clk_mask = 1;
+	if (!fwnode_property_read_u32(ep, "sony,ts-clock-mask", &val)) {
+		if (val > 0x1f)
+			return dev_err_probe(dev, -EINVAL,
+					     "invalid sony,ts-clock-mask 0x%x\n",
+					     val);
+		config->ts_clk_mask = val;
 	}
 
-	/* serial data pin (0=TSDATA0, 1=TSDATA7) */
-	if (!of_property_read_u32(np, "sony,ts-serial-data-pin", &val)) {
-		if (val <= 1)
-			config->ts_ser_data = val;
-		else
-			dev_warn(dev, "Invalid ts-serial-data-pin %u, using default\n", val);
-	}
-
-	/* TS clock mode (0=gated, 1=continuous) */
-	if (!of_property_read_u32(np, "sony,ts-clock-mode", &val)) {
-		if (val <= 1)
-			config->ts_clk = val;
-		else
-			dev_warn(dev, "Invalid ts-clock-mode %u, using default\n", val);
-	}
-
-	/* TS clock mask (bit flags) */
-	if (!of_property_read_u32(np, "sony,ts-clock-mask", &val)) {
-		if (val <= 0x1F) /* Valid range: 0-31 (5 bits) */
-			config->ts_clk_mask = val;
-		else
-			dev_warn(dev, "Invalid ts-clock-mask 0x%x, using default\n", val);
-	}
-
-	/* TS valid mask (bit flags) */
-	if (!of_property_read_u32(np, "sony,ts-valid-mask", &val)) {
-		if (val <= 0x1F) /* Valid range: 0-31 (5 bits) */
-			config->ts_valid = val;
-		else
-			dev_warn(dev, "Invalid ts-valid-mask 0x%x, using default\n", val);
-	}
-
-	/* ATSC core disable flag */
-	if (!of_property_read_u32(np, "sony,atsc-core-disable", &val)) {
-		config->atscCoreDisable = val ? 1 : 0;
-	}
-
-	dev_info(dev, "DT config: xtal=%d ts_mode=%u ts_ser=%u ts_clk=%u mask=0x%x valid=0x%x atsc_dis=%u\n",
-		config->xtal, config->ts_mode, config->ts_ser_data,
-		config->ts_clk, config->ts_clk_mask, config->ts_valid,
-		config->atscCoreDisable);
+	config->atscCoreDisable =
+		device_property_read_bool(dev, "sony,atsc-core-disable");
+	config->lock_flag = device_property_read_bool(dev, "sony,lock-indicator");
 
 	return 0;
 }
@@ -2566,48 +2556,62 @@ static struct regmap_config map_config = {
 
 static int cxd2878_probe(struct i2c_client *client)
 {
+	const struct cxd2878_config *pdata = dev_get_platdata(&client->dev);
 	struct i2c_adapter *i2c = client->adapter;
-	const struct cxd2878_config *config = client->dev.platform_data ? client->dev.platform_data : i2c_get_match_data(client);
 	struct cxd2878_dev *dev;
-	struct reset_control *rstc;
-
+	struct gpio_desc *reset;
 	int ret;
 	u16 id;
 	u8 data[2];
 
-	dev = devm_kzalloc(&client->dev, sizeof(struct cxd2878_dev),GFP_KERNEL);
-	if(!dev) {
-		goto err;
+	dev = devm_kzalloc(&client->dev, sizeof(*dev), GFP_KERNEL);
+	if (!dev)
+		return -ENOMEM;
+
+	if (pdata) {
+		/* instantiated by a bridge driver */
+		dev->config = *pdata;
+	} else {
+		ret = cxd2878_parse_fwnode(&client->dev, &dev->config);
+		if (ret)
+			return ret;
 	}
 
-	memcpy(&dev->config, config, sizeof(dev->config));
-	// override with config passed by dts
-	cxd2878_parse_dt(&client->dev, &dev->config);
 	dev->i2c_slvt = client;
-	dev->i2c_slvx = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr + 2);
-	dev->i2c_slvr = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x20);
-	dev->i2c_slvm = devm_i2c_new_dummy_device(&client->dev, i2c, client->addr - 0x54);
-	if (IS_ERR(dev->i2c_slvx) ||
-		  IS_ERR(dev->i2c_slvr) ||
-		  IS_ERR(dev->i2c_slvm)) {
-		goto err;
-	}
-	dev->slvt = devm_regmap_init_i2c(dev->i2c_slvt, &map_config);
-	dev->slvx = devm_regmap_init_i2c(dev->i2c_slvx, &map_config);
-	dev->slvr = devm_regmap_init_i2c(dev->i2c_slvr, &map_config);
-	dev->slvm = devm_regmap_init_i2c(dev->i2c_slvm, &map_config);
-	if (IS_ERR(dev->slvt) ||
-		  IS_ERR(dev->slvx) ||
-		  IS_ERR(dev->slvr) ||
-		  IS_ERR(dev->slvm)) {
-		goto err;
-	}
+	dev->i2c_slvx = devm_i2c_new_dummy_device(&client->dev, i2c,
+						  client->addr + 2);
+	if (IS_ERR(dev->i2c_slvx))
+		return PTR_ERR(dev->i2c_slvx);
+	dev->i2c_slvr = devm_i2c_new_dummy_device(&client->dev, i2c,
+						  client->addr - 0x20);
+	if (IS_ERR(dev->i2c_slvr))
+		return PTR_ERR(dev->i2c_slvr);
+	dev->i2c_slvm = devm_i2c_new_dummy_device(&client->dev, i2c,
+						  client->addr - 0x54);
+	if (IS_ERR(dev->i2c_slvm))
+		return PTR_ERR(dev->i2c_slvm);
 
-	rstc = devm_reset_control_get(&client->dev, NULL);
-	if (!IS_ERR(rstc)) {
-		reset_control_assert(rstc);
+	dev->slvt = devm_regmap_init_i2c(dev->i2c_slvt, &map_config);
+	if (IS_ERR(dev->slvt))
+		return PTR_ERR(dev->slvt);
+	dev->slvx = devm_regmap_init_i2c(dev->i2c_slvx, &map_config);
+	if (IS_ERR(dev->slvx))
+		return PTR_ERR(dev->slvx);
+	dev->slvr = devm_regmap_init_i2c(dev->i2c_slvr, &map_config);
+	if (IS_ERR(dev->slvr))
+		return PTR_ERR(dev->slvr);
+	dev->slvm = devm_regmap_init_i2c(dev->i2c_slvm, &map_config);
+	if (IS_ERR(dev->slvm))
+		return PTR_ERR(dev->slvm);
+
+	/* the GPIO's active level holds the chip in reset */
+	reset = devm_gpiod_get_optional(&client->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset))
+		return dev_err_probe(&client->dev, PTR_ERR(reset),
+				     "failed to get reset GPIO\n");
+	if (reset) {
 		msleep(10);
-		reset_control_deassert(rstc);
+		gpiod_set_value_cansleep(reset, 0);
 		msleep(10);
 	}
 
@@ -2671,9 +2675,8 @@ static int cxd2878_probe(struct i2c_client *client)
 			break;
 		default:
 		case SONY_DEMOD_CHIP_ID_UNKNOWN: /**< Unknown */		
-			dev_err(&client->dev,"%s:Can not decete the chip.\n",KBUILD_MODNAME);
-			goto err;
-			break;
+			return dev_err_probe(&client->dev, -ENODEV,
+					     "unknown chip ID 0x%03x\n", id);
 	}
 	dev->chipid = id;
 
@@ -2684,91 +2687,54 @@ static int cxd2878_probe(struct i2c_client *client)
 	/* create mux i2c adapter for tuner */
 	dev->muxc = i2c_mux_alloc(client->adapter, &client->dev, 1, 0, I2C_MUX_GATE,
 	    cxd2878_select, cxd2878_deselect);
-	if (!dev->muxc) {
-		ret = -ENOMEM;
-		goto err;
-	}
+	if (!dev->muxc)
+		return -ENOMEM;
 	dev->muxc->priv = dev;
 	ret = i2c_mux_add_adapter(dev->muxc, 0, 0);
-	if (ret) {
-		goto err;
-	}
-	
+	if (ret)
+		return ret;
+
 	i2c_set_clientdata(client, dev);
 
-	if (config->fe) {
-		*config->fe = &dev->fe;
-	}
-	else {
-		ret = component_add(&client->dev, &cxd2878_component_ops);
-		if (ret) {
-			dev_err(&client->dev,"%s:Failed to add as component\n",KBUILD_MODNAME);
-			goto err_del_adapters;
-		}
+	if (pdata) {
+		if (pdata->fe)
+			*pdata->fe = &dev->fe;
+		return 0;
 	}
 
-	dev_dbg(&client->dev,"%s: attaching frontend successfully.\n",KBUILD_MODNAME);
-	
+	dev->part.dev = &client->dev;
+	dev->part.ops = &cxd2878_part_ops;
+	dev->part.in_port = DVB_FE_PORT_IN;
+	dev->part.out_port = DVB_FE_PORT_OUT;
+	ret = devm_dvb_fe_part_register(&dev->part);
+	if (ret) {
+		i2c_mux_del_adapters(dev->muxc);
+		return dev_err_probe(&client->dev, ret,
+				     "failed to register frontend\n");
+	}
+
 	return 0;
-
-err_del_adapters:
-	i2c_mux_del_adapters(dev->muxc);
-err:
-	dev_err(&client->dev,"%s:error attaching frontend.\n",KBUILD_MODNAME);
-	return -1;
 }
 
 static void cxd2878_remove(struct i2c_client *client)
 {
 	struct cxd2878_dev *dev = i2c_get_clientdata(client);
+
 	if (dev->config.fe) {
 		dev->fe.demodulator_priv = NULL;
 		memset(&dev->fe.ops, 0, sizeof(struct dvb_frontend_ops));
 	}
-	else {
-		component_del(&client->dev, &cxd2878_component_ops);
-	}
 	i2c_mux_del_adapters(dev->muxc);
-	dev_info(&client->dev,"%s: frontend successfully removed.\n",KBUILD_MODNAME);
 }
 
-static const struct cxd2878_config cxd2878_configs[] = {
-	{
-		.addr_slvt = 0x6c,
-		.xtal = SONY_DEMOD_XTAL_24000KHz,
-		.ts_mode = 1,
-		.ts_ser_data = 0,
-		.ts_clk = 1,
-		.ts_clk_mask = 1,
-		.ts_valid = 0,
-		.atscCoreDisable = 0,
-		.lock_flag = 1,
-	},
-	{
-		.addr_slvt = 0x6c,
-		.xtal = SONY_DEMOD_XTAL_24000KHz,
-		.ts_mode = 0,
-		.ts_ser_data = 0,
-		.ts_clk = 1,
-		.ts_clk_mask = 1,
-		.ts_valid = 0,
-		.atscCoreDisable = 0,
-		.lock_flag = 1,
-	}
-};
-
 static const struct of_device_id cxd2878_of_match[] = {
-	{ .compatible = "sony,cxd2878", .data = &cxd2878_configs[0] },
-	{ .compatible = "sony,cxd2878-24-p", .data = &cxd2878_configs[0] },
-	{ .compatible = "sony,cxd2878-24-s", .data = &cxd2878_configs[1] },
+	{ .compatible = "sony,cxd2878" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, cxd2878_of_match);
 
 static const struct i2c_device_id cxd2878_id_table[] = {
-	{ "cxd2878", (kernel_ulong_t)&cxd2878_configs[0] },
-	{ "cxd2878-24-p", (kernel_ulong_t)&cxd2878_configs[0] },
-	{ "cxd2878-24-s", (kernel_ulong_t)&cxd2878_configs[1] },
+	{ "cxd2878" },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, cxd2878_id_table);

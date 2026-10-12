@@ -7,9 +7,11 @@
 */
 #include "m88rs6060_priv.h"
 #include <linux/mutex.h>
-#include <linux/component.h>
+#include <linux/clk.h>
+#include <linux/gpio/consumer.h>
 #include <linux/i2c-mux.h>
-#include <linux/reset.h>
+#include <linux/property.h>
+#include <media/dvb_fwnode.h>
 
 #define HWTUNE
 
@@ -22,6 +24,7 @@ struct m88rs6060_dev {
 	struct m88rs6060_cfg config;
 
     struct dvb_frontend fe;
+	struct dvb_fe_part part;
 	enum fe_status fe_status;
 	bool TsClockChecked; //clock retio
 	bool warm; // for the init and download fw
@@ -3041,25 +3044,83 @@ static int m88rs6060_select(struct i2c_mux_core *muxc, u32 chan)
 	return 0;
 }
 
-static int m88rs6060_bind(struct device *dev, struct device *master, void *data)
+static struct dvb_frontend *m88rs6060_part_get_frontend(struct dvb_fe_part *part)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct m88rs6060_dev *priv = i2c_get_clientdata(client);
-	struct dvb_frontend **fe = data;
+	struct m88rs6060_dev *dev =
+		container_of(part, struct m88rs6060_dev, part);
 
-	*fe = &priv->fe;
+	return &dev->fe;
+}
+
+static const struct dvb_fe_part_ops m88rs6060_part_ops = {
+	.get_frontend = m88rs6060_part_get_frontend,
+};
+
+static const struct m88rs6060_cfg m88rs6060_default_cfg = {
+	.tuner_adr = 0x2c,
+	.i2c_wr_max = 33,
+	.repeater_value = 0x11,
+};
+
+/*
+ * Configuration from the firmware node: crystal clock, TS output endpoint
+ * (port 1) and vendor properties.
+ */
+static int m88rs6060_parse_fwnode(struct device *dev,
+				  struct m88rs6060_cfg *cfg)
+{
+	struct fwnode_handle *ep __free(fwnode_handle) = NULL;
+	struct dvb_ts_endpoint ts = { };
+	struct clk *xtal;
+	int ret;
+
+	xtal = devm_clk_get_enabled(dev, NULL);
+	if (IS_ERR(xtal))
+		return dev_err_probe(dev, PTR_ERR(xtal),
+				     "failed to get crystal clock\n");
+
+	cfg->clk = clk_get_rate(xtal);
+	if (!cfg->clk)
+		return dev_err_probe(dev, -EINVAL, "crystal clock has no rate\n");
+
+	/* also when the TS receiver is disabled */
+	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), DVB_FE_PORT_OUT,
+					     0, FWNODE_GRAPH_ENDPOINT_NEXT |
+					     FWNODE_GRAPH_DEVICE_DISABLED);
+	if (!ep)
+		return dev_err_probe(dev, -EINVAL, "no TS output endpoint\n");
+
+	ret = dvb_fwnode_ts_endpoint_parse(ep, &ts);
+	if (ret)
+		return dev_err_probe(dev, ret, "invalid TS output endpoint\n");
+
+	switch (ts.bus_width) {
+	case 1:
+		/* serial output on D0, or on D7 with the pin switch */
+		if (ts.data_shift != 0 && ts.data_shift != 7)
+			return dev_err_probe(dev, -EINVAL,
+					     "serial TS only on data line 0 or 7\n");
+		cfg->ts_mode = MtFeTsOutMode_Serial;
+		cfg->ts_pinswitch = ts.data_shift == 7;
+		break;
+	case 8:
+		cfg->ts_mode = MtFeTsOutMode_Parallel;
+		break;
+	default:
+		return dev_err_probe(dev, -EINVAL,
+				     "unsupported TS bus width %u\n",
+				     ts.bus_width);
+	}
+
+	cfg->envelope_mode =
+		device_property_read_bool(dev, "montage,diseqc-envelope-mode");
 
 	return 0;
 }
 
-static const struct component_ops m88rs6060_component_ops = {
-	.bind = m88rs6060_bind,
-};
-
 static int m88rs6060_probe(struct i2c_client *client)
 {
-	const struct m88rs6060_cfg *cfg = i2c_get_match_data(client);
-	struct reset_control *rstc;
+	struct gpio_desc *reset;
 	struct m88rs6060_dev *dev;
 	int ret;
 	unsigned tmp;
@@ -3072,23 +3133,15 @@ static int m88rs6060_probe(struct i2c_client *client)
 	dev_dbg(&client->dev, "\n");
 
 	dev = devm_kzalloc(&client->dev, sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		ret = -ENOMEM;
-		goto err;
-	}
+	if (!dev)
+		return -ENOMEM;
 
+	dev->config = m88rs6060_default_cfg;
+	ret = m88rs6060_parse_fwnode(&client->dev, &dev->config);
+	if (ret)
+		return ret;
 	dev->config.demod_adr = client->addr;
-	dev->config.tuner_adr = cfg->tuner_adr;
-	dev->config.clk = cfg->clk;
-	dev->config.ts_mode = cfg->ts_mode;
-	dev->config.i2c_wr_max = cfg->i2c_wr_max;
-	dev->config.ts_pinswitch = cfg->ts_pinswitch;
-	dev->config.ts_autoclock = cfg->ts_autoclock;
-	dev->config.repeater_value = cfg->repeater_value;
-	dev->config.envelope_mode = cfg->envelope_mode;
-	dev->config.disable_22k = cfg->disable_22k;
 	dev->TsClockChecked = false;
-	dev->config.num = cfg->num;
 
 	dev->client = client;
 	dev->regmap = devm_regmap_init_i2c(client, &regmap_config);
@@ -3097,11 +3150,14 @@ static int m88rs6060_probe(struct i2c_client *client)
 		goto err;
 	}
 
-	rstc = devm_reset_control_get(&client->dev, NULL);
-	if (!IS_ERR(rstc)) {
-		reset_control_assert(rstc);
+	/* the GPIO's active level holds the chip in reset */
+	reset = devm_gpiod_get_optional(&client->dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset))
+		return dev_err_probe(&client->dev, PTR_ERR(reset),
+				     "failed to get reset GPIO\n");
+	if (reset) {
 		msleep(10);
-		reset_control_deassert(rstc);
+		gpiod_set_value_cansleep(reset, 0);
 		msleep(10);
 	}
 
@@ -3131,12 +3187,12 @@ static int m88rs6060_probe(struct i2c_client *client)
 		goto err;
 
 	memset(&tuner_info, 0, sizeof(tuner_info));
-	tuner_info.addr = cfg->tuner_adr;
+	tuner_info.addr = dev->config.tuner_adr;
 	dev->tuner_client =
 		i2c_new_client_device(dev->muxc->adapter[0], &tuner_info);
 	if (IS_ERR(dev->tuner_client)) {
 		dev_err(&client->dev, "Failed to create i2c tuner client\n");
-		ret = PTR_ERR(client);
+		ret = PTR_ERR(dev->tuner_client);
 		goto err_i2c_adapter;
 	}
 
@@ -3160,10 +3216,13 @@ static int m88rs6060_probe(struct i2c_client *client)
 	//ready chip
 	m88rs6060_ready(dev);
 
-	ret = component_add(&dev->client->dev, &m88rs6060_component_ops);
+	dev->part.dev = &client->dev;
+	dev->part.ops = &m88rs6060_part_ops;
+	dev->part.in_port = DVB_FE_PORT_IN;
+	dev->part.out_port = DVB_FE_PORT_OUT;
+	ret = devm_dvb_fe_part_register(&dev->part);
 	if (ret) {
-		dev_err(&dev->client->dev, "%s:Failed to add as component\n",
-			KBUILD_MODNAME);
+		dev_err(&client->dev, "failed to register frontend: %d\n", ret);
 		goto err_tuner_client;
 	}
 
@@ -3183,7 +3242,6 @@ err:
 static void m88rs6060_remove(struct i2c_client *client)
 {
 	struct m88rs6060_dev *dev = i2c_get_clientdata(client);
-	component_del(&dev->client->dev, &m88rs6060_component_ops);
 
 	dev_dbg(&dev->client->dev, "\n");
 
@@ -3191,37 +3249,14 @@ static void m88rs6060_remove(struct i2c_client *client)
 	i2c_mux_del_adapters(dev->muxc);
 }
 
-struct m88rs6060_cfg m88rs6060_configs[] = {
-	{
-		.clk = 27000000,
-		.i2c_wr_max = 33,
-		.ts_mode = MtFeTsOutMode_Parallel,
-		.demod_adr = 0x69,
-		.tuner_adr = 0x2c,
-		.repeater_value = 0x11,
-	},
-	{
-		.clk = 27000000,
-		.i2c_wr_max = 33,
-		.ts_mode = MtFeTsOutMode_Serial,
-		.demod_adr = 0x69,
-		.tuner_adr = 0x2c,
-		.repeater_value = 0x11,
-	},
-};
-
 static const struct of_device_id m88rs6060_of_match[] = {
-	{ .compatible = "montage,m88rs6060", .data = &m88rs6060_configs[0] },
-	{ .compatible = "montage,m88rs6060-27p", .data = &m88rs6060_configs[0] },
-	{ .compatible = "montage,m88rs6060-27s", .data = &m88rs6060_configs[1] },
+	{ .compatible = "montage,m88rs6060" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, m88rs6060_of_match);
 
 static const struct i2c_device_id m88rs6060_id_table[] = {
-	{ "m88rs6060", (kernel_ulong_t)&m88rs6060_configs[0] },
-	{ "m88rs6060-27p", (kernel_ulong_t)&m88rs6060_configs[0] },
-	{ "m88rs6060-27s", (kernel_ulong_t)&m88rs6060_configs[1] },
+	{ "m88rs6060" },
 	{}
 };
 

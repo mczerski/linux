@@ -8,6 +8,10 @@
 // Author: Ryan Chang
 //-----------------------------------------------------//
 
+#include <linux/i2c.h>
+#include <linux/mod_devicetable.h>
+#include <linux/module.h>
+#include <media/dvb_fwnode.h>
 #include "r912.h"
 
 #define  ADC_MULTI_READ  1
@@ -5606,7 +5610,64 @@ struct dvb_frontend *r912_attach(struct dvb_frontend *fe,
 	fe->tuner_priv = priv;
 	return fe;
 }
-EXPORT_SYMBOL(r912_attach);
+EXPORT_SYMBOL_GPL(r912_attach);
+
+/*
+ * Device-tree glue: the tuner as an I2C device that attaches to the frontend
+ * connected to its IF output (include/media/dvb_fwnode.h). The tuner sits
+ * behind the demodulator's I2C repeater, which dvb-core opens around the
+ * transfers. The driver assumes a 16 MHz crystal (R912_Xtal).
+ */
+struct r912_dt {
+	struct dvb_fe_part part;
+	struct r912_config cfg;
+	struct i2c_adapter *i2c;
+};
+
+static int r912_dt_attach(struct dvb_fe_part *part, struct dvb_frontend *fe)
+{
+	struct r912_dt *dt = container_of(part, struct r912_dt, part);
+
+	return dvb_attach(r912_attach, fe, &dt->cfg, dt->i2c) ? 0 : -ENODEV;
+}
+
+static const struct dvb_fe_part_ops r912_dt_part_ops = {
+	.attach = r912_dt_attach,
+};
+
+static int r912_dt_probe(struct i2c_client *client)
+{
+	struct r912_dt *dt;
+
+	dt = devm_kzalloc(&client->dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	dt->cfg.i2c_address = client->addr;
+	dt->i2c = client->adapter;
+
+	dt->part.dev = &client->dev;
+	dt->part.ops = &r912_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_NONE;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id r912_of_match[] = {
+	{ .compatible = "rafaelmicro,r912" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, r912_of_match);
+
+static struct i2c_driver r912_dt_driver = {
+	.driver = {
+		.name = "r912",
+		.of_match_table = r912_of_match,
+	},
+	.probe = r912_dt_probe,
+};
+module_i2c_driver(r912_dt_driver);
 
 MODULE_DESCRIPTION("Rafael R912 silicon tuner driver");
 MODULE_AUTHOR("Luis Alves <ljalvs@gmail.com>");

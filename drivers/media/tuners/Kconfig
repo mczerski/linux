@@ -78,10 +78,10 @@ config MEDIA_TUNER_M88RS6000T
 
 config MEDIA_TUNER_M88TC6800
 	tristate "Montage M88TC6800 tuner"
-	depends on MEDIA_SUPPORT && I2C
+	depends on DVB_CORE && I2C
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
-	  Montage M88TC6800 internal tuner.
+	  Montage M88TC6800 (M88TC6K) cable and terrestrial silicon tuner.
 
 config MEDIA_TUNER_MAX2165
 	tristate "Maxim MAX2165 silicon tuner"
@@ -169,7 +169,7 @@ config MEDIA_TUNER_MXL60X_COMMON
 
 config MEDIA_TUNER_MXL603
 	tristate "MaxLinear MxL603 silicon tuner"
-	depends on MEDIA_SUPPORT && I2C
+	depends on MEDIA_SUPPORT && I2C && DVB_CORE
 	select MEDIA_TUNER_MXL60X_COMMON
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
@@ -214,7 +214,7 @@ config MEDIA_TUNER_R820T
 
 config MEDIA_TUNER_R912
 	tristate "Rafael Micro R912 silicon tuner"
-	depends on MEDIA_SUPPORT && I2C
+	depends on MEDIA_SUPPORT && I2C && DVB_CORE
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
 	 Rafael Micro R912 silicon tuner driver.

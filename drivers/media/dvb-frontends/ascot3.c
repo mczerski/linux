@@ -13,10 +13,13 @@
 
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/i2c.h>
+#include <linux/mod_devicetable.h>
 #include <linux/dvb/frontend.h>
 #include <linux/types.h>
 #include "ascot3.h"
 #include <media/dvb_frontend.h>
+#include <media/dvb_fwnode.h>
 
 #define MAX_WRITE_REGSIZE 32
 
@@ -564,6 +567,62 @@ struct dvb_frontend *ascot3_attach(struct dvb_frontend *fe,
 	return fe;
 }
 EXPORT_SYMBOL_GPL(ascot3_attach);
+
+/*
+ * Device-tree glue: the tuner as an I2C device that attaches to the frontend
+ * connected to its IF output (include/media/dvb_fwnode.h). The demodulator
+ * opens its I2C gate around the transfers.
+ */
+struct ascot3_dt {
+	struct dvb_fe_part part;
+	struct ascot3_config cfg;
+	struct i2c_adapter *i2c;
+};
+
+static int ascot3_dt_attach(struct dvb_fe_part *part, struct dvb_frontend *fe)
+{
+	struct ascot3_dt *dt = container_of(part, struct ascot3_dt, part);
+
+	return dvb_attach(ascot3_attach, fe, &dt->cfg, dt->i2c) ? 0 : -ENODEV;
+}
+
+static const struct dvb_fe_part_ops ascot3_dt_part_ops = {
+	.attach = ascot3_dt_attach,
+};
+
+static int ascot3_dt_probe(struct i2c_client *client)
+{
+	struct ascot3_dt *dt;
+
+	dt = devm_kzalloc(&client->dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	dt->cfg.i2c_address = client->addr;
+	dt->i2c = client->adapter;
+
+	dt->part.dev = &client->dev;
+	dt->part.ops = &ascot3_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_NONE;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id ascot3_of_match[] = {
+	{ .compatible = "sony,ascot3" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, ascot3_of_match);
+
+static struct i2c_driver ascot3_dt_driver = {
+	.driver = {
+		.name = "ascot3",
+		.of_match_table = ascot3_of_match,
+	},
+	.probe = ascot3_dt_probe,
+};
+module_i2c_driver(ascot3_dt_driver);
 
 MODULE_DESCRIPTION("Sony ASCOT3 Terrestrial/Cable Tuner Driver");
 MODULE_AUTHOR("sasa.savic.sr@gmail.com");

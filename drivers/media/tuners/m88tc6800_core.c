@@ -1,3 +1,9 @@
+#include <linux/clk.h>
+#include <linux/i2c.h>
+#include <linux/mod_devicetable.h>
+#include <linux/module.h>
+#include <linux/property.h>
+#include <media/dvb_fwnode.h>
 #include "m88tc6800_priv.h"
 
 static const u8 m88tc6800_fw[] = {
@@ -325,7 +331,97 @@ err:
 	kfree(priv);
 	return NULL;
 }
-EXPORT_SYMBOL(m88tc6800_attach);
+EXPORT_SYMBOL_GPL(m88tc6800_attach);
+
+/*
+ * Device-tree glue: the tuner as an I2C device that attaches to the frontend
+ * connected to its IF output (include/media/dvb_fwnode.h).
+ */
+struct m88tc6800_dt {
+	struct dvb_fe_part part;
+	struct m88tc6800_config cfg;
+	struct i2c_adapter *i2c;
+};
+
+static int m88tc6800_dt_attach(struct dvb_fe_part *part,
+			       struct dvb_frontend *fe)
+{
+	struct m88tc6800_dt *dt = container_of(part, struct m88tc6800_dt, part);
+
+	return dvb_attach(m88tc6800_attach, fe, dt->i2c, &dt->cfg) ?
+	       0 : -ENODEV;
+}
+
+static const struct dvb_fe_part_ops m88tc6800_dt_part_ops = {
+	.attach = m88tc6800_dt_attach,
+};
+
+/* crystal load capacitance and DAC settings of the vendor driver */
+static const struct m88tc6800_config m88tc6800_dt_default_config = {
+	.xtal_cap = 24,
+	.dac_gain = 2,
+	.dac = 4570,
+};
+
+static int m88tc6800_dt_probe(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	struct m88tc6800_dt *dt;
+	unsigned long rate;
+	struct clk *xtal;
+	u32 val;
+
+	dt = devm_kzalloc(dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	dt->cfg = m88tc6800_dt_default_config;
+	dt->cfg.addr = client->addr;
+	dt->i2c = client->adapter;
+
+	xtal = devm_clk_get_enabled(dev, NULL);
+	if (IS_ERR(xtal))
+		return dev_err_probe(dev, PTR_ERR(xtal),
+				     "failed to get crystal clock\n");
+
+	rate = clk_get_rate(xtal);
+	if (rate != 24000000 && rate != 27000000)
+		return dev_err_probe(dev, -EINVAL,
+				     "unsupported crystal frequency %lu Hz\n",
+				     rate);
+	dt->cfg.xtal = rate / 1000;
+
+	/* crystal load capacitance, 1 pF per step */
+	if (!device_property_read_u32(dev, "montage,xtal-cap", &val)) {
+		if (val > 31)
+			return dev_err_probe(dev, -EINVAL,
+					     "invalid montage,xtal-cap %u\n",
+					     val);
+		dt->cfg.xtal_cap = val;
+	}
+
+	dt->part.dev = dev;
+	dt->part.ops = &m88tc6800_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_IN;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id m88tc6800_of_match[] = {
+	{ .compatible = "montage,m88tc6800" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, m88tc6800_of_match);
+
+static struct i2c_driver m88tc6800_dt_driver = {
+	.driver = {
+		.name = "m88tc6800",
+		.of_match_table = m88tc6800_of_match,
+	},
+	.probe = m88tc6800_dt_probe,
+};
+module_i2c_driver(m88tc6800_dt_driver);
 
 MODULE_DESCRIPTION("Montage M88TC6800 tuner driver");
 MODULE_AUTHOR("Marek Czerski <ma.czerski@gmail.com>");

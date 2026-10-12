@@ -13,9 +13,13 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
+#include <linux/gpio/consumer.h>
+#include <linux/mod_devicetable.h>
+#include <linux/property.h>
 #include <linux/version.h>
 #include <linux/dvb/frontend.h>
 #include <media/dvb_frontend.h>
+#include <media/dvb_fwnode.h>
 #include "mn88436.h"
 
 struct mn88436_state {
@@ -357,6 +361,101 @@ err1:
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(mn88436_attach);
+
+/*
+ * Device-tree glue: the chip as an I2C device that provides its frontend as a
+ * frontend part (include/media/dvb_fwnode.h). The legacy attach function
+ * creates the frontend each time a TS receiver gets it. The chip has four
+ * address pairs, 0x18/0x10 to 0x1b/0x13; reg is the first address of the
+ * pair.
+ */
+struct mn88436_dt {
+	struct dvb_fe_part part;
+	struct i2c_adapter *i2c;
+	u8 device_id;
+};
+
+static struct dvb_frontend *mn88436_dt_get_frontend(struct dvb_fe_part *part)
+{
+	struct mn88436_dt *dt = container_of(part, struct mn88436_dt, part);
+	struct dvb_frontend *fe;
+
+	fe = dvb_attach(mn88436_attach, dt->i2c, dt->device_id);
+
+	return fe ?: ERR_PTR(-ENODEV);
+}
+
+static const struct dvb_fe_part_ops mn88436_dt_part_ops = {
+	.get_frontend = mn88436_dt_get_frontend,
+};
+
+static int mn88436_dt_probe(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	struct fwnode_handle *ep __free(fwnode_handle) = NULL;
+	struct dvb_ts_endpoint ts = { };
+	struct gpio_desc *reset;
+	struct mn88436_dt *dt;
+	int ret;
+
+	if (client->addr < 0x18 || client->addr > 0x1b)
+		return dev_err_probe(dev, -EINVAL, "invalid address 0x%02x\n",
+				     client->addr);
+
+	dt = devm_kzalloc(dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	dt->i2c = client->adapter;
+	dt->device_id = client->addr - 0x18;
+
+	/* also when the TS receiver is disabled */
+	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), DVB_FE_PORT_OUT,
+					     0, FWNODE_GRAPH_ENDPOINT_NEXT |
+					     FWNODE_GRAPH_DEVICE_DISABLED);
+	if (!ep)
+		return dev_err_probe(dev, -EINVAL, "no TS output endpoint\n");
+
+	ret = dvb_fwnode_ts_endpoint_parse(ep, &ts);
+	if (ret)
+		return dev_err_probe(dev, ret, "invalid TS output endpoint\n");
+	/* the driver sets up a parallel TS output */
+	if (ts.bus_width != 8)
+		return dev_err_probe(dev, -EINVAL, "only parallel TS output\n");
+
+	/* the GPIO's active level holds the chip in reset */
+	reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset))
+		return dev_err_probe(dev, PTR_ERR(reset),
+				     "failed to get reset GPIO\n");
+	if (reset) {
+		msleep(600);
+		gpiod_set_value_cansleep(reset, 0);
+		msleep(200);
+	}
+
+	dt->part.dev = dev;
+	dt->part.ops = &mn88436_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_IN;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id mn88436_of_match[] = {
+	{ .compatible = "panasonic,mn88436" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, mn88436_of_match);
+
+static struct i2c_driver mn88436_dt_driver = {
+	.driver = {
+		.name = "mn88436",
+		.of_match_table = mn88436_of_match,
+	},
+	.probe = mn88436_dt_probe,
+};
+module_i2c_driver(mn88436_dt_driver);
 
 MODULE_DESCRIPTION("Panasonic MN88436 ATSC demod driver");
 MODULE_AUTHOR("Sasa Savic <sasa.savic.sr@gmail.com>");

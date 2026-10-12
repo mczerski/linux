@@ -15,8 +15,13 @@
 #include <linux/string.h>
 #include <linux/bitrev.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/i2c.h>
+#include <linux/mod_devicetable.h>
+#include <linux/property.h>
 
 #include "media/dvb_frontend.h"
+#include <media/dvb_fwnode.h>
 #include "avl6862.h"
 #include "avl6862_priv.h"
 
@@ -2056,6 +2061,105 @@ err:
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(avl6862_attach);
+
+/*
+ * Device-tree glue: the chip as an I2C device that provides its frontend as a
+ * frontend part (include/media/dvb_fwnode.h). A tuner on the signal input is
+ * reached through the chip's I2C repeater, which dvb-core opens around the
+ * tuner's transfers. The legacy attach function creates the frontend each
+ * time a TS receiver gets it.
+ */
+struct avl6862_dt {
+	struct dvb_fe_part part;
+	struct avl6862_config cfg;
+	struct i2c_adapter *i2c;
+};
+
+static struct dvb_frontend *avl6862_dt_get_frontend(struct dvb_fe_part *part)
+{
+	struct avl6862_dt *dt = container_of(part, struct avl6862_dt, part);
+	struct dvb_frontend *fe;
+
+	fe = dvb_attach(avl6862_attach, &dt->cfg, dt->i2c);
+
+	return fe ?: ERR_PTR(-ENODEV);
+}
+
+static const struct dvb_fe_part_ops avl6862_dt_part_ops = {
+	.get_frontend = avl6862_dt_get_frontend,
+};
+
+static int avl6862_dt_probe(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	struct fwnode_handle *ep __free(fwnode_handle) = NULL;
+	struct dvb_ts_endpoint ts = { };
+	struct gpio_desc *reset;
+	struct avl6862_dt *dt;
+	int ret;
+
+	dt = devm_kzalloc(dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	dt->cfg.demod_address = client->addr;
+	/* AVL6862: DVB-S/S2 as well; AVL6762: DVB-T/T2/C only */
+	dt->cfg.dual_tuner = (uintptr_t)i2c_get_match_data(client);
+	dt->i2c = client->adapter;
+
+	/* also when the TS receiver is disabled */
+	ep = fwnode_graph_get_endpoint_by_id(dev_fwnode(dev), DVB_FE_PORT_OUT,
+					     0, FWNODE_GRAPH_ENDPOINT_NEXT |
+					     FWNODE_GRAPH_DEVICE_DISABLED);
+	if (!ep)
+		return dev_err_probe(dev, -EINVAL, "no TS output endpoint\n");
+
+	ret = dvb_fwnode_ts_endpoint_parse(ep, &ts);
+	if (ret)
+		return dev_err_probe(dev, ret, "invalid TS output endpoint\n");
+
+	if (ts.bus_width == 1) {
+		/* the driver puts serial output on MPEG_DATA_0 */
+		if (ts.data_shift != 0)
+			return dev_err_probe(dev, -EINVAL,
+					     "serial TS only on data line 0\n");
+		dt->cfg.ts_serial = 1;
+	}
+
+	/* the GPIO's active level holds the chip in reset */
+	reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset))
+		return dev_err_probe(dev, PTR_ERR(reset),
+				     "failed to get reset GPIO\n");
+	if (reset) {
+		msleep(600);
+		gpiod_set_value_cansleep(reset, 0);
+		msleep(200);
+	}
+
+	dt->part.dev = dev;
+	dt->part.ops = &avl6862_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_IN;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id avl6862_of_match[] = {
+	{ .compatible = "availink,avl6762", .data = (void *)0 },
+	{ .compatible = "availink,avl6862", .data = (void *)1 },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, avl6862_of_match);
+
+static struct i2c_driver avl6862_dt_driver = {
+	.driver = {
+		.name = "avl6862",
+		.of_match_table = avl6862_of_match,
+	},
+	.probe = avl6862_dt_probe,
+};
+module_i2c_driver(avl6862_dt_driver);
 
 MODULE_DESCRIPTION("Availink avl68xx DVB demodulator driver");
 MODULE_AUTHOR("Luis Alves (ljalvs@gmail.com)");

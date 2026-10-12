@@ -398,7 +398,8 @@ config DVB_CXD2841ER
 
 config DVB_CXD2878
 	tristate "Sony CXD2878"
-	depends on DVB_CORE && I2C
+	depends on DVB_CORE && I2C && I2C_MUX
+	select REGMAP_I2C
 	default m if !MEDIA_SUBDRV_AUTOSELECT
 	help
 	  Say Y when you want to support this frontend.

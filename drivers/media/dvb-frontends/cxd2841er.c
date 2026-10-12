@@ -14,6 +14,12 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/clk.h>
+#include <linux/delay.h>
+#include <linux/gpio/consumer.h>
+#include <linux/i2c.h>
+#include <linux/mod_devicetable.h>
+#include <linux/property.h>
 #include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/bitops.h>
@@ -24,6 +30,7 @@
 
 #include <linux/int_log.h>
 #include <media/dvb_frontend.h>
+#include <media/dvb_fwnode.h>
 #include "cxd2841er.h"
 #include "cxd2841er_priv.h"
 
@@ -4000,6 +4007,127 @@ static struct dvb_frontend_ops cxd2841er_t_c_ops = {
 	.i2c_gate_ctrl = cxd2841er_i2c_gate_ctrl,
 	.get_frontend_algo = cxd2841er_get_algo
 };
+
+/*
+ * Device-tree glue: the chip as an I2C device that provides its DVB-T/T2/C
+ * frontend as a frontend part (include/media/dvb_fwnode.h). The legacy
+ * attach function creates the frontend each time a TS receiver gets it.
+ */
+struct cxd2841er_dt {
+	struct dvb_fe_part part;
+	struct cxd2841er_config cfg;
+	struct i2c_adapter *i2c;
+};
+
+static struct dvb_frontend *cxd2841er_dt_get_frontend(struct dvb_fe_part *part)
+{
+	struct cxd2841er_dt *dt = container_of(part, struct cxd2841er_dt, part);
+	struct dvb_frontend *fe;
+
+	fe = dvb_attach(cxd2841er_attach_t_c, &dt->cfg, dt->i2c);
+
+	return fe ?: ERR_PTR(-ENODEV);
+}
+
+static const struct dvb_fe_part_ops cxd2841er_dt_part_ops = {
+	.get_frontend = cxd2841er_dt_get_frontend,
+};
+
+static int cxd2841er_dt_probe(struct i2c_client *client)
+{
+	struct device *dev = &client->dev;
+	struct fwnode_handle *fwnode = dev_fwnode(dev);
+	struct fwnode_handle *ep __free(fwnode_handle) = NULL;
+	struct fwnode_handle *in __free(fwnode_handle) = NULL;
+	struct dvb_ts_endpoint ts = { };
+	struct gpio_desc *reset;
+	struct cxd2841er_dt *dt;
+	struct clk *xtal;
+	int ret;
+
+	dt = devm_kzalloc(dev, sizeof(*dt), GFP_KERNEL);
+	if (!dt)
+		return -ENOMEM;
+
+	xtal = devm_clk_get_enabled(dev, NULL);
+	if (IS_ERR(xtal))
+		return dev_err_probe(dev, PTR_ERR(xtal),
+				     "failed to get crystal clock\n");
+
+	switch (clk_get_rate(xtal)) {
+	case 20500000:
+		dt->cfg.xtal = SONY_XTAL_20500;
+		break;
+	case 24000000:
+		dt->cfg.xtal = SONY_XTAL_24000;
+		break;
+	case 41000000:
+		dt->cfg.xtal = SONY_XTAL_41000;
+		break;
+	default:
+		return dev_err_probe(dev, -EINVAL,
+				     "unsupported crystal frequency %lu Hz\n",
+				     clk_get_rate(xtal));
+	}
+
+	/* the legacy configuration takes the 8-bit address */
+	dt->cfg.i2c_addr = client->addr << 1;
+	dt->i2c = client->adapter;
+
+	/* a tuner on the signal input is reached through the I2C gate */
+	in = fwnode_graph_get_endpoint_by_id(fwnode, DVB_FE_PORT_IN, 0,
+					     FWNODE_GRAPH_ENDPOINT_NEXT);
+	if (in)
+		dt->cfg.flags |= CXD2841ER_USE_GATECTRL;
+	if (fwnode_property_read_bool(fwnode, "sony,ascot"))
+		dt->cfg.flags |= CXD2841ER_ASCOT;
+
+	/* also when the TS receiver is disabled */
+	ep = fwnode_graph_get_endpoint_by_id(fwnode, DVB_FE_PORT_OUT, 0,
+					     FWNODE_GRAPH_ENDPOINT_NEXT |
+					     FWNODE_GRAPH_DEVICE_DISABLED);
+	if (!ep)
+		return dev_err_probe(dev, -EINVAL, "no TS output endpoint\n");
+
+	ret = dvb_fwnode_ts_endpoint_parse(ep, &ts);
+	if (ret)
+		return dev_err_probe(dev, ret, "invalid TS output endpoint\n");
+	if (ts.bus_width == 1)
+		dt->cfg.flags |= CXD2841ER_TS_SERIAL;
+
+	/* the GPIO's active level holds the chip in reset */
+	reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
+	if (IS_ERR(reset))
+		return dev_err_probe(dev, PTR_ERR(reset),
+				     "failed to get reset GPIO\n");
+	if (reset) {
+		msleep(600);
+		gpiod_set_value_cansleep(reset, 0);
+		msleep(200);
+	}
+
+	dt->part.dev = dev;
+	dt->part.ops = &cxd2841er_dt_part_ops;
+	dt->part.in_port = DVB_FE_PORT_IN;
+	dt->part.out_port = DVB_FE_PORT_OUT;
+
+	return devm_dvb_fe_part_register(&dt->part);
+}
+
+static const struct of_device_id cxd2841er_of_match[] = {
+	{ .compatible = "sony,cxd2841er" },
+	{ }
+};
+MODULE_DEVICE_TABLE(of, cxd2841er_of_match);
+
+static struct i2c_driver cxd2841er_dt_driver = {
+	.driver = {
+		.name = "cxd2841er",
+		.of_match_table = cxd2841er_of_match,
+	},
+	.probe = cxd2841er_dt_probe,
+};
+module_i2c_driver(cxd2841er_dt_driver);
 
 MODULE_DESCRIPTION("Sony CXD2837/38/41/43/54ER DVB-C/C2/T/T2/S/S2 demodulator driver");
 MODULE_AUTHOR("Sergey Kozlov <serjk@netup.ru>, Abylay Ospan <aospan@netup.ru>");
