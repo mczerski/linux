@@ -1,0 +1,196 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/media/amlogic,meson-g12a-demux.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Amlogic transport stream demultiplexer
+
+maintainers:
+  - Marek Czerski <m.czerski@ap-tech.pl>
+
+description: |
+  The demux block of the Amlogic GXBB, GXL, GXM, G12A, G12B and SM1 SoCs
+  receives MPEG transport streams on up to three TS input ports, usually
+  from DVB demodulators.
+
+properties:
+  compatible:
+    enum:
+      - amlogic,meson-gxbb-demux
+      - amlogic,meson-g12a-demux
+
+  reg:
+    items:
+      - description: Demux cores and their common configuration
+      - description: async FIFO 0
+      - description: async FIFO 1
+
+  reg-names:
+    items:
+      - const: stb
+      - const: asyncfifo0
+      - const: asyncfifo1
+
+  interrupts:
+    items:
+      - description: async FIFO 0, a chunk of the ring was written
+      - description: async FIFO 1, a chunk of the ring was written
+
+  interrupt-names:
+    items:
+      - const: asyncfifo0
+      - const: asyncfifo1
+
+  clocks:
+    minItems: 2
+    maxItems: 3
+
+  clock-names:
+    minItems: 2
+    maxItems: 3
+
+  resets:
+    items:
+      - description: demux
+      - description: async FIFO 0
+      - description: async FIFO 1
+
+  reset-names:
+    items:
+      - const: demux
+      - const: asyncfifo0
+      - const: asyncfifo1
+
+  ports:
+    $ref: /schemas/graph.yaml#/properties/ports
+
+    patternProperties:
+      "^port@[0-2]$":
+        $ref: /schemas/graph.yaml#/$defs/port-base
+        unevaluatedProperties: false
+        description:
+          TS input 0, 1 or 2, linked to the TS output of a demodulator. A port
+          has one endpoint for each demodulator wired to the input, of which
+          only one may drive it at a time.
+
+        patternProperties:
+          "^endpoint(@[0-9a-f]+)?$":
+            $ref: video-interfaces.yaml#
+            unevaluatedProperties: false
+
+            properties:
+              bus-width:
+                enum: [1, 8]
+                description:
+                  1 for a serial bus on data line 0, 8 for a parallel bus.
+
+              pclk-sample:
+                enum: [0, 1]
+                description:
+                  Sample data at the falling (0) or rising (1) edge of the TS
+                  clock.
+
+              data-enable-active:
+                description:
+                  Polarity of the VALID signal, 0/1 for LOW/HIGH. The default
+                  is HIGH.
+
+              ts-sync-active:
+                $ref: /schemas/types.yaml#/definitions/uint32
+                enum: [0, 1]
+                description:
+                  Polarity of the SYNC signal, which marks the first byte of a
+                  packet, 0/1 for LOW/HIGH. The default is HIGH.
+
+              ts-error-active:
+                $ref: /schemas/types.yaml#/definitions/uint32
+                enum: [0, 1]
+                description:
+                  Polarity of the ERROR signal, 0/1 for LOW/HIGH. The default
+                  is HIGH.
+
+            required:
+              - bus-width
+
+required:
+  - compatible
+  - reg
+  - reg-names
+  - interrupts
+  - interrupt-names
+  - clocks
+  - clock-names
+  - resets
+  - reset-names
+
+allOf:
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: amlogic,meson-gxbb-demux
+    then:
+      properties:
+        clocks:
+          items:
+            - description: demux clock gate
+            - description: async FIFO clock gate
+            - description: AHB arbiter clock gate
+        clock-names:
+          items:
+            - const: demux
+            - const: asyncfifo
+            - const: ahb_arb0
+    else:
+      properties:
+        clocks:
+          items:
+            - description: demux clock gate
+            - description: AHB arbiter clock gate
+        clock-names:
+          items:
+            - const: demux
+            - const: ahb_arb0
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/g12a-clkc.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/reset/amlogic,meson-g12a-reset.h>
+
+    demux@ffd06000 {
+        compatible = "amlogic,meson-g12a-demux";
+        reg = <0xffd06000 0x400>,
+              <0xffd0a000 0x10>,
+              <0xffd09000 0x10>;
+        reg-names = "stb", "asyncfifo0", "asyncfifo1";
+        interrupts = <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
+                     <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
+        interrupt-names = "asyncfifo0", "asyncfifo1";
+        clocks = <&clkc CLKID_DEMUX>, <&clkc CLKID_AHB_ARB0>;
+        clock-names = "demux", "ahb_arb0";
+        resets = <&reset RESET_DEMUX>,
+                 <&reset RESET_ASYNC0>,
+                 <&reset RESET_ASYNC1>;
+        reset-names = "demux", "asyncfifo0", "asyncfifo1";
+
+        ports {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            port@0 {
+                reg = <0>;
+
+                endpoint {
+                    remote-endpoint = <&demod_ts>;
+                    bus-width = <1>;
+                    pclk-sample = <0>;
+                };
+            };
+        };
+    };
+...
