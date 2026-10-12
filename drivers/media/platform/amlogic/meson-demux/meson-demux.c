@@ -22,6 +22,7 @@
 #include <linux/bitops.h>
 #include <linux/bits.h>
 #include <linux/clk.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
@@ -34,6 +35,7 @@
 #include <linux/platform_device.h>
 #include <linux/property.h>
 #include <linux/reset.h>
+#include <linux/seq_file.h>
 #include <linux/sizes.h>
 #include <linux/workqueue.h>
 
@@ -227,6 +229,8 @@ struct meson_stb_demux {
 	struct mutex lock;
 	unsigned long cores_busy;
 	unsigned long s2p_busy;
+
+	struct dentry *debugfs;
 };
 
 static void __iomem *stb_reg(struct meson_stb_demux *stb, unsigned int core,
@@ -840,6 +844,80 @@ static void meson_stb_input_unregister(struct meson_stb_input *in)
 	dvb_dmx_release(&in->demux);
 }
 
+static void meson_stb_status_input(struct seq_file *s,
+				   struct meson_stb_input *in)
+{
+	struct meson_stb_demux *stb = in->stb;
+
+	if (in->port < 0) {
+		seq_printf(s, "demux%u: no TS input\n", in->index);
+		return;
+	}
+
+	seq_printf(s, "TS%d: %s, frontend%u, demux%u, dvr%u, feeds %u",
+		   in->port, in->ts.bus_width == 1 ? "serial" : "parallel",
+		   in->index, in->index, in->index, in->feeds);
+	if (!in->fifo) {
+		seq_puts(s, ", idle\n");
+		return;
+	}
+
+	seq_printf(s, ", core %d", in->core);
+	if (in->s2p >= 0)
+		seq_printf(s, ", S2P%d", in->s2p);
+	seq_printf(s, ", async FIFO %u\n", in->fifo->id);
+	seq_printf(s, "  FEC_INPUT_CONTROL: 0x%08x\n",
+		   stb_read(stb, in->core, FEC_INPUT_CONTROL));
+	seq_printf(s, "  FEC_INPUT_DATA: 0x%08x\n",
+		   stb_read(stb, in->core, FEC_INPUT_DATA));
+	seq_printf(s, "  DEMUX_CONTROL: 0x%08x\n",
+		   stb_read(stb, in->core, DEMUX_CONTROL));
+	seq_printf(s, "  STB_INT_STATUS: 0x%08x\n",
+		   stb_read(stb, in->core, STB_INT_STATUS));
+	seq_printf(s, "  input packets: %u\n",
+		   (u32)FIELD_GET(INPUT_PACKET_COUNT,
+				  stb_read(stb, in->core, DEMUX_PACKET_COUNT)));
+}
+
+static void meson_stb_status_fifo(struct seq_file *s,
+				  struct meson_stb_fifo *fifo)
+{
+	u32 reg1 = fifo_read(fifo, ASYNC_FIFO_REG1);
+	u32 reg2 = fifo_read(fifo, ASYNC_FIFO_REG2);
+
+	seq_printf(s, "async FIFO %u:", fifo->id);
+	if (fifo->input)
+		seq_printf(s, " TS%d\n", fifo->input->port);
+	else
+		seq_puts(s, " idle\n");
+	seq_printf(s, "  chunks written: %u\n", atomic_read(&fifo->chunks_done));
+	seq_printf(s, "  chunks read: %u\n", fifo->chunks_read);
+	seq_printf(s, "  overruns: %u\n", fifo->overruns);
+	seq_printf(s, "  lost interrupts: %u\n", fifo->lost_irqs);
+	seq_printf(s, "  REG0: 0x%08x\n", fifo_read(fifo, ASYNC_FIFO_REG0));
+	seq_printf(s, "  REG1: 0x%08x%s\n", reg1,
+		   reg1 & ASYNC_FIFO_ERR ? " (error)" : "");
+	seq_printf(s, "  REG2: 0x%08x%s, fill count %u\n", reg2,
+		   reg2 & ASYNC_FIFO_FULL ? " (full)" : "",
+		   (u32)FIELD_GET(ASYNC_FIFO_FILL_CNT, reg2));
+}
+
+static int meson_stb_status_show(struct seq_file *s, void *data)
+{
+	struct meson_stb_demux *stb = s->private;
+	unsigned int i;
+
+	mutex_lock(&stb->lock);
+	for (i = 0; i < stb->num_inputs; i++)
+		meson_stb_status_input(s, &stb->inputs[i]);
+	for (i = 0; i < stb->data->num_fifos; i++)
+		meson_stb_status_fifo(s, &stb->fifos[i]);
+	mutex_unlock(&stb->lock);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(meson_stb_status);
+
 static int meson_stb_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -922,6 +1000,10 @@ static int meson_stb_probe(struct platform_device *pdev)
 		}
 	}
 
+	stb->debugfs = debugfs_create_dir(dev_name(dev), NULL);
+	debugfs_create_file("status", 0444, stb->debugfs, stb,
+			    &meson_stb_status_fops);
+
 	return 0;
 }
 
@@ -930,6 +1012,7 @@ static void meson_stb_remove(struct platform_device *pdev)
 	struct meson_stb_demux *stb = platform_get_drvdata(pdev);
 	unsigned int i;
 
+	debugfs_remove_recursive(stb->debugfs);
 	for (i = 0; i < stb->num_inputs; i++)
 		meson_stb_input_unregister(&stb->inputs[i]);
 	dvb_unregister_adapter(&stb->adapter);
