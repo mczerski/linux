@@ -76,6 +76,13 @@ config MEDIA_TUNER_M88RS6000T
 	help
 	  Montage M88RS6000 internal tuner.
 
+config MEDIA_TUNER_M88TC6800
+	tristate "Montage M88TC6800 tuner"
+	depends on MEDIA_SUPPORT && I2C
+	default m if !MEDIA_SUBDRV_AUTOSELECT
+	help
+	  Montage M88TC6800 internal tuner.
+
 config MEDIA_TUNER_MAX2165
 	tristate "Maxim MAX2165 silicon tuner"
 	depends on MEDIA_SUPPORT && I2C
