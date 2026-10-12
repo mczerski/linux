@@ -1,0 +1,261 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2026 Marek Czerski <m.czerski@ap-tech.pl>
+ */
+
+/dts-v1/;
+
+#include "meson-sm1-ac2xx.dtsi"
+#include <dt-bindings/sound/meson-g12a-tohdmitx.h>
+
+/ {
+	compatible = "gtmedia,gtcombo", "amlogic,sm1";
+	model = "GTMedia GTCombo";
+
+	/* CXD2878 crystal (vendor fe0_demod_xtal = <1>: 24 MHz) */
+	xtal_cxd2878: clock-24000000 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+	};
+
+	/* M88TC6800 and M88RS6060 crystals, one node for both */
+	xtal_m88: clock-27000000 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <27000000>;
+	};
+
+	/* GPIOA_15 low powers the DVB frontends (vendor dvb_power_value = 0) */
+	dvb_power: regulator-dvb-power {
+		compatible = "regulator-fixed";
+		regulator-name = "DVB_POWER";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio GPIOA_15 GPIO_ACTIVE_LOW>;
+		regulator-always-on;
+	};
+
+	sound {
+		compatible = "amlogic,axg-sound-card";
+		model = "GTCOMBO";
+		audio-aux-devs = <&tdmout_b>;
+		audio-routing = "TDMOUT_B IN 0", "FRDDR_A OUT 1",
+				"TDMOUT_B IN 1", "FRDDR_B OUT 1",
+				"TDMOUT_B IN 2", "FRDDR_C OUT 1",
+				"TDM_B Playback", "TDMOUT_B OUT";
+
+		clocks = <&clkc CLKID_MPLL2>,
+			 <&clkc CLKID_MPLL0>,
+			 <&clkc CLKID_MPLL1>;
+
+		assigned-clocks = <&clkc CLKID_MPLL2>,
+				  <&clkc CLKID_MPLL0>,
+				  <&clkc CLKID_MPLL1>;
+		assigned-clock-rates = <294912000>,
+				       <270950400>,
+				       <393216000>;
+
+		dai-link-0 {
+			sound-dai = <&frddr_a>;
+		};
+
+		dai-link-1 {
+			sound-dai = <&frddr_b>;
+		};
+
+		dai-link-2 {
+			sound-dai = <&frddr_c>;
+		};
+
+		/* 8ch hdmi interface */
+		dai-link-3 {
+			sound-dai = <&tdmif_b>;
+			dai-format = "i2s";
+			dai-tdm-slot-tx-mask-0 = <1 1>;
+			dai-tdm-slot-tx-mask-1 = <1 1>;
+			dai-tdm-slot-tx-mask-2 = <1 1>;
+			dai-tdm-slot-tx-mask-3 = <1 1>;
+			mclk-fs = <256>;
+
+			codec {
+				sound-dai = <&tohdmitx TOHDMITX_I2S_IN_B>;
+			};
+		};
+
+		/* hdmi glue */
+		dai-link-4 {
+			sound-dai = <&tohdmitx TOHDMITX_I2S_OUT>;
+
+			codec {
+				sound-dai = <&hdmi_tx>;
+			};
+		};
+	};
+};
+
+&arb {
+	status = "okay";
+};
+
+/* CEC works on this board through AO-CEC-A, not AO-CEC-B (same pin, GPIOH_3) */
+&cec_AO {
+	status = "okay";
+};
+
+&cecb_AO {
+	status = "disabled";
+};
+
+&clkc_audio {
+	status = "okay";
+};
+
+&demux {
+	pinctrl-0 = <&tsin_ao_a_pins>, <&tsin_b_z_parallel_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		/* TS0: tsin_ao_a, serial */
+		port@0 {
+			reg = <0>;
+
+			demux_ts0: endpoint {
+				remote-endpoint = <&cxd2878_ts>;
+				bus-width = <1>;
+				/* the vendor's ts0_control = 0x800, FEC_CLK */
+				pclk-sample = <0>;
+			};
+		};
+
+		/* TS1: tsin_b on GPIOZ, parallel */
+		port@1 {
+			reg = <1>;
+
+			demux_ts1: endpoint {
+				remote-endpoint = <&m88rs6060_ts>;
+				bus-width = <8>;
+			};
+		};
+	};
+};
+
+&ethmac {
+	status = "okay";
+	phy-handle = <&internal_ephy>;
+	phy-mode = "rmii";
+};
+
+&frddr_a {
+	status = "okay";
+};
+
+&frddr_b {
+	status = "okay";
+};
+
+&frddr_c {
+	status = "okay";
+};
+
+/*
+ * DVB frontends: fe0 is the CXD2878 with the M88TC6800 (M88TC6K) tuner
+ * behind its I2C gate, fe1 the M88DM6K, driven by the m88rs6060 driver.
+ */
+&i2c2 {
+	status = "okay";
+	pinctrl-0 = <&i2c2_sda_z_pins>, <&i2c2_sck_z_pins>;
+	pinctrl-names = "default";
+
+	demodulator@69 {
+		compatible = "montage,m88rs6060";
+		reg = <0x69>;
+		clocks = <&xtal_m88>;
+		reset-gpios = <&gpio GPIOZ_1 GPIO_ACTIVE_LOW>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+
+				m88rs6060_ts: endpoint {
+					remote-endpoint = <&demux_ts1>;
+					bus-width = <8>;
+				};
+			};
+		};
+	};
+
+	demodulator@6c {
+		compatible = "sony,cxd2878";
+		reg = <0x6c>;
+		clocks = <&xtal_cxd2878>;
+		reset-gpios = <&gpio GPIOZ_6 GPIO_ACTIVE_LOW>;
+
+		i2c-gate {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			tuner@64 {
+				compatible = "montage,m88tc6800";
+				reg = <0x64>;
+				clocks = <&xtal_m88>;
+				montage,xtal-cap = <24>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@1 {
+						reg = <1>;
+
+						m88tc6800_if: endpoint {
+							remote-endpoint = <&cxd2878_if>;
+						};
+					};
+				};
+			};
+		};
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				cxd2878_if: endpoint {
+					remote-endpoint = <&m88tc6800_if>;
+				};
+			};
+
+			/* serial on TSDATA0, as configured on le-13-amlogic-dvb */
+			port@1 {
+				reg = <1>;
+
+				cxd2878_ts: endpoint {
+					remote-endpoint = <&demux_ts0>;
+					bus-width = <1>;
+				};
+			};
+		};
+	};
+};
+
+&tdmif_b {
+	status = "okay";
+};
+
+&tdmout_b {
+	status = "okay";
+};
+
+&tohdmitx {
+	status = "okay";
+};
