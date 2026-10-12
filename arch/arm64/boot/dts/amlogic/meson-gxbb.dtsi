@@ -287,6 +287,17 @@
 	clock-names = "xtal", "mpeg-clk";
 };
 
+&demux {
+	clocks = <&clkc CLKID_DEMUX>,
+		 <&clkc CLKID_ASYNC_FIFO>,
+		 <&clkc CLKID_AHB_ARB0>;
+	clock-names = "demux", "asyncfifo", "ahb_arb0";
+	resets = <&reset RESET_DEMUX>,
+		 <&reset RESET_PERIPHS_ASYNC_0>,
+		 <&reset RESET_PERIPHS_ASYNC_1>;
+	reset-names = "demux", "asyncfifo0", "asyncfifo1";
+};
+
 &efuse {
 	clocks = <&clkc CLKID_EFUSE>;
 };
@@ -566,6 +577,44 @@
 				       "uart_rts_c";
 				function = "uart_c";
 				bias-disable;
+			};
+		};
+
+		tsin_a_pins: tsin_a {
+			mux {
+				groups = "tsin_a_clk",
+				       "tsin_a_sop",
+				       "tsin_a_d_valid",
+				       "tsin_a_d0";
+				function = "tsin_a";
+			};
+		};
+
+		tsin_a_parallel_pins: tsin_a_parallel {
+			mux {
+				groups = "tsin_a_clk",
+				       "tsin_a_sop",
+				       "tsin_a_d_valid",
+				       "tsin_a_d0",
+				       "tsin_a_dp";
+				function = "tsin_a";
+			};
+		};
+
+		tsin_a_fail_pins: tsin_a_fail {
+			mux {
+				groups = "tsin_a_fail";
+				function = "tsin_a";
+			};
+		};
+
+		tsin_b_pins: tsin_b {
+			mux {
+				groups = "tsin_b_clk",
+				       "tsin_b_sop",
+				       "tsin_b_d_valid",
+				       "tsin_b_d0";
+				function = "tsin_b";
 			};
 		};
 

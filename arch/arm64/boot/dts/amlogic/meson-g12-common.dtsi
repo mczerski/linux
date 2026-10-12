@@ -1498,6 +1498,66 @@
 						};
 					};
 
+					tsin_a_pins: tsin-a {
+						mux {
+							groups = "tsin_a_clk",
+								 "tsin_a_sop",
+								 "tsin_a_valid",
+								 "tsin_a_din0";
+							function = "tsin_a";
+							bias-disable;
+						};
+					};
+
+					tsin_b_x_pins: tsin-b-x {
+						mux {
+							groups = "tsin_b_clk_x",
+								 "tsin_b_sop_x",
+								 "tsin_b_valid_x",
+								 "tsin_b_din0_x";
+							function = "tsin_b";
+							bias-disable;
+						};
+					};
+
+					tsin_b_z_pins: tsin-b-z {
+						mux {
+							groups = "tsin_b_clk_z",
+								 "tsin_b_sop_z",
+								 "tsin_b_valid_z",
+								 "tsin_b_din0_z";
+							function = "tsin_b";
+							bias-disable;
+						};
+					};
+
+					/* without FAIL on GPIOZ_6, see tsin_b_fail_pins */
+					tsin_b_z_parallel_pins: tsin-b-z-parallel {
+						mux {
+							groups = "tsin_b_clk_z",
+								 "tsin_b_sop_z",
+								 "tsin_b_valid_z",
+								 "tsin_b_din0_z",
+								 "tsin_b_din1",
+								 "tsin_b_din2",
+								 "tsin_b_din3",
+								 "tsin_b_din4",
+								 "tsin_b_din5",
+								 "tsin_b_din6",
+								 "tsin_b_din7";
+							function = "tsin_b";
+							bias-disable;
+						};
+					};
+
+					tsin_b_fail_pins: tsin-b-fail {
+						mux {
+							groups = "tsin_b_fail";
+							function = "tsin_b";
+							bias-disable;
+						};
+					};
+
 					uart_a_pins: uart-a {
 						mux {
 							groups = "uart_a_tx",
@@ -1913,6 +1973,17 @@
 					};
 				};
 
+				tsin_ao_a_pins: tsin-ao-a {
+					mux {
+						groups = "tsin_ao_aclk",
+							 "tsin_ao_asop",
+							 "tsin_ao_a_valid",
+							 "tsin_ao_adin0";
+						function = "tsin_ao_a";
+						bias-disable;
+					};
+				};
+
 				uart_ao_a_pins: uart-ao-a {
 					mux {
 						groups = "uart_ao_a_tx",
@@ -2216,6 +2287,25 @@
 				compatible = "amlogic,meson-axg-reset";
 				reg = <0x0 0x1004 0x0 0x9c>;
 				#reset-cells = <1>;
+			};
+
+			demux: demux@6000 {
+				compatible = "amlogic,meson-g12a-demux";
+				reg = <0x0 0x6000 0x0 0x400>,
+				      <0x0 0xa000 0x0 0x10>,
+				      <0x0 0x9000 0x0 0x10>;
+				reg-names = "stb", "asyncfifo0", "asyncfifo1";
+				interrupts = <GIC_SPI 19 IRQ_TYPE_EDGE_RISING>,
+					     <GIC_SPI 25 IRQ_TYPE_EDGE_RISING>;
+				interrupt-names = "asyncfifo0", "asyncfifo1";
+				clocks = <&clkc CLKID_DEMUX>,
+					 <&clkc CLKID_AHB_ARB0>;
+				clock-names = "demux", "ahb_arb0";
+				resets = <&reset RESET_DEMUX>,
+					 <&reset RESET_ASYNC0>,
+					 <&reset RESET_ASYNC1>;
+				reset-names = "demux", "asyncfifo0", "asyncfifo1";
+				status = "disabled";
 			};
 
 			gpio_intc: interrupt-controller@f080 {
