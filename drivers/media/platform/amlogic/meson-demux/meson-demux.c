@@ -42,6 +42,7 @@
 #include <media/dmxdev.h>
 #include <media/dvb_demux.h>
 #include <media/dvb_frontend.h>
+#include <media/dvb_fwnode.h>
 #include <media/dvbdev.h>
 
 DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
@@ -181,22 +182,13 @@ struct meson_stb_fifo {
 	struct work_struct work;
 };
 
-/* bus of a TS input, from its endpoint */
-struct meson_stb_ts {
-	u32 bus_width;
-	bool clk_falling;
-	bool valid_active_low;
-	bool sync_active_low;
-	bool error_active_low;
-};
-
 struct meson_stb_input {
 	struct meson_stb_demux *stb;
 	/* TS input port, or -1 for a demux fed only through its dvr device */
 	int port;
 	/* number of the frontend, demux and dvr devices in the adapter */
 	unsigned int index;
-	struct meson_stb_ts ts;
+	struct dvb_ts_endpoint ts;
 	struct dvb_frontend *fe;
 
 	/* running feeds, under demux.mutex */
@@ -369,7 +361,7 @@ static int meson_stb_fm_write(struct meson_stb_demux *stb, unsigned int core,
 static int meson_stb_setup_core(struct meson_stb_input *in)
 {
 	struct meson_stb_demux *stb = in->stb;
-	const struct meson_stb_ts *ts = &in->ts;
+	const struct dvb_ts_endpoint *ts = &in->ts;
 	unsigned int i;
 	u32 fec;
 	int ret;
@@ -395,7 +387,7 @@ static int meson_stb_setup_core(struct meson_stb_input *in)
 	 * S905X datasheet has the input sampled at the falling clock edge with
 	 * CLK_POL set, taken to be bit 11.
 	 */
-	if (ts->clk_falling)
+	if (ts->clk_edge == DVB_TS_CLK_EDGE_FALLING)
 		fec |= FEC_INPUT_FEC_CLK;
 	if (ts->sync_active_low)
 		fec |= FEC_INPUT_SOP;
@@ -614,56 +606,9 @@ static int meson_stb_stop_feed(struct dvb_demux_feed *feed)
 	return 0;
 }
 
-/* A polarity property: 0 is active low, 1 or absent active high */
-static int meson_stb_ts_polarity(struct fwnode_handle *ep, const char *name,
-				 bool *active_low)
-{
-	u32 val;
-
-	*active_low = false;
-	if (fwnode_property_read_u32(ep, name, &val))
-		return 0;
-	if (val > 1)
-		return -EINVAL;
-	*active_low = !val;
-
-	return 0;
-}
-
-/* The bus of a TS input: width, sampling clock edge and signal polarities */
-static int meson_stb_parse_ts(struct fwnode_handle *ep,
-			      struct meson_stb_ts *ts)
-{
-	u32 val;
-	int ret;
-
-	memset(ts, 0, sizeof(*ts));
-
-	if (fwnode_property_read_u32(ep, "bus-width", &ts->bus_width) ||
-	    (ts->bus_width != 1 && ts->bus_width != 8))
-		return -EINVAL;
-
-	if (!fwnode_property_read_u32(ep, "pclk-sample", &val)) {
-		if (val > 1)
-			return -EINVAL;
-		ts->clk_falling = !val;
-	}
-
-	ret = meson_stb_ts_polarity(ep, "data-enable-active",
-				    &ts->valid_active_low);
-	if (!ret)
-		ret = meson_stb_ts_polarity(ep, "ts-sync-active",
-					    &ts->sync_active_low);
-	if (!ret)
-		ret = meson_stb_ts_polarity(ep, "ts-error-active",
-					    &ts->error_active_low);
-
-	return ret;
-}
-
 /*
  * Find the TS inputs: every port with an endpoint whose remote device is
- * enabled.
+ * enabled. Get the frontend connected to each.
  */
 static int meson_stb_find_inputs(struct meson_stb_demux *stb)
 {
@@ -685,10 +630,16 @@ static int meson_stb_find_inputs(struct meson_stb_demux *stb)
 		if (!ep)
 			continue;
 
-		ret = meson_stb_parse_ts(ep, &in->ts);
+		ret = dvb_fwnode_ts_endpoint_parse(ep, &in->ts);
 		if (ret)
 			return dev_err_probe(stb->dev, ret,
 					     "invalid endpoint of TS input %u\n",
+					     port);
+
+		in->fe = devm_dvb_frontend_get(stb->dev, ep);
+		if (IS_ERR(in->fe))
+			return dev_err_probe(stb->dev, PTR_ERR(in->fe),
+					     "no frontend on TS input %u\n",
 					     port);
 
 		in->port = port;
