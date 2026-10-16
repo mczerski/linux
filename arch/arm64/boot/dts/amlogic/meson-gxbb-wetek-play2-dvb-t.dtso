@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * WeTek Play 2 DVB-T/T2/C card: Sony CXD2841ER demodulator with a Sony
+ * Ascot3 tuner behind its I2C gate
+ */
+
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/gpio/meson-gxbb-gpio.h>
+
+&{/} {
+	xtal_cxd2841er: clock-20500000 {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <20500000>;
+	};
+
+	/* power of the card, also needed for its reset line */
+	nim_pwr: regulator-nim {
+		compatible = "regulator-fixed";
+		regulator-name = "NIM_PWR";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		gpio = <&gpio GPIOY_15 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+	};
+};
+
+/* TS0 (tsin_a), parallel */
+&demux {
+	pinctrl-0 = <&tsin_a_parallel_pins>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			demux_ts0: endpoint {
+				remote-endpoint = <&demod_ts>;
+				bus-width = <8>;
+			};
+		};
+	};
+};
+
+&i2c_A {
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	demodulator@6c {
+		compatible = "sony,cxd2841er";
+		reg = <0x6c>;
+		clocks = <&xtal_cxd2841er>;
+		reset-gpios = <&gpio GPIOY_13 GPIO_ACTIVE_LOW>;
+		/* orders the probe after the card power */
+		vdd-supply = <&nim_pwr>;
+		sony,ascot;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+
+				demod_if: endpoint {
+					remote-endpoint = <&tuner_if>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+
+				demod_ts: endpoint {
+					remote-endpoint = <&demux_ts0>;
+					bus-width = <8>;
+				};
+			};
+		};
+	};
+
+	tuner@60 {
+		compatible = "sony,ascot3";
+		reg = <0x60>;
+		vdd-supply = <&nim_pwr>;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@1 {
+				reg = <1>;
+
+				tuner_if: endpoint {
+					remote-endpoint = <&demod_if>;
+				};
+			};
+		};
+	};
+};

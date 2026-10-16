@@ -101,10 +101,18 @@
 	pinctrl-names = "default";
 };
 
+/* the DVB card's I2C bus: SDA is on GPIODV_24, the USB power GPIO */
 &i2c_A {
 	status = "okay";
 	pinctrl-0 = <&i2c_a_pins>;
 	pinctrl-names = "default";
+};
+
+/* GPIODV_24 is I2C_A SDA on this board, so USB power stays on */
+&usb_pwr {
+	/delete-property/ gpio;
+	/delete-property/ enable-active-high;
+	regulator-always-on;
 };
 
 &usb1_phy {
