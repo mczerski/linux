@@ -1,0 +1,44 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2018 He Yangxuan
+ */
+
+/dts-v1/;
+
+#include "meson-gxl-s905x-p212.dts"
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/leds/common.h>
+
+/ {
+	compatible = "videostrong,gxl-km5", "amlogic,s905x", "amlogic,meson-gxl";
+	model = "MeCool KM5";
+
+	leds {
+		compatible = "gpio-leds";
+
+		led-standby {
+			function = LED_FUNCTION_STANDBY;
+			gpios = <&gpio GPIODV_24 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	gpio-keys-polled {
+		compatible = "gpio-keys-polled";
+		poll-interval = <100>;
+
+		power-button {
+			label = "power";
+			linux,code = <KEY_POWER>;
+			gpios = <&gpio_ao GPIOAO_2 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&emmc_pwrseq {
+	status = "disabled";
+};
+
+&sd_emmc_c {
+	status = "disabled";
+};
