@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/misc/amlogic,meson-g12a-smartcard.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: Amlogic ISO 7816 smart card interface
+
+maintainers:
+  - Marek Czerski <m.czerski@ap-tech.pl>
+
+description: |
+  The smart card interface of the Amlogic GXBB, GXL, GXM, G12A, G12B and SM1
+  SoCs is an ISO 7816-3 UART with a card clock generator. It drives the
+  CLK and I/O lines of the card, usually through a card interface chip that
+  also supplies VCC and checks the card presence. The card RST line, the
+  activation of the interface chip and the presence signal are GPIOs.
+
+properties:
+  compatible:
+    enum:
+      - amlogic,meson-gxbb-smartcard
+      - amlogic,meson-g12a-smartcard
+
+  reg:
+    maxItems: 1
+
+  interrupts:
+    maxItems: 1
+
+  clocks:
+    items:
+      - description: smart card clock gate
+      - description:
+          fclk_div4, the source the card clock is divided from
+
+  clock-names:
+    items:
+      - const: pclk
+      - const: card
+
+  resets:
+    maxItems: 1
+
+  reset-gpios:
+    maxItems: 1
+    description: Card RST line, asserted while the card is in reset.
+
+  enable-gpios:
+    maxItems: 1
+    description:
+      Activation input of the card interface chip, asserted to power the
+      card (for example CMDVCC of a TDA8024).
+
+  detect-gpios:
+    maxItems: 1
+    description: Card presence, asserted while a card is inserted.
+
+required:
+  - compatible
+  - reg
+  - interrupts
+  - clocks
+  - clock-names
+  - reset-gpios
+  - detect-gpios
+
+additionalProperties: false
+
+examples:
+  - |
+    #include <dt-bindings/clock/g12a-clkc.h>
+    #include <dt-bindings/gpio/gpio.h>
+    #include <dt-bindings/gpio/meson-g12a-gpio.h>
+    #include <dt-bindings/interrupt-controller/arm-gic.h>
+    #include <dt-bindings/interrupt-controller/irq.h>
+    #include <dt-bindings/reset/amlogic,meson-g12a-reset.h>
+
+    smartcard@ffd25000 {
+        compatible = "amlogic,meson-g12a-smartcard";
+        reg = <0xffd25000 0x24>;
+        interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+        clocks = <&clkc CLKID_SD>, <&clkc CLKID_FCLK_DIV4>;
+        clock-names = "pclk", "card";
+        resets = <&reset RESET_SC>;
+        pinctrl-0 = <&iso7816_h_pins>;
+        pinctrl-names = "default";
+        reset-gpios = <&gpio_ao GPIOAO_10 GPIO_ACTIVE_LOW>;
+        enable-gpios = <&gpio_ao GPIOE_2 GPIO_ACTIVE_LOW>;
+        detect-gpios = <&gpio GPIOC_7 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP)>;
+    };
+...

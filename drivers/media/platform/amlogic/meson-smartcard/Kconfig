@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config MESON_SMARTCARD
+	tristate "Amlogic ISO 7816 smart card interface"
+	depends on ARCH_MESON || COMPILE_TEST
+	help
+	  Support for the ISO 7816 smart card interface of the Amlogic GXBB,
+	  GXL, GXM, G12A, G12B and SM1 SoCs, used with the card slot of
+	  DVB receivers. The card is accessed through /dev/smcN with the
+	  interface of the Amlogic vendor driver, as used by OSCam.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called meson-smartcard.
