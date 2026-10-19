@@ -6,9 +6,12 @@
  * them in three demux cores. This driver registers one DVB adapter with a
  * frontend, a demux and a dvr device for each connected TS input: frontend
  * N, demux N and dvr N belong to the same input. While a feed of an input
- * runs, a demux core records the whole stream of the input, before PID
- * filtering, through an async FIFO into a ring in memory, and passes it to
- * the software demux of dvb-core, which does all PID and section filtering.
+ * runs, a demux core records the input through an async FIFO into a ring in
+ * memory and passes it to the software demux of dvb-core, which does the
+ * section filtering. The core records only the packets of the PIDs of the
+ * running feeds, matched by its PID slots, or the whole stream when the PIDs
+ * do not fit into the slots or a feed takes the whole stream (PID 0x2000).
+ * Once it records the whole stream, it does so until the last feed stops.
  *
  * The cores, the serial-to-parallel converters and the async FIFOs are taken
  * when an input starts and given back when it stops, so more inputs can be
@@ -67,6 +70,9 @@ DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 #define DEMUX_CONTROL			0x04
 #define  ENABLE_FREE_CLK_FEC_DATA_VALID	BIT(31)
 #define  ENABLE_FREE_CLK_STB_REG	BIT(30)
+/* the second video output; with the recorder type it passes slots to the recorder */
+#define  VIDEO2_ENABLE			BIT(25)
+#define  VIDEO2_TYPE			GENMASK(24, 22)
 #define  TS_RECORDER_BEFORE_FILTER	BIT(10)
 #define  TS_RECORDER_ENABLE		BIT(9)
 #define  SECTION_END_WITH_TABLE_ID	BIT(8)
@@ -76,6 +82,8 @@ DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 #define FM_WR_ADDR			0x07
 #define  FM_WR_DATA_REQUEST		BIT(15)
 #define MAX_FM_COMP_ADDR		0x08
+/* the last filter memory word with a PID slot in use */
+#define  MAX_FM_PID_WORD		GENMASK(3, 0)
 #define OM_CMD_STATUS			0x0b
 #define  OM_CMD_PENDING			BIT(0)
 #define STB_INT_STATUS			0x23
@@ -95,15 +103,38 @@ DVB_DEFINE_MOD_OPT_ADAPTER_NR(adapter_nr);
 #define  INVERT_S2P(n)			(GENMASK(6, 2) << S2P_SHIFT(n))
 #define  S2P_FEC_SERIAL_SEL(n)		(GENMASK(1, 0) << S2P_SHIFT(n))
 
-/* filter memory words 0 to 15 hold the 32 PID slots, two per word */
+/*
+ * Filter memory words 0 to 15 hold the 32 PID slots, two per word: the even
+ * slot in bits 31 to 16, the odd one in bits 15 to 0. A slot holds a type
+ * and a PID. Type 7 sends the packets of the PID to the recorder. The vendor
+ * driver uses 31 slots.
+ */
 #define STB_PID_WORDS			16
-/* two unused slots: type 7 (recorder) with PID 0x1ffe, which never occurs */
+#define STB_PID_SLOTS			31
+#define STB_PID_SLOT_TYPE		GENMASK(15, 13)
+#define STB_PID_SLOT_PID		GENMASK(12, 0)
+#define  STB_PID_TYPE_RECORDER		7
+/* an unused slot: type 7 with PID 0x1ffe, which never occurs */
+#define STB_PID_SLOT_UNUSED		0xfffe
 #define STB_PID_UNUSED			0xfffefffe
+/* no PID in the slot */
+#define STB_PID_NONE			0xffff
+/* the PID of a feed of the whole stream */
+#define STB_PID_ALL			0x2000
+/* null packets */
+#define STB_PID_NULL			0x1fff
 
-/* DEMUX_CONTROL for recording the whole stream */
-#define STB_RECORD_ALL			(ENABLE_FREE_CLK_FEC_DATA_VALID | \
+/*
+ * DEMUX_CONTROL for recording; TS_RECORDER_BEFORE_FILTER for the whole
+ * stream. Packets of the slots reach the recorder only through the second
+ * video output set to the recorder type. It stays set in both modes, as
+ * switching it off while recording corrupts a packet.
+ */
+#define STB_RECORD			(ENABLE_FREE_CLK_FEC_DATA_VALID | \
 					 ENABLE_FREE_CLK_STB_REG | \
-					 TS_RECORDER_BEFORE_FILTER | \
+					 VIDEO2_ENABLE | \
+					 FIELD_PREP_CONST(VIDEO2_TYPE, \
+							  STB_PID_TYPE_RECORDER) | \
 					 TS_RECORDER_ENABLE | \
 					 SECTION_END_WITH_TABLE_ID | \
 					 KEEP_DUPLICATE_PACKAGE | \
@@ -142,6 +173,13 @@ static const u8 meson_stb_fifo_source[] = { 3, 2 };
 #define STB_CHUNK_SIZE			SZ_64K
 #define STB_NUM_CHUNKS			(STB_RING_SIZE / STB_CHUNK_SIZE)
 
+/*
+ * With only a few PIDs recorded, a chunk can take seconds or longer to fill.
+ * The worker also runs at this interval and passes on what the FIFO wrote of
+ * the current chunk, up to the 128-byte burst before the write address.
+ */
+#define STB_POLL_INTERVAL		msecs_to_jiffies(20)
+
 /**
  * struct meson_stb_data - resources of the STB block of a SoC
  * @num_inputs: TS input ports
@@ -175,11 +213,13 @@ struct meson_stb_fifo {
 	atomic_t chunks_done;
 	/* chunks passed to the software demux */
 	u32 chunks_read;
+	/* bytes of the chunk after them passed to the software demux */
+	u32 chunk_bytes_read;
 	/* interrupts found missing from the write address */
 	u32 lost_irqs;
 	/* times the FIFO overwrote chunks not read yet */
 	u32 overruns;
-	struct work_struct work;
+	struct delayed_work work;
 };
 
 struct meson_stb_input {
@@ -197,6 +237,12 @@ struct meson_stb_input {
 	int core;
 	int s2p;
 	struct meson_stb_fifo *fifo;
+	/*
+	 * While recording, under stb->lock: the PID of each slot, and whether
+	 * the core records the whole stream instead of the PIDs of the slots.
+	 */
+	u16 slot_pid[STB_PID_SLOTS];
+	bool record_all;
 
 	struct dvb_demux demux;
 	struct dmxdev dmxdev;
@@ -366,12 +412,15 @@ static int meson_stb_setup_core(struct meson_stb_input *in)
 	u32 fec;
 	int ret;
 
-	/* no PID slot matches, the recorder takes the packets before them */
+	/* no PID slot matches */
 	for (i = 0; i < STB_PID_WORDS; i++) {
 		ret = meson_stb_fm_write(stb, in->core, i, STB_PID_UNUSED);
 		if (ret)
 			return ret;
 	}
+	stb_update(stb, in->core, MAX_FM_COMP_ADDR, MAX_FM_PID_WORD, 0);
+	for (i = 0; i < STB_PID_SLOTS; i++)
+		in->slot_pid[i] = STB_PID_NONE;
 
 	if (in->s2p >= 0) {
 		stb_update(stb, 0, STB_TOP_CONFIG,
@@ -406,6 +455,7 @@ static void meson_stb_fifo_start(struct meson_stb_fifo *fifo,
 {
 	atomic_set(&fifo->chunks_done, 0);
 	fifo->chunks_read = 0;
+	fifo->chunk_bytes_read = 0;
 	fifo->lost_irqs = 0;
 
 	/* the sequence of the vendor driver */
@@ -442,10 +492,122 @@ static int meson_stb_find_free(unsigned long busy, unsigned int num)
 }
 
 /*
- * Take a core, an S2P converter for a serial input and an async FIFO, and
- * start recording the input. Returns -EBUSY when one of them is not free.
+ * Collect the PIDs to record for the running feeds of an input into @pids,
+ * counting @start as running and @stop as stopped. Returns the number of
+ * PIDs, or -1 when the core has to record the whole stream: for a feed of
+ * PID 0x2000 or more PIDs than slots.
+ *
+ * The null packets are always recorded. The core writes to the FIFO in
+ * 128-byte bursts and keeps the rest of a packet until more packets come; with
+ * only rare PIDs, such as a single table, the end of a section would wait
+ * for the next repetition.
  */
-static int meson_stb_capture_start(struct meson_stb_input *in)
+static int meson_stb_feed_pids(struct meson_stb_input *in,
+			       struct dvb_demux_feed *start,
+			       struct dvb_demux_feed *stop, u16 *pids)
+{
+	struct dvb_demux *demux = &in->demux;
+	int i, j, num = 0;
+
+	pids[num++] = STB_PID_NULL;
+
+	for (i = 0; i < demux->feednum; i++) {
+		struct dvb_demux_feed *feed = &demux->feed[i];
+
+		if (feed != start &&
+		    (feed == stop || feed->state != DMX_STATE_GO))
+			continue;
+		if (feed->pid == STB_PID_ALL)
+			return -1;
+
+		for (j = 0; j < num && pids[j] != feed->pid; j++)
+			;
+		if (j < num)
+			continue;
+		if (num == STB_PID_SLOTS)
+			return -1;
+		pids[num++] = feed->pid;
+	}
+
+	return num;
+}
+
+static bool meson_stb_has_pid(const u16 *pids, int num, u16 pid)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		if (pids[i] == pid)
+			return true;
+
+	return false;
+}
+
+static u16 meson_stb_slot(struct meson_stb_input *in, unsigned int slot)
+{
+	if (slot >= STB_PID_SLOTS || in->slot_pid[slot] == STB_PID_NONE)
+		return STB_PID_SLOT_UNUSED;
+
+	return FIELD_PREP(STB_PID_SLOT_TYPE, STB_PID_TYPE_RECORDER) |
+	       FIELD_PREP(STB_PID_SLOT_PID, in->slot_pid[slot]);
+}
+
+/*
+ * Set the PID slots of a core to @num PIDs. A PID keeps its slot while it is
+ * in use, and only the filter memory words that change are written, so the
+ * packets of the other PIDs keep flowing.
+ */
+static int meson_stb_write_slots(struct meson_stb_input *in, const u16 *pids,
+				 int num)
+{
+	struct meson_stb_demux *stb = in->stb;
+	unsigned long changed = 0;
+	unsigned int slot, word, last = 0;
+	int i, ret;
+
+	for (slot = 0; slot < STB_PID_SLOTS; slot++) {
+		u16 pid = in->slot_pid[slot];
+
+		if (pid != STB_PID_NONE && !meson_stb_has_pid(pids, num, pid)) {
+			in->slot_pid[slot] = STB_PID_NONE;
+			changed |= BIT(slot / 2);
+		}
+	}
+
+	for (i = 0; i < num; i++) {
+		if (meson_stb_has_pid(in->slot_pid, STB_PID_SLOTS, pids[i]))
+			continue;
+
+		for (slot = 0; in->slot_pid[slot] != STB_PID_NONE; slot++)
+			;
+		in->slot_pid[slot] = pids[i];
+		changed |= BIT(slot / 2);
+	}
+
+	for_each_set_bit(word, &changed, STB_PID_WORDS) {
+		ret = meson_stb_fm_write(stb, in->core, word,
+					 (u32)meson_stb_slot(in, 2 * word) << 16 |
+					 meson_stb_slot(in, 2 * word + 1));
+		if (ret)
+			return ret;
+	}
+
+	for (slot = 0; slot < STB_PID_SLOTS; slot++)
+		if (in->slot_pid[slot] != STB_PID_NONE)
+			last = slot / 2;
+	stb_update(stb, in->core, MAX_FM_COMP_ADDR, MAX_FM_PID_WORD,
+		   FIELD_PREP(MAX_FM_PID_WORD, last));
+
+	return 0;
+}
+
+/*
+ * Take a core, an S2P converter for a serial input and an async FIFO, and
+ * start recording @num PIDs of the input, or the whole stream if @num is
+ * negative. Returns -EBUSY when one of them is not free.
+ */
+static int meson_stb_capture_start(struct meson_stb_input *in,
+				   const u16 *pids, int num)
 {
 	struct meson_stb_demux *stb = in->stb;
 	const struct meson_stb_data *data = stb->data;
@@ -478,6 +640,8 @@ static int meson_stb_capture_start(struct meson_stb_input *in)
 	in->s2p = s2p;
 
 	ret = meson_stb_setup_core(in);
+	if (!ret && num >= 0)
+		ret = meson_stb_write_slots(in, pids, num);
 	if (ret)
 		goto unlock;
 
@@ -486,9 +650,12 @@ static int meson_stb_capture_start(struct meson_stb_input *in)
 		stb->s2p_busy |= BIT(s2p);
 	in->fifo = fifo;
 	fifo->input = in;
+	in->record_all = num < 0;
 
 	meson_stb_fifo_start(fifo, core);
-	stb_write(stb, core, DEMUX_CONTROL, STB_RECORD_ALL);
+	stb_write(stb, core, DEMUX_CONTROL, STB_RECORD |
+		  (in->record_all ? TS_RECORDER_BEFORE_FILTER : 0));
+	queue_delayed_work(system_highpri_wq, &fifo->work, STB_POLL_INTERVAL);
 
 	dev_dbg(stb->dev, "TS%d: core %d, S2P %d, async FIFO %u\n",
 		in->port, core, s2p, fifo->id);
@@ -509,7 +676,7 @@ static void meson_stb_capture_stop(struct meson_stb_input *in)
 	meson_stb_fifo_stop(fifo);
 	/* a late interrupt can still queue the work, which then finds no input */
 	WRITE_ONCE(fifo->input, NULL);
-	cancel_work_sync(&fifo->work);
+	cancel_delayed_work_sync(&fifo->work);
 
 	stb->cores_busy &= ~BIT(in->core);
 	if (in->s2p >= 0)
@@ -517,6 +684,36 @@ static void meson_stb_capture_stop(struct meson_stb_input *in)
 	in->fifo = NULL;
 
 	mutex_unlock(&stb->lock);
+}
+
+/*
+ * Record @num PIDs of a recording input, or the whole stream if @num is
+ * negative. Switching the recorder from the whole stream back to the slots
+ * can drop the packet in transit, so once it records the whole stream, it
+ * does so until the capture stops.
+ */
+static int meson_stb_set_pids(struct meson_stb_input *in, const u16 *pids,
+			      int num)
+{
+	struct meson_stb_demux *stb = in->stb;
+	int ret = 0;
+
+	mutex_lock(&stb->lock);
+
+	if (in->record_all)
+		goto unlock;
+
+	if (num < 0) {
+		stb_update(stb, in->core, DEMUX_CONTROL,
+			   TS_RECORDER_BEFORE_FILTER, TS_RECORDER_BEFORE_FILTER);
+		in->record_all = true;
+	} else {
+		ret = meson_stb_write_slots(in, pids, num);
+	}
+
+unlock:
+	mutex_unlock(&stb->lock);
+	return ret;
 }
 
 static irqreturn_t meson_stb_fifo_irq(int irq, void *data)
@@ -538,18 +735,36 @@ static irqreturn_t meson_stb_fifo_irq(int irq, void *data)
 		done += lost;
 	}
 	atomic_set(&fifo->chunks_done, done);
-	queue_work(system_highpri_wq, &fifo->work);
+	mod_delayed_work(system_highpri_wq, &fifo->work, 0);
 
 	return IRQ_HANDLED;
+}
+
+/* Pass bytes @start to @end of the ring to the software demux */
+static void meson_stb_fifo_pass(struct meson_stb_fifo *fifo,
+				struct meson_stb_input *in, unsigned int start,
+				unsigned int end)
+{
+	struct device *dev = fifo->stb->dev;
+	dma_addr_t dma = fifo->ring_dma + start;
+
+	dma_sync_single_for_cpu(dev, dma, end - start, DMA_FROM_DEVICE);
+	/*
+	 * The data is not aligned to packets; dvb_dmx_swfilter() finds the
+	 * packets. While writes to dvr0 feed the demux, the input is dropped.
+	 */
+	if (in->demux.dmx.frontend == &in->hw_frontend)
+		dvb_dmx_swfilter(&in->demux, fifo->ring + start, end - start);
+	dma_sync_single_for_device(dev, dma, end - start, DMA_FROM_DEVICE);
 }
 
 static void meson_stb_fifo_work(struct work_struct *work)
 {
 	struct meson_stb_fifo *fifo =
-		container_of(work, struct meson_stb_fifo, work);
+		container_of(to_delayed_work(work), struct meson_stb_fifo, work);
 	struct meson_stb_input *in = READ_ONCE(fifo->input);
-	struct device *dev = fifo->stb->dev;
 	u32 done = atomic_read(&fifo->chunks_done);
+	unsigned int offset, wptr, end;
 
 	if (!in)
 		return;
@@ -558,36 +773,50 @@ static void meson_stb_fifo_work(struct work_struct *work)
 	if (done - fifo->chunks_read > STB_NUM_CHUNKS - 1) {
 		fifo->overruns++;
 		fifo->chunks_read = done - (STB_NUM_CHUNKS - 1);
+		fifo->chunk_bytes_read = 0;
 	}
 
 	for (; fifo->chunks_read != done; fifo->chunks_read++) {
-		unsigned int offset = (fifo->chunks_read % STB_NUM_CHUNKS) *
-				      STB_CHUNK_SIZE;
-		dma_addr_t dma = fifo->ring_dma + offset;
-
-		dma_sync_single_for_cpu(dev, dma, STB_CHUNK_SIZE,
-					DMA_FROM_DEVICE);
-		/*
-		 * Chunks are not aligned to packets; dvb_dmx_swfilter() finds
-		 * the packets. While writes to dvr0 feed the demux, the input
-		 * is dropped.
-		 */
-		if (in->demux.dmx.frontend == &in->hw_frontend)
-			dvb_dmx_swfilter(&in->demux, fifo->ring + offset,
-					 STB_CHUNK_SIZE);
-		dma_sync_single_for_device(dev, dma, STB_CHUNK_SIZE,
-					   DMA_FROM_DEVICE);
+		offset = (fifo->chunks_read % STB_NUM_CHUNKS) * STB_CHUNK_SIZE;
+		meson_stb_fifo_pass(fifo, in, offset + fifo->chunk_bytes_read,
+				    offset + STB_CHUNK_SIZE);
+		fifo->chunk_bytes_read = 0;
 	}
+
+	/*
+	 * The chunk being written, up to the burst before the write address.
+	 * If the FIFO has already moved on to the next chunk, the interrupt
+	 * of this one follows.
+	 */
+	offset = (done % STB_NUM_CHUNKS) * STB_CHUNK_SIZE;
+	wptr = fifo_read(fifo, ASYNC_FIFO_REG0) - lower_32_bits(fifo->ring_dma);
+	if (wptr >= offset + ASYNC_FIFO_UNIT && wptr < offset + STB_CHUNK_SIZE) {
+		end = ALIGN_DOWN(wptr - offset, ASYNC_FIFO_UNIT) -
+		      ASYNC_FIFO_UNIT;
+		if (end > fifo->chunk_bytes_read) {
+			meson_stb_fifo_pass(fifo, in,
+					    offset + fifo->chunk_bytes_read,
+					    offset + end);
+			fifo->chunk_bytes_read = end;
+		}
+	}
+
+	queue_delayed_work(system_highpri_wq, &fifo->work, STB_POLL_INTERVAL);
 }
 
 static int meson_stb_start_feed(struct dvb_demux_feed *feed)
 {
 	struct meson_stb_input *in = feed->demux->priv;
-	int ret;
+	u16 pids[STB_PID_SLOTS];
+	int num, ret;
 
-	/* the whole input is recorded while any feed runs */
-	if (in->port >= 0 && in->feeds == 0) {
-		ret = meson_stb_capture_start(in);
+	/* the input is recorded while any feed runs */
+	if (in->port >= 0) {
+		num = meson_stb_feed_pids(in, feed, NULL, pids);
+		if (in->feeds == 0)
+			ret = meson_stb_capture_start(in, pids, num);
+		else
+			ret = meson_stb_set_pids(in, pids, num);
 		if (ret)
 			return ret;
 	}
@@ -599,11 +828,21 @@ static int meson_stb_start_feed(struct dvb_demux_feed *feed)
 static int meson_stb_stop_feed(struct dvb_demux_feed *feed)
 {
 	struct meson_stb_input *in = feed->demux->priv;
+	u16 pids[STB_PID_SLOTS];
+	int num;
 
-	if (--in->feeds == 0 && in->port >= 0)
+	if (in->port < 0) {
+		in->feeds--;
+		return 0;
+	}
+
+	if (--in->feeds == 0) {
 		meson_stb_capture_stop(in);
+		return 0;
+	}
 
-	return 0;
+	num = meson_stb_feed_pids(in, NULL, feed, pids);
+	return meson_stb_set_pids(in, pids, num);
 }
 
 /*
@@ -668,7 +907,7 @@ static void meson_stb_cancel_work(void *data)
 {
 	struct meson_stb_fifo *fifo = data;
 
-	cancel_work_sync(&fifo->work);
+	cancel_delayed_work_sync(&fifo->work);
 }
 
 static int meson_stb_get_fifo(struct platform_device *pdev,
@@ -681,7 +920,7 @@ static int meson_stb_get_fifo(struct platform_device *pdev,
 
 	fifo->stb = stb;
 	fifo->id = id;
-	INIT_WORK(&fifo->work, meson_stb_fifo_work);
+	INIT_DELAYED_WORK(&fifo->work, meson_stb_fifo_work);
 	snprintf(name, sizeof(name), "asyncfifo%u", id);
 
 	fifo->base = devm_platform_ioremap_resource_byname(pdev, name);
@@ -799,6 +1038,7 @@ static void meson_stb_status_input(struct seq_file *s,
 				   struct meson_stb_input *in)
 {
 	struct meson_stb_demux *stb = in->stb;
+	unsigned int i;
 
 	if (in->port < 0) {
 		seq_printf(s, "demux%u: no TS input\n", in->index);
@@ -817,6 +1057,15 @@ static void meson_stb_status_input(struct seq_file *s,
 	if (in->s2p >= 0)
 		seq_printf(s, ", S2P%d", in->s2p);
 	seq_printf(s, ", async FIFO %u\n", in->fifo->id);
+	if (in->record_all) {
+		seq_puts(s, "  PIDs: whole stream\n");
+	} else {
+		seq_puts(s, "  PIDs:");
+		for (i = 0; i < STB_PID_SLOTS; i++)
+			if (in->slot_pid[i] != STB_PID_NONE)
+				seq_printf(s, " %u:0x%04x", i, in->slot_pid[i]);
+		seq_putc(s, '\n');
+	}
 	seq_printf(s, "  FEC_INPUT_CONTROL: 0x%08x\n",
 		   stb_read(stb, in->core, FEC_INPUT_CONTROL));
 	seq_printf(s, "  FEC_INPUT_DATA: 0x%08x\n",
