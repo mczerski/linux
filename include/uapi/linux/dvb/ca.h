@@ -117,6 +117,18 @@ struct ca_descr {
 	unsigned char cw[8];
 };
 
+/**
+ * struct ca_pid - binds a PID to a CA descrambler slot
+ *
+ * @pid: the PID
+ * @index: the CA descrambler slot whose control words descramble the
+ *	packets of the PID, as in &struct ca_descr, or -1 to unbind the PID
+ */
+struct ca_pid {
+	unsigned int pid;
+	int index;
+};
+
 #define CA_RESET          _IO('o', 128)
 #define CA_GET_CAP        _IOR('o', 129, struct ca_caps)
 #define CA_GET_SLOT_INFO  _IOR('o', 130, struct ca_slot_info)
@@ -124,6 +136,7 @@ struct ca_descr {
 #define CA_GET_MSG        _IOR('o', 132, struct ca_msg)
 #define CA_SEND_MSG       _IOW('o', 133, struct ca_msg)
 #define CA_SET_DESCR      _IOW('o', 134, struct ca_descr)
+#define CA_SET_PID        _IOW('o', 135, struct ca_pid)
 
 #if !defined(__KERNEL__)
 
@@ -133,6 +146,7 @@ typedef struct ca_descr_info  ca_descr_info_t;
 typedef struct ca_caps  ca_caps_t;
 typedef struct ca_msg ca_msg_t;
 typedef struct ca_descr ca_descr_t;
+typedef struct ca_pid ca_pid_t;
 
 #endif
 
