@@ -474,6 +474,118 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
 	return MICRON_ON_DIE_SUPPORTED;
 }
 
+/*
+ * Shared pages of the L74A MLC die (datasheet "64Gb, 128Gb, 256Gb
+ * Asynchronous/Synchronous NAND", table "Shared Pages"): lower page L shares
+ * its cells with upper page L + 6, for L = 0, 1 and L = 4k, 4k + 1
+ * (k = 1..61). Pages 2, 3, 248, 249 and 252..255 share no cells.
+ *
+ * Pairs (group 0 = lower or unshared page, group 1 = upper page):
+ *   pairs 0..2:      group 0 = pages 0, 1, 2      group 1 = 6, 7, 3
+ *   pairs 3..124:    group 0 = lower page L       group 1 = L + 6
+ *   pairs 125..127:  group 0 = pages 248, 252, 254 group 1 = 249, 253, 255
+ *
+ * The unshared pages 3, 249, 253 and 255 are put in group 1 so that every
+ * pair has two pages. The SLC emulation only writes group 0, so it never
+ * writes an upper page and leaves those four pages unused. Group 0 pages
+ * grow with the pair number, as the program order within a block requires.
+ */
+static const u8 micron_l74a_tail_pages[3][2] = {
+	{ 248, 249 }, { 252, 253 }, { 254, 255 },
+};
+
+static int micron_l74a_pairing_get_info(struct mtd_info *mtd, int page,
+					struct mtd_pairing_info *info)
+{
+	int lower;
+
+	info->group = 0;
+
+	switch (page) {
+	case 0 ... 2:
+		info->pair = page;
+		return 0;
+	case 3:
+		info->pair = 2;
+		info->group = 1;
+		return 0;
+	case 6 ... 7:
+		info->pair = page - 6;
+		info->group = 1;
+		return 0;
+	case 248 ... 249:
+		info->pair = 125;
+		info->group = page & 1;
+		return 0;
+	case 252 ... 255:
+		info->pair = 126 + (page - 252) / 2;
+		info->group = page & 1;
+		return 0;
+	}
+
+	/* pages 4..247, 250, 251: lower pages are 4k, 4k + 1, upper + 6 */
+	info->group = !!(page & 2);
+	lower = info->group ? page - 6 : page;
+	info->pair = 3 + 2 * (lower / 4 - 1) + (lower & 1);
+
+	return 0;
+}
+
+static int micron_l74a_pairing_get_wunit(struct mtd_info *mtd,
+					 const struct mtd_pairing_info *info)
+{
+	int pair = info->pair, group = info->group;
+	int lower;
+
+	if (pair < 2)
+		return group ? pair + 6 : pair;
+
+	if (pair == 2)
+		return group ? 3 : 2;
+
+	if (pair >= 125)
+		return micron_l74a_tail_pages[pair - 125][group];
+
+	lower = 4 * ((pair - 3) / 2 + 1) + ((pair - 3) & 1);
+
+	return group ? lower + 6 : lower;
+}
+
+static const struct mtd_pairing_scheme micron_l74a_pairing_scheme = {
+	.ngroups = 2,
+	.get_info = micron_l74a_pairing_get_info,
+	.get_wunit = micron_l74a_pairing_get_wunit,
+};
+
+/* parts with the L74A die, from the datasheet's part number list */
+static const char * const micron_l74a_models[] = {
+	"MT29F64G08CBAB",
+	"MT29F128G08CFAB",
+	"MT29F256G08CJAB",
+	"MT29F64G08CBCBB",
+	"MT29F128G08CECBB",
+	"MT29F256G08CKCBB",
+	"MT29F256G08CMCBB",
+};
+
+static void micron_nand_set_pairing_scheme(struct nand_chip *chip)
+{
+	const char *model = chip->parameters.model;
+	int i;
+
+	if (!model || nanddev_bits_per_cell(&chip->base) != 2 ||
+	    nanddev_pages_per_eraseblock(&chip->base) != 256)
+		return;
+
+	for (i = 0; i < ARRAY_SIZE(micron_l74a_models); i++) {
+		if (strstarts(model, micron_l74a_models[i])) {
+			mtd_set_pairing_scheme(nand_to_mtd(chip),
+					       &micron_l74a_pairing_scheme);
+			return;
+		}
+	}
+}
+
 static int micron_nand_init(struct nand_chip *chip)
 {
 	struct nand_device *base = &chip->base;
@@ -498,6 +610,8 @@ static int micron_nand_init(struct nand_chip *chip)
 
 	if (mtd->writesize == 2048)
 		chip->options |= NAND_BBM_SECONDPAGE;
+
+	micron_nand_set_pairing_scheme(chip);
 
 	ondie = micron_supports_on_die_ecc(chip);
 

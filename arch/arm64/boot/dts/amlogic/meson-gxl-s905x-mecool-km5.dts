@@ -39,6 +39,30 @@
 	status = "disabled";
 };
 
+&nfc {
+	status = "okay";
+
+	nand@0 {
+		reg = <0>;
+		nand-on-flash-bbt;
+		nand-ecc-strength = <50>;
+		nand-ecc-step-size = <1024>;
+
+		partitions {
+			compatible = "fixed-partitions";
+			#address-cells = <2>;
+			#size-cells = <2>;
+
+			partition@0 {
+				label = "data";
+				reg = <0x0 0x0 0x2 0x0>;
+				compatible = "linux,ubi";
+				slc-mode;
+			};
+		};
+	};
+};
+
 &sd_emmc_c {
 	status = "disabled";
 };
